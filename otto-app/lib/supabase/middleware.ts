@@ -37,9 +37,10 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/login") ||
     pathname.startsWith("/auth/callback") ||
     pathname.startsWith("/auth/signout");
+  const isPublicApi = pathname.startsWith("/api/health") || pathname === "/manifest.webmanifest";
   const isPublicRoot = pathname === "/";
 
-  if (!user && !isAuthRoute && !isPublicRoot) {
+  if (!user && !isAuthRoute && !isPublicApi && !isPublicRoot) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.searchParams.set("next", pathname);
