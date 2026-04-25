@@ -13,6 +13,7 @@
     "prepare": "cd .. && husky otto-app/.husky"
   },
   "dependencies": {
+    "@sentry/nextjs": "^10.50.0",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.104.1",
     "lucide-react": "^1.11.0",
