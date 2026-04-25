@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+@theme {
+  /* Colors — cream */
+  --color-cream: #f2ebdc;
+  --color-cream-deep: #e8dec8;
+  --color-cream-paper: #faf5ea;
+  --color-cream-shadow: #ddd0b5;
+
+  /* Colors — navy */
+  --color-navy: #1b2a4e;
+  --color-navy-deep: #0f1b36;
+  --color-navy-soft: #2c3e6b;
+  --color-navy-pale: #b8c2d6;
+
+  /* Colors — ink (text + borders) */
+  --color-ink: #1b2a4e;
+  --color-ink-soft: #4a5878;
+  --color-ink-faded: #8590ab;
+  --color-ink-line: #d4cbb6;
+
+  /* Fonts */
+  --font-sans: var(--font-assistant), ui-sans-serif, system-ui, sans-serif;
+  --font-caveat: var(--font-caveat), cursive;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Display sizes */
+  --text-display-lg: 44px;
+  --text-display-lg--line-height: 1.1;
+  --text-display-lg--letter-spacing: -0.02em;
+  --text-display-lg--font-weight: 800;
+
+  --text-display-md: 32px;
+  --text-display-md--line-height: 1.1;
+  --text-display-md--letter-spacing: -0.02em;
+  --text-display-md--font-weight: 700;
+
+  --text-display-sm: 22px;
+  --text-display-sm--line-height: 1.2;
+  --text-display-sm--letter-spacing: -0.01em;
+  --text-display-sm--font-weight: 700;
+
+  /* Stat sizes */
+  --text-stat-lg: 56px;
+  --text-stat-lg--line-height: 1;
+  --text-stat-lg--letter-spacing: -0.04em;
+  --text-stat-lg--font-weight: 800;
+
+  --text-stat: 42px;
+  --text-stat--line-height: 1;
+  --text-stat--letter-spacing: -0.03em;
+  --text-stat--font-weight: 800;
+
+  /* Micro labels */
+  --text-micro: 11px;
+  --text-micro--line-height: 1.4;
+  --text-micro--letter-spacing: 0.12em;
+  --text-micro--font-weight: 600;
+}
+
+body {
+  font-family: var(--font-sans);
+}

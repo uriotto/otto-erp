@@ -1,0 +1,942 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OTTO Dashboard — Deep Navy + Cream</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700;800&family=Caveat:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        /* Deep Navy + Cream palette */
+        --cream: #f2ebdc;
+        --cream-deep: #e8dec8;
+        --cream-paper: #faf5ea;
+        --cream-shadow: #ddd0b5;
+        --navy: #1b2a4e;
+        --navy-deep: #0f1b36;
+        --navy-soft: #2c3e6b;
+        --navy-pale: #b8c2d6;
+        --ink: #1b2a4e;
+        --ink-soft: #4a5878;
+        --ink-faded: #8590ab;
+        --ink-line: #d4cbb6;
+
+        --font-display: "Assistant", sans-serif;
+        --font-body: "Assistant", sans-serif;
+        --font-hand: "Caveat", cursive;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: var(--font-body);
+        background: var(--cream);
+        color: var(--ink);
+        min-height: 100vh;
+        direction: rtl;
+        overflow-x: hidden;
+        font-weight: 400;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E");
+        opacity: 0.04;
+        pointer-events: none;
+        z-index: 1;
+        mix-blend-mode: multiply;
+      }
+
+      .app {
+        display: grid;
+        grid-template-columns: 260px 1fr;
+        min-height: 100vh;
+        position: relative;
+        z-index: 2;
+      }
+
+      /* SIDEBAR */
+      .sidebar {
+        background: var(--cream-paper);
+        color: var(--ink);
+        padding: 32px 20px;
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        overflow-y: auto;
+        border-left: 1px solid var(--ink-line);
+      }
+
+      .logo {
+        font-family: var(--font-display);
+        font-weight: 800;
+        font-size: 38px;
+        letter-spacing: -0.04em;
+        color: var(--navy);
+        margin-bottom: 2px;
+        line-height: 1;
+        direction: ltr;
+        text-align: right;
+      }
+
+      .logo-dot {
+        color: var(--navy);
+        font-size: 46px;
+        line-height: 0;
+        position: relative;
+      }
+
+      .logo-dot::after {
+        content: "";
+        position: absolute;
+        bottom: 8px;
+        right: 0;
+        width: 8px;
+        height: 8px;
+        background: var(--navy);
+        border-radius: 50%;
+      }
+
+      .tagline {
+        font-family: var(--font-hand);
+        font-size: 19px;
+        color: var(--ink-faded);
+        margin-bottom: 40px;
+        transform: rotate(-1deg);
+        display: inline-block;
+      }
+
+      .nav-section {
+        margin-bottom: 24px;
+      }
+
+      .nav-label {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        color: var(--ink-faded);
+        margin-bottom: 8px;
+        padding-right: 12px;
+        font-weight: 600;
+      }
+
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 9px 14px;
+        border-radius: 8px;
+        color: var(--ink-soft);
+        cursor: pointer;
+        transition: all 0.15s;
+        margin-bottom: 1px;
+        font-weight: 500;
+        font-size: 14px;
+      }
+
+      .nav-item:hover {
+        background: var(--cream-deep);
+        color: var(--navy);
+      }
+
+      .nav-item.active {
+        background: var(--navy);
+        color: var(--cream-paper);
+        font-weight: 600;
+      }
+
+      .nav-icon {
+        width: 18px;
+        height: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+      }
+
+      .nav-badge {
+        margin-right: auto;
+        background: var(--navy);
+        color: var(--cream-paper);
+        font-size: 10px;
+        font-weight: 700;
+        padding: 2px 7px;
+        border-radius: 10px;
+        min-width: 18px;
+        text-align: center;
+      }
+
+      .nav-item.active .nav-badge {
+        background: var(--cream-paper);
+        color: var(--navy);
+      }
+
+      /* MAIN */
+      .main {
+        padding: 40px 48px;
+        max-width: 1400px;
+      }
+
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 36px;
+      }
+
+      .greeting {
+        font-family: var(--font-display);
+        font-size: 42px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        line-height: 1.1;
+        color: var(--navy);
+      }
+
+      .greeting-sub {
+        font-family: var(--font-hand);
+        font-size: 22px;
+        color: var(--ink-faded);
+        margin-top: 6px;
+      }
+
+      .header-actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .timer-pill {
+        background: var(--cream-paper);
+        color: var(--navy);
+        padding: 10px 18px;
+        border-radius: 100px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 600;
+        border: 1px solid var(--ink-line);
+        cursor: pointer;
+        transition: all 0.15s;
+        font-size: 14px;
+      }
+
+      .timer-pill:hover {
+        border-color: var(--navy);
+      }
+
+      .timer-pulse {
+        width: 8px;
+        height: 8px;
+        background: var(--navy);
+        border-radius: 50%;
+        animation: pulse 1.6s infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.3;
+        }
+      }
+
+      .icon-btn {
+        width: 38px;
+        height: 38px;
+        background: var(--cream-paper);
+        border: 1px solid var(--ink-line);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 15px;
+        transition: all 0.15s;
+        color: var(--ink-soft);
+      }
+
+      .icon-btn:hover {
+        border-color: var(--navy);
+        color: var(--navy);
+      }
+
+      /* GRID */
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(12, 1fr);
+        gap: 16px;
+      }
+
+      .card {
+        background: var(--cream-paper);
+        border: 1px solid var(--ink-line);
+        border-radius: 14px;
+        padding: 24px;
+        position: relative;
+        transition: border-color 0.2s;
+      }
+
+      .card:hover {
+        border-color: var(--ink-soft);
+      }
+
+      .card-title {
+        font-family: var(--font-display);
+        font-size: 19px;
+        font-weight: 700;
+        margin-bottom: 4px;
+        color: var(--navy);
+        letter-spacing: -0.01em;
+      }
+
+      .card-subtitle {
+        font-size: 12px;
+        color: var(--ink-faded);
+        margin-bottom: 18px;
+        font-weight: 500;
+      }
+
+      /* STATS */
+      .stat {
+        grid-column: span 3;
+      }
+
+      .stat-label {
+        font-size: 11px;
+        color: var(--ink-faded);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        font-weight: 600;
+        margin-bottom: 6px;
+      }
+
+      .stat-value {
+        font-family: var(--font-display);
+        font-size: 42px;
+        font-weight: 800;
+        line-height: 1;
+        letter-spacing: -0.03em;
+        color: var(--navy);
+        margin-bottom: 10px;
+      }
+
+      .stat-trend {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--ink-faded);
+      }
+
+      .trend-up {
+        color: var(--navy-soft);
+      }
+      .trend-down {
+        color: var(--navy);
+        font-weight: 600;
+      }
+
+      /* HOUR BANK */
+      .hour-bank {
+        grid-column: span 7;
+        background: var(--cream-paper);
+        border: 1px solid var(--ink-line);
+        position: relative;
+      }
+
+      .deco-stamp {
+        position: absolute;
+        top: 18px;
+        left: 24px;
+        transform: rotate(-6deg);
+        font-family: var(--font-hand);
+        font-size: 16px;
+        color: var(--navy);
+        opacity: 0.85;
+        font-weight: 700;
+      }
+
+      .deco-stamp::after {
+        content: "";
+        display: block;
+        height: 2px;
+        background: var(--navy);
+        border-radius: 2px;
+        margin-top: -2px;
+        opacity: 0.4;
+      }
+
+      .bank-customer {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 20px;
+      }
+
+      .bank-avatar {
+        width: 42px;
+        height: 42px;
+        background: var(--navy);
+        color: var(--cream-paper);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-display);
+        font-size: 19px;
+        font-weight: 700;
+      }
+
+      .bank-customer-name {
+        font-family: var(--font-display);
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--navy);
+        letter-spacing: -0.01em;
+      }
+
+      .bank-customer-meta {
+        font-size: 12px;
+        color: var(--ink-faded);
+        font-weight: 500;
+      }
+
+      .bank-numbers {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 12px;
+      }
+
+      .bank-remaining {
+        font-family: var(--font-display);
+        font-size: 56px;
+        font-weight: 800;
+        line-height: 1;
+        color: var(--navy);
+        letter-spacing: -0.04em;
+      }
+
+      .bank-total {
+        font-size: 14px;
+        color: var(--ink-faded);
+        font-weight: 500;
+      }
+
+      .bank-bar {
+        height: 12px;
+        background: var(--cream-deep);
+        border-radius: 100px;
+        overflow: hidden;
+        position: relative;
+        border: 1px solid var(--ink-line);
+      }
+
+      .bank-bar-fill {
+        height: 100%;
+        background: var(--navy);
+        width: 38%;
+        transition: width 0.5s;
+      }
+
+      .bank-alerts {
+        display: flex;
+        gap: 8px;
+        margin-top: 14px;
+        flex-wrap: wrap;
+      }
+
+      .alert-chip {
+        background: transparent;
+        border: 1px solid var(--navy);
+        color: var(--navy);
+        padding: 5px 12px;
+        border-radius: 100px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .alert-chip.subtle {
+        border-color: var(--ink-line);
+        color: var(--ink-soft);
+        font-weight: 500;
+      }
+
+      /* SCHEDULE */
+      .schedule {
+        grid-column: span 5;
+      }
+
+      .schedule-item {
+        display: flex;
+        gap: 14px;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--cream-deep);
+      }
+
+      .schedule-item:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+      }
+
+      .schedule-time {
+        font-family: var(--font-display);
+        font-weight: 700;
+        font-size: 16px;
+        color: var(--navy);
+        min-width: 56px;
+        letter-spacing: -0.01em;
+      }
+
+      .schedule-title {
+        font-weight: 600;
+        font-size: 14px;
+        margin-bottom: 2px;
+        color: var(--navy);
+      }
+
+      .schedule-meta {
+        font-size: 11px;
+        color: var(--ink-faded);
+        font-weight: 500;
+      }
+
+      .schedule-tag {
+        display: inline-block;
+        padding: 2px 7px;
+        border-radius: 100px;
+        font-size: 10px;
+        font-weight: 600;
+        margin-left: 6px;
+        background: var(--cream-deep);
+        color: var(--ink-soft);
+        border: 1px solid var(--ink-line);
+      }
+
+      /* PIPELINE */
+      .pipeline {
+        grid-column: span 8;
+      }
+
+      .pipeline-stages {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .stage {
+        background: var(--cream);
+        border: 1px solid var(--ink-line);
+        border-radius: 10px;
+        padding: 14px 10px;
+        text-align: center;
+        transition: all 0.15s;
+        cursor: pointer;
+      }
+
+      .stage:hover {
+        border-color: var(--navy);
+      }
+
+      .stage-count {
+        font-family: var(--font-display);
+        font-size: 30px;
+        font-weight: 800;
+        line-height: 1;
+        color: var(--navy);
+        letter-spacing: -0.02em;
+      }
+
+      .stage-name {
+        font-size: 11px;
+        color: var(--ink-faded);
+        margin-top: 4px;
+        font-weight: 600;
+      }
+
+      .stage.won {
+        background: var(--navy);
+        color: var(--cream-paper);
+        border-color: var(--navy);
+      }
+
+      .stage.won .stage-count {
+        color: var(--cream-paper);
+      }
+      .stage.won .stage-name {
+        color: var(--navy-pale);
+      }
+
+      /* ACTIVITY */
+      .activity {
+        grid-column: span 4;
+      }
+
+      .activity-item {
+        display: flex;
+        gap: 12px;
+        padding: 11px 0;
+        border-bottom: 1px solid var(--cream-deep);
+      }
+
+      .activity-item:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+      }
+
+      .activity-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--ink-faded);
+        margin-top: 8px;
+        flex-shrink: 0;
+      }
+
+      .activity-dot.accent {
+        background: var(--navy);
+      }
+
+      .activity-text {
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--ink-soft);
+        flex: 1;
+        font-weight: 500;
+      }
+
+      .activity-text strong {
+        color: var(--navy);
+        font-weight: 700;
+      }
+
+      .activity-time {
+        color: var(--ink-faded);
+        font-size: 11px;
+        margin-top: 2px;
+        font-weight: 500;
+      }
+
+      /* Mobile */
+      @media (max-width: 900px) {
+        .app {
+          grid-template-columns: 1fr;
+        }
+        .sidebar {
+          display: none;
+        }
+        .main {
+          padding: 24px;
+        }
+        .greeting {
+          font-size: 30px;
+        }
+        .stat,
+        .hour-bank,
+        .schedule,
+        .pipeline,
+        .activity {
+          grid-column: span 12;
+        }
+        .pipeline-stages {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="logo">OTTO<span class="logo-dot">.</span></div>
+        <div class="tagline">אוטומציות לעצלנים</div>
+
+        <div class="nav-section">
+          <div class="nav-label">ראשי</div>
+          <div class="nav-item active">
+            <span class="nav-icon">⌂</span>
+            <span>בית</span>
+          </div>
+          <div class="nav-item">
+            <span class="nav-icon">◷</span>
+            <span>היום</span>
+            <span class="nav-badge">7</span>
+          </div>
+          <div class="nav-item">
+            <span class="nav-icon">⊕</span>
+            <span>לידים</span>
+            <span class="nav-badge">3</span>
+          </div>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-label">עבודה</div>
+          <div class="nav-item">
+            <span class="nav-icon">☺</span><span>לקוחות</span>
+          </div>
+          <div class="nav-item">
+            <span class="nav-icon">▣</span><span>פרויקטים</span>
+          </div>
+          <div class="nav-item">
+            <span class="nav-icon">✓</span><span>משימות</span>
+          </div>
+          <div class="nav-item">
+            <span class="nav-icon">⏱</span><span>שעות</span>
+          </div>
+          <div class="nav-item">
+            <span class="nav-icon">▦</span><span>בנק שעות</span>
+          </div>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-label">כסף ומסמכים</div>
+          <div class="nav-item">
+            <span class="nav-icon">₪</span><span>פיננסים</span>
+          </div>
+          <div class="nav-item">
+            <span class="nav-icon">⊞</span><span>הצעות מחיר</span>
+          </div>
+          <div class="nav-item">
+            <span class="nav-icon">▤</span><span>מסמכים</span>
+          </div>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-label">חכם</div>
+          <div class="nav-item">
+            <span class="nav-icon">◉</span><span>הקלטות</span>
+          </div>
+          <div class="nav-item">
+            <span class="nav-icon">✦</span><span>סוכנים</span>
+          </div>
+          <div class="nav-item">
+            <span class="nav-icon">∿</span><span>שיווק</span>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main">
+        <div class="header">
+          <div>
+            <div class="greeting">בוקר טוב, אורי</div>
+            <div class="greeting-sub">7 דברים על השולחן היום</div>
+          </div>
+          <div class="header-actions">
+            <div class="timer-pill">
+              <span class="timer-pulse"></span>
+              <span>1:22:14</span>
+              <span style="opacity: 0.5; font-size: 12px; font-weight: 500"
+                >— דיאטן · אפיון</span
+              >
+            </div>
+            <div class="icon-btn">⚙</div>
+            <div class="icon-btn">⌕</div>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card stat">
+            <div class="stat-label">הכנסה החודש</div>
+            <div class="stat-value">₪18.4K</div>
+            <div class="stat-trend trend-up">↑ 22% מהחודש שעבר</div>
+          </div>
+
+          <div class="card stat">
+            <div class="stat-label">שעות מחויבות</div>
+            <div class="stat-value">
+              47<span
+                style="
+                  font-size: 20px;
+                  color: var(--ink-faded);
+                  font-weight: 600;
+                "
+                >/68</span
+              >
+            </div>
+            <div class="stat-trend">69% billable rate</div>
+          </div>
+
+          <div class="card stat">
+            <div class="stat-label">לקוחות פעילים</div>
+            <div class="stat-value">12</div>
+            <div class="stat-trend trend-up">↑ 2 חדשים החודש</div>
+          </div>
+
+          <div class="card stat">
+            <div class="stat-label">חשבוניות פתוחות</div>
+            <div class="stat-value">₪9.2K</div>
+            <div class="stat-trend trend-down">3 בפיגור</div>
+          </div>
+
+          <div class="card hour-bank">
+            <div class="deco-stamp">דורש תשומת לב</div>
+
+            <div style="margin-top: 8px">
+              <div class="card-title">בנק שעות פעיל</div>
+              <div class="card-subtitle">הלקוחה הבולטת החודש</div>
+            </div>
+
+            <div class="bank-customer">
+              <div class="bank-avatar">ר</div>
+              <div>
+                <div class="bank-customer-name">רוני אבן</div>
+                <div class="bank-customer-meta">
+                  רכישה: 1.4.2026 · תפוגה: 1.10.2026
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div class="bank-numbers">
+                <div>
+                  <span class="bank-remaining">7.5</span>
+                </div>
+                <div class="bank-total">מתוך 20 שעות</div>
+              </div>
+              <div class="bank-bar">
+                <div class="bank-bar-fill"></div>
+              </div>
+            </div>
+
+            <div class="bank-alerts">
+              <div class="alert-chip">⚠ ירדנו מתחת ל-30%</div>
+              <div class="alert-chip subtle">→ הצעת חידוש מוכנה</div>
+            </div>
+          </div>
+
+          <div class="card schedule">
+            <div class="card-title">היום</div>
+            <div class="card-subtitle">חמישי · 25 באפריל</div>
+
+            <div class="schedule-item">
+              <div class="schedule-time">09:30</div>
+              <div style="flex: 1">
+                <div class="schedule-title">פגישת אפיון — אבישג</div>
+                <div class="schedule-meta">
+                  45 דק׳ <span class="schedule-tag">Zoom</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="schedule-item">
+              <div class="schedule-time">11:00</div>
+              <div style="flex: 1">
+                <div class="schedule-title">Deep Work — בניית סנריו Make</div>
+                <div class="schedule-meta">
+                  2 שעות · אמיר <span class="schedule-tag">פוקוס</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="schedule-item">
+              <div class="schedule-time">14:30</div>
+              <div style="flex: 1">
+                <div class="schedule-title">שיחת המשך — ורד</div>
+                <div class="schedule-meta">
+                  30 דק׳ <span class="schedule-tag">טלפון</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="schedule-item">
+              <div class="schedule-time">17:00</div>
+              <div style="flex: 1">
+                <div class="schedule-title">הרצאה — בית הספר של שגיא</div>
+                <div class="schedule-meta">
+                  90 דק׳ · הוראה <span class="schedule-tag">Zoom</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card pipeline">
+            <div class="card-title">Pipeline לידים</div>
+            <div class="card-subtitle">14 לידים פעילים · המרה החודש 28%</div>
+
+            <div class="pipeline-stages">
+              <div class="stage">
+                <div class="stage-count">5</div>
+                <div class="stage-name">חדש</div>
+              </div>
+              <div class="stage">
+                <div class="stage-count">3</div>
+                <div class="stage-name">קשר ראשון</div>
+              </div>
+              <div class="stage">
+                <div class="stage-count">4</div>
+                <div class="stage-name">פגישה</div>
+              </div>
+              <div class="stage">
+                <div class="stage-count">2</div>
+                <div class="stage-name">הצעה</div>
+              </div>
+              <div class="stage won">
+                <div class="stage-count">1</div>
+                <div class="stage-name">סגור</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card activity">
+            <div class="card-title">פעילות אחרונה</div>
+            <div class="card-subtitle">3 שעות אחרונות</div>
+
+            <div class="activity-item">
+              <div class="activity-dot accent"></div>
+              <div style="flex: 1">
+                <div class="activity-text">
+                  <strong>אסתר אביטל</strong> שילמה חשבונית #1043
+                </div>
+                <div class="activity-time">לפני 18 דקות</div>
+              </div>
+            </div>
+
+            <div class="activity-item">
+              <div class="activity-dot"></div>
+              <div style="flex: 1">
+                <div class="activity-text">ליד חדש מ-WhatsApp</div>
+                <div class="activity-time">לפני 47 דקות</div>
+              </div>
+            </div>
+
+            <div class="activity-item">
+              <div class="activity-dot accent"></div>
+              <div style="flex: 1">
+                <div class="activity-text">
+                  <strong>אבישג</strong> חתמה על הצעה #28
+                </div>
+                <div class="activity-time">לפני שעה</div>
+              </div>
+            </div>
+
+            <div class="activity-item">
+              <div class="activity-dot"></div>
+              <div style="flex: 1">
+                <div class="activity-text">
+                  תמלול הוכן · פגישה עם <strong>אמיר</strong>
+                </div>
+                <div class="activity-time">לפני 2 שעות</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>
