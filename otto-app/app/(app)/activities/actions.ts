@@ -5,7 +5,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 
 const ActivitySchema = z.object({
-  type: z.enum(["call", "email", "meeting", "note", "task"]),
+  type: z.enum(["call", "email", "whatsapp", "meeting", "note", "task"]),
   title: z.string().min(1, "כותרת חובה"),
   body: z.string().optional(),
   occurred_at: z.string().optional(),

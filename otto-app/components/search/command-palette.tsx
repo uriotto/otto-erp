@@ -53,7 +53,6 @@ export function CommandPalette() {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setRecent(getRecent(RECENT_LIMIT));
     } else {
-       
       setQuery("");
       setResults({ customers: [], leads: [], activities: [] });
       setActiveIndex(0);

@@ -3,11 +3,17 @@
 import { useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, AlertCircle, Clock, Pencil, MessageSquarePlus } from "lucide-react";
-import { ACTIVITY_META, type ActivityType } from "./activity-types";
+import { ACTIVITY_META, LOGGED_ACTIVITY_TYPES, type ActivityType } from "./activity-types";
 import { NewActivityDialog } from "./new-activity-dialog";
 import { EditActivityDialog } from "./edit-activity-dialog";
 import { deleteActivity, toggleActivityComplete } from "@/app/(app)/activities/actions";
 import { useToast } from "@/components/ui/toast";
+import {
+  formatActivityAbsolute,
+  formatActivityRelative,
+  formatActivityTime,
+  formatMeetingRange,
+} from "@/lib/format-activity-time";
 
 export type Activity = {
   id: string;
@@ -91,6 +97,7 @@ function ActivityItem({ activity, parentPath }: { activity: Activity; parentPath
   const Icon = meta.icon;
   const isTask = activity.type === "task";
   const isMeeting = activity.type === "meeting";
+  const isLogged = LOGGED_ACTIVITY_TYPES.includes(activity.type as ActivityType);
   const serverIsDone = !!activity.completed_at;
   const [optimisticDone, setOptimisticDone] = useOptimistic(
     serverIsDone,
@@ -123,7 +130,7 @@ function ActivityItem({ activity, parentPath }: { activity: Activity; parentPath
 
   return (
     <li
-      className={`group flex gap-3 rounded-xl border p-3.5 transition-all duration-300 ease-out motion-reduce:transition-none ${
+      className={`group relative flex gap-3 rounded-xl border p-3.5 transition-all duration-300 ease-out motion-reduce:transition-none ${
         isOverdue
           ? "border-red-200 bg-red-50/40"
           : isDone
@@ -169,7 +176,8 @@ function ActivityItem({ activity, parentPath }: { activity: Activity; parentPath
         </button>
       ) : (
         <div
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${meta.color}`}
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${meta.color}`}
+          aria-label={meta.label}
         >
           <Icon size={16} />
         </div>
@@ -186,7 +194,7 @@ function ActivityItem({ activity, parentPath }: { activity: Activity; parentPath
               {activity.title}
             </div>
             <div className="text-ink-faded mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
-              <span>{meta.label}</span>
+              <span className="font-medium">{meta.label}</span>
               {isTask && activity.due_at && (
                 <>
                   <span>·</span>
@@ -197,44 +205,56 @@ function ActivityItem({ activity, parentPath }: { activity: Activity; parentPath
                   >
                     {isOverdue ? <AlertCircle size={11} /> : <Clock size={11} />}
                     {isOverdue ? "באיחור: " : "יעד: "}
-                    {formatRelative(activity.due_at)}
+                    {formatActivityRelative(activity.due_at)}
                   </span>
                 </>
               )}
               {isMeeting && activity.end_at ? (
                 <>
                   <span>·</span>
-                  <span>
-                    {formatAbsolute(activity.occurred_at)} – {formatTime(activity.end_at)}
-                  </span>
+                  <span>{formatMeetingRange(activity.occurred_at, activity.end_at)}</span>
+                </>
+              ) : isLogged ? (
+                <>
+                  <span>·</span>
+                  <time>בוצע ב-{formatActivityRelative(activity.occurred_at)}</time>
                 </>
               ) : (
                 !isTask && (
                   <>
                     <span>·</span>
-                    <time>{formatRelative(activity.occurred_at)}</time>
+                    <time>{formatActivityRelative(activity.occurred_at)}</time>
                   </>
                 )
               )}
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-all group-hover:opacity-100">
-            <button
-              onClick={() => setShowEdit(true)}
-              disabled={pending}
-              className="text-ink-faded hover:text-navy rounded p-1 transition-colors disabled:opacity-50"
-              aria-label="ערוך"
+          <div className="flex shrink-0 items-center gap-1">
+            <time
+              className="text-ink-faded mt-0.5 text-[11px] whitespace-nowrap tabular-nums transition-opacity group-hover:opacity-0"
+              dateTime={activity.occurred_at}
+              title={formatActivityAbsolute(activity.occurred_at)}
             >
-              <Pencil size={13} />
-            </button>
-            <button
-              onClick={handleDelete}
-              disabled={pending}
-              className="text-ink-faded rounded p-1 transition-colors hover:text-red-600 disabled:opacity-50"
-              aria-label="מחק"
-            >
-              <Trash2 size={13} />
-            </button>
+              {formatActivityTime(activity.occurred_at)}
+            </time>
+            <div className="absolute end-3 flex items-center gap-0.5 opacity-0 transition-all group-hover:opacity-100">
+              <button
+                onClick={() => setShowEdit(true)}
+                disabled={pending}
+                className="text-ink-faded hover:text-navy rounded p-1 transition-colors disabled:opacity-50"
+                aria-label="ערוך"
+              >
+                <Pencil size={13} />
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={pending}
+                className="text-ink-faded rounded p-1 transition-colors hover:text-red-600 disabled:opacity-50"
+                aria-label="מחק"
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
           </div>
         </div>
         {activity.body && (
@@ -254,47 +274,4 @@ function ActivityItem({ activity, parentPath }: { activity: Activity; parentPath
       )}
     </li>
   );
-}
-
-function formatRelative(iso: string): string {
-  const d = new Date(iso);
-  const target = d.getTime();
-  const now = Date.now();
-  const isFuture = target > now;
-  const absMs = Math.abs(target - now);
-  const min = Math.round(absMs / 60_000);
-  const h = Math.round(absMs / 3_600_000);
-
-  // Calendar-day diff (not 24h diff) — so "tomorrow morning" shows as "מחר" even if <24h
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-  const startOfTarget = new Date(d);
-  startOfTarget.setHours(0, 0, 0, 0);
-  const dayDiff = Math.round((startOfTarget.getTime() - startOfToday.getTime()) / 86_400_000);
-
-  const time = formatTime(iso);
-
-  if (min < 2) return "הרגע";
-  if (dayDiff === 0) {
-    if (h < 1) return isFuture ? `בעוד ${min} דק׳` : `לפני ${min} דק׳`;
-    return isFuture ? `היום ב-${time}` : `לפני ${h} שעות`;
-  }
-  if (dayDiff === 1) return `מחר ב-${time}`;
-  if (dayDiff === -1) return `אתמול ב-${time}`;
-  if (dayDiff > 1 && dayDiff <= 7) return `בעוד ${dayDiff} ימים`;
-  if (dayDiff < -1 && dayDiff >= -7) return `לפני ${Math.abs(dayDiff)} ימים`;
-  return formatAbsolute(iso);
-}
-
-function formatAbsolute(iso: string): string {
-  return new Date(iso).toLocaleString("he-IL", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
 }

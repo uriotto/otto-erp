@@ -8,11 +8,40 @@ import {
   ArrowLeft,
   DollarSign,
   Activity,
+  Phone,
+  Mail,
+  StickyNote,
+  CheckSquare,
+  Square,
+  Clock,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { relativeTimeHebrew } from "@/lib/relative-time";
 
 export const metadata = {
   title: "דשבורד — OTTO",
+};
+
+type ActivityFeedRow = {
+  id: string;
+  type: string;
+  title: string;
+  occurred_at: string;
+  created_at: string;
+  customer_id: string | null;
+  lead_id: string | null;
+  customers: { id: string; name: string } | null;
+  leads: { id: string; name: string } | null;
+};
+
+type TaskRow = {
+  id: string;
+  title: string;
+  due_at: string | null;
+  customer_id: string | null;
+  lead_id: string | null;
+  customers: { id: string; name: string } | null;
+  leads: { id: string; name: string } | null;
 };
 
 export default async function DashboardPage() {
@@ -35,11 +64,12 @@ export default async function DashboardPage() {
     { data: openLeads },
     { count: tasksOpen },
     { count: tasksOverdue },
+    { count: tasksDueToday },
     { count: meetingsToday },
     { count: activitiesThisWeek },
     { data: leadsWon },
-    { data: recentCustomers },
-    { data: recentLeads },
+    { data: recentActivities },
+    { data: todayTasks },
   ] = await Promise.all([
     supabase.from("customers").select("*", { count: "exact", head: true }),
     supabase.from("customers").select("*", { count: "exact", head: true }).eq("status", "active"),
@@ -59,6 +89,13 @@ export default async function DashboardPage() {
     supabase
       .from("activities")
       .select("*", { count: "exact", head: true })
+      .eq("type", "task")
+      .is("completed_at", null)
+      .gte("due_at", startOfToday.toISOString())
+      .lte("due_at", endOfToday.toISOString()),
+    supabase
+      .from("activities")
+      .select("*", { count: "exact", head: true })
       .eq("type", "meeting")
       .gte("occurred_at", startOfToday.toISOString())
       .lte("occurred_at", endOfToday.toISOString()),
@@ -68,14 +105,20 @@ export default async function DashboardPage() {
       .gte("created_at", sevenDaysAgo.toISOString()),
     supabase.from("leads").select("value").eq("status", "won"),
     supabase
-      .from("customers")
-      .select("id, name, company, created_at")
-      .order("created_at", { ascending: false })
-      .limit(5),
+      .from("activities")
+      .select(
+        "id, type, title, occurred_at, created_at, customer_id, lead_id, customers(id, name), leads(id, name)",
+      )
+      .order("occurred_at", { ascending: false })
+      .limit(8),
     supabase
-      .from("leads")
-      .select("id, name, company, status, created_at")
-      .order("created_at", { ascending: false })
+      .from("activities")
+      .select("id, title, due_at, customer_id, lead_id, customers(id, name), leads(id, name)")
+      .eq("type", "task")
+      .is("completed_at", null)
+      .gte("due_at", startOfToday.toISOString())
+      .lte("due_at", endOfToday.toISOString())
+      .order("due_at", { ascending: true })
       .limit(5),
   ]);
 
@@ -84,6 +127,9 @@ export default async function DashboardPage() {
 
   const displayName = profile?.full_name?.split(" ")[0] ?? profile?.email?.split("@")[0] ?? "אורי";
   const greeting = getGreeting();
+
+  const feedItems = (recentActivities ?? []) as unknown as ActivityFeedRow[];
+  const tasks = (todayTasks ?? []) as unknown as TaskRow[];
 
   return (
     <div className="space-y-8">
@@ -101,7 +147,7 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      {/* Top stats */}
+      {/* Top: 4 primary stats */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
           icon={<Users size={18} />}
@@ -119,10 +165,12 @@ export default async function DashboardPage() {
           tone="primary"
         />
         <StatCard
-          icon={<DollarSign size={18} />}
-          label="פוטנציאל"
-          value={`₪${openPipelineValue.toLocaleString("he-IL")}`}
-          hint={wonValue ? `נסגר: ₪${wonValue.toLocaleString("he-IL")}` : undefined}
+          icon={<CheckCircle2 size={18} />}
+          label="משימות היום"
+          value={tasksDueToday ?? 0}
+          hint={(tasksOverdue ?? 0) > 0 ? `${tasksOverdue} באיחור` : undefined}
+          href="/today"
+          tone={(tasksOverdue ?? 0) > 0 ? "warning" : undefined}
         />
         <StatCard
           icon={<Activity size={18} />}
@@ -131,84 +179,42 @@ export default async function DashboardPage() {
         />
       </div>
 
-      {/* Today panel */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Link
-          href="/today"
-          className={`bg-cream-paper hover:border-ink-soft border-ink-line group rounded-2xl border p-5 transition-all ${
-            (tasksOverdue ?? 0) > 0 ? "border-red-200 bg-red-50/30" : ""
-          }`}
-        >
-          <div className="text-ink-soft mb-2 flex items-center gap-1.5 text-xs">
-            <AlertCircle size={14} className={(tasksOverdue ?? 0) > 0 ? "text-red-600" : ""} />
-            משימות באיחור
-          </div>
-          <div
-            className={`text-display-md font-bold ${(tasksOverdue ?? 0) > 0 ? "text-red-700" : "text-navy"}`}
-          >
-            {tasksOverdue ?? 0}
-          </div>
-          <div className="text-ink-faded mt-2 flex items-center gap-1 text-xs">
-            לדף היום <ArrowLeft size={11} />
-          </div>
-        </Link>
-
-        <Link
-          href="/today"
-          className="bg-cream-paper hover:border-ink-soft border-ink-line group rounded-2xl border p-5 transition-all"
-        >
-          <div className="text-ink-soft mb-2 flex items-center gap-1.5 text-xs">
-            <CheckCircle2 size={14} />
-            משימות פתוחות
-          </div>
-          <div className="text-display-md text-navy font-bold">{tasksOpen ?? 0}</div>
-          <div className="text-ink-faded mt-2 flex items-center gap-1 text-xs">
-            לדף היום <ArrowLeft size={11} />
-          </div>
-        </Link>
-
-        <Link
-          href="/today"
-          className="bg-cream-paper hover:border-ink-soft border-ink-line group rounded-2xl border p-5 transition-all"
-        >
-          <div className="text-ink-soft mb-2 flex items-center gap-1.5 text-xs">
-            <Calendar size={14} className="text-orange-600" />
-            פגישות היום
-          </div>
-          <div className="text-display-md text-navy font-bold">{meetingsToday ?? 0}</div>
-          <div className="text-ink-faded mt-2 flex items-center gap-1 text-xs">
-            לדף היום <ArrowLeft size={11} />
-          </div>
-        </Link>
+      {/* Middle: activity feed (60%) + today's tasks (40%) */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+        <div className="lg:col-span-3">
+          <ActivityFeed items={feedItems} />
+        </div>
+        <div className="lg:col-span-2">
+          <TodayTasksCard tasks={tasks} totalToday={tasksDueToday ?? 0} />
+        </div>
       </div>
 
-      {/* Recent items */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <RecentList
-          title="לקוחות אחרונים"
-          icon={<Users size={14} className="text-blue-600" />}
-          items={(recentCustomers ?? []).map((c) => ({
-            id: c.id,
-            title: c.name,
-            subtitle: c.company,
-            href: `/customers/${c.id}`,
-            date: c.created_at,
-          }))}
-          emptyText="אין עדיין לקוחות"
-          allHref="/customers"
+      {/* Bottom: secondary stats */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard
+          icon={<DollarSign size={18} />}
+          label="פוטנציאל"
+          value={`₪${openPipelineValue.toLocaleString("he-IL")}`}
+          hint={wonValue ? `נסגר: ₪${wonValue.toLocaleString("he-IL")}` : undefined}
         />
-        <RecentList
-          title="לידים אחרונים"
-          icon={<TrendingUp size={14} className="text-purple-600" />}
-          items={(recentLeads ?? []).map((l) => ({
-            id: l.id,
-            title: l.name,
-            subtitle: l.company,
-            href: `/leads/${l.id}`,
-            date: l.created_at,
-          }))}
-          emptyText="אין עדיין לידים"
-          allHref="/leads"
+        <StatCard
+          icon={<AlertCircle size={18} />}
+          label="משימות באיחור"
+          value={tasksOverdue ?? 0}
+          href="/today"
+          tone={(tasksOverdue ?? 0) > 0 ? "warning" : undefined}
+        />
+        <StatCard
+          icon={<CheckCircle2 size={18} />}
+          label="משימות פתוחות"
+          value={tasksOpen ?? 0}
+          href="/today"
+        />
+        <StatCard
+          icon={<Calendar size={18} />}
+          label="פגישות היום"
+          value={meetingsToday ?? 0}
+          href="/today"
         />
       </div>
     </div>
@@ -237,19 +243,28 @@ function StatCard({
   value: string | number;
   hint?: string;
   href?: string;
-  tone?: "primary";
+  tone?: "primary" | "warning";
 }) {
-  const styles = tone === "primary" ? "border-navy/10 bg-navy/5" : "border-ink-line bg-cream-paper";
+  const toneStyles =
+    tone === "primary"
+      ? "border-navy/15 bg-navy/5"
+      : tone === "warning"
+        ? "border-red-200 bg-red-50/40"
+        : "border-ink-line bg-cream-paper";
+
+  const interactive = href
+    ? "hover:-translate-y-0.5 hover:shadow-md hover:border-navy/30 transition-all duration-200"
+    : "transition-all duration-200";
+
+  const valueColor = tone === "warning" ? "text-red-700" : "text-navy";
 
   const content = (
-    <div
-      className={`rounded-2xl border p-5 transition-colors ${styles} ${href ? "hover:border-ink-soft" : ""}`}
-    >
+    <div className={`rounded-2xl border p-5 ${toneStyles} ${interactive}`}>
       <div className="text-ink-soft mb-2 flex items-center gap-1.5 text-xs">
         {icon}
         {label}
       </div>
-      <div className="text-display-md text-navy font-bold">{value}</div>
+      <div className={`text-display-md font-bold ${valueColor}`}>{value}</div>
       {hint && <div className="text-ink-faded mt-1 text-xs">{hint}</div>}
     </div>
   );
@@ -257,58 +272,141 @@ function StatCard({
   return href ? <Link href={href}>{content}</Link> : content;
 }
 
-function RecentList({
-  title,
-  icon,
-  items,
-  emptyText,
-  allHref,
-}: {
-  title: string;
-  icon: React.ReactNode;
-  items: { id: string; title: string; subtitle?: string | null; href: string; date: string }[];
-  emptyText: string;
-  allHref: string;
-}) {
+function activityIcon(type: string) {
+  const size = 14;
+  switch (type) {
+    case "call":
+      return <Phone size={size} className="text-emerald-600" />;
+    case "email":
+      return <Mail size={size} className="text-blue-600" />;
+    case "meeting":
+      return <Calendar size={size} className="text-orange-600" />;
+    case "task":
+      return <CheckCircle2 size={size} className="text-purple-600" />;
+    case "note":
+      return <StickyNote size={size} className="text-amber-600" />;
+    default:
+      return <Activity size={size} className="text-ink-soft" />;
+  }
+}
+
+function parentFromActivity(item: ActivityFeedRow | TaskRow): {
+  name: string;
+  href: string;
+} | null {
+  if (item.customer_id && item.customers) {
+    return { name: item.customers.name, href: `/customers/${item.customers.id}` };
+  }
+  if (item.lead_id && item.leads) {
+    return { name: item.leads.name, href: `/leads/${item.leads.id}` };
+  }
+  return null;
+}
+
+function ActivityFeed({ items }: { items: ActivityFeedRow[] }) {
   return (
     <div className="bg-cream-paper border-ink-line rounded-2xl border p-5">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {icon}
-          <h2 className="text-navy text-sm font-semibold">{title}</h2>
+          <Activity size={14} className="text-navy" />
+          <h2 className="text-navy text-sm font-semibold">פעילות אחרונה</h2>
         </div>
         <Link
-          href={allHref}
+          href="/today"
           className="text-ink-faded hover:text-navy flex items-center gap-1 text-xs transition-colors"
         >
           הכל <ArrowLeft size={11} />
         </Link>
       </div>
+
       {items.length === 0 ? (
-        <p className="text-ink-faded py-4 text-center text-sm">{emptyText}</p>
+        <p className="text-ink-faded py-6 text-center text-sm">אין עדיין פעילויות</p>
       ) : (
-        <ul className="space-y-2">
-          {items.map((item) => (
-            <li key={item.id}>
-              <Link
-                href={item.href}
-                className="hover:bg-cream flex items-center justify-between rounded-lg px-2 py-2 transition-colors"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="text-navy truncate text-sm font-medium">{item.title}</div>
-                  {item.subtitle && (
-                    <div className="text-ink-faded truncate text-xs">{item.subtitle}</div>
-                  )}
-                </div>
-                <span className="text-ink-faded ms-3 shrink-0 text-xs">
-                  {new Date(item.date).toLocaleDateString("he-IL", {
-                    day: "numeric",
-                    month: "short",
-                  })}
-                </span>
-              </Link>
-            </li>
-          ))}
+        <ul className="divide-ink-line/70 divide-y">
+          {items.map((item) => {
+            const parent = parentFromActivity(item);
+            const href = parent?.href ?? "/today";
+            return (
+              <li key={item.id}>
+                <Link
+                  href={href}
+                  className="hover:bg-cream group -mx-2 flex items-start gap-3 rounded-lg px-2 py-2.5 transition-colors"
+                >
+                  <div className="border-ink-line bg-cream mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border">
+                    {activityIcon(item.type)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-navy truncate text-sm font-medium">{item.title}</div>
+                    <div className="text-ink-faded mt-0.5 flex items-center gap-1.5 text-xs">
+                      {parent ? (
+                        <span className="text-ink-soft truncate">{parent.name}</span>
+                      ) : (
+                        <span className="text-ink-faded">ללא קישור</span>
+                      )}
+                      <span className="text-ink-faded">·</span>
+                      <span className="flex items-center gap-1">
+                        <Clock size={10} />
+                        {relativeTimeHebrew(item.occurred_at)}
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function TodayTasksCard({ tasks, totalToday }: { tasks: TaskRow[]; totalToday: number }) {
+  return (
+    <div className="bg-cream-paper border-ink-line rounded-2xl border p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <CheckSquare size={14} className="text-navy" />
+          <h2 className="text-navy text-sm font-semibold">המשימות שלי להיום</h2>
+        </div>
+        <Link
+          href="/today"
+          className="text-ink-faded hover:text-navy flex items-center gap-1 text-xs transition-colors"
+        >
+          {totalToday > 0 ? `${totalToday} סה"כ` : "הכל"} <ArrowLeft size={11} />
+        </Link>
+      </div>
+
+      {tasks.length === 0 ? (
+        <div className="py-6 text-center">
+          <CheckCircle2 size={28} className="text-ink-faded mx-auto mb-2 opacity-50" />
+          <p className="text-ink-faded text-sm">אין משימות להיום</p>
+          <p className="text-ink-faded mt-0.5 text-xs">תהנה מהשקט</p>
+        </div>
+      ) : (
+        <ul className="space-y-1.5">
+          {tasks.map((task) => {
+            const parent = parentFromActivity(task);
+            const href = parent?.href ?? "/today";
+            return (
+              <li key={task.id}>
+                <Link
+                  href={href}
+                  className="hover:bg-cream group -mx-2 flex items-start gap-2.5 rounded-lg px-2 py-2 transition-colors"
+                >
+                  <Square
+                    size={16}
+                    className="text-ink-faded group-hover:text-navy mt-0.5 shrink-0 transition-colors"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-navy truncate text-sm">{task.title}</div>
+                    {parent && (
+                      <div className="text-ink-faded mt-0.5 truncate text-xs">{parent.name}</div>
+                    )}
+                  </div>
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

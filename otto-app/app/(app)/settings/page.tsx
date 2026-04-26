@@ -3,6 +3,10 @@ import { LogOut } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { ProfileCard } from "./profile-card";
 import { TenantCard } from "./tenant-card";
+import { TagsCard } from "./tags-card";
+import { ExportCard } from "./export-card";
+import { DangerZoneCard } from "./danger-zone-card";
+import { listTagsUsage } from "./actions";
 
 export const metadata = { title: "הגדרות — OTTO" };
 
@@ -28,6 +32,9 @@ export default async function SettingsPage() {
     .eq("id", profile.tenant_id)
     .single();
 
+  const tagsResult = await listTagsUsage();
+  const tags = tagsResult.data ?? [];
+
   return (
     <div className="mx-auto max-w-3xl">
       <div className="mb-8">
@@ -52,6 +59,12 @@ export default async function SettingsPage() {
             canEdit={profile.role === "admin"}
           />
         )}
+
+        <TagsCard initialTags={tags} />
+
+        <ExportCard />
+
+        {tenant && profile.role === "admin" && <DangerZoneCard tenantName={tenant.name} />}
 
         <div className="border-ink-line flex items-center justify-between rounded-2xl border border-dashed p-5">
           <div>

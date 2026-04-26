@@ -198,6 +198,47 @@ export async function exportLeadsCsv(): Promise<
   return { csv, filename };
 }
 
+export async function bulkDeleteLeads(ids: string[]): Promise<{ error?: string; count?: number }> {
+  if (!Array.isArray(ids) || ids.length === 0) return { error: "לא נבחרו לידים" };
+
+  const supabase = await createClient();
+  const { data: profile } = await supabase.from("users").select("tenant_id").single();
+  if (!profile) return { error: "לא מחובר" };
+
+  const { error, count } = await supabase
+    .from("leads")
+    .delete({ count: "exact" })
+    .in("id", ids)
+    .eq("tenant_id", profile.tenant_id);
+
+  if (error) return { error: error.message };
+  revalidatePath("/leads");
+  return { count: count ?? 0 };
+}
+
+export async function bulkUpdateLeadsStatus(
+  ids: string[],
+  status: string,
+): Promise<{ error?: string; count?: number }> {
+  if (!Array.isArray(ids) || ids.length === 0) return { error: "לא נבחרו לידים" };
+  const allowed = ["new", "contacted", "qualified", "proposal", "won", "lost"];
+  if (!allowed.includes(status)) return { error: "סטטוס לא תקין" };
+
+  const supabase = await createClient();
+  const { data: profile } = await supabase.from("users").select("tenant_id").single();
+  if (!profile) return { error: "לא מחובר" };
+
+  const { error, count } = await supabase
+    .from("leads")
+    .update({ status }, { count: "exact" })
+    .in("id", ids)
+    .eq("tenant_id", profile.tenant_id);
+
+  if (error) return { error: error.message };
+  revalidatePath("/leads");
+  return { count: count ?? 0 };
+}
+
 export async function deleteLead(id: string): Promise<{ error?: string }> {
   const supabase = await createClient();
   const { data: profile } = await supabase.from("users").select("tenant_id").single();

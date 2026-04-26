@@ -14,11 +14,18 @@ import {
   Filter,
   Sparkles,
   SearchX,
+  Trash2,
 } from "lucide-react";
 import type { Tables } from "@/lib/supabase/types";
 import { NewLeadDialog } from "./new-lead-dialog";
-import { updateLeadStatus, exportLeadsCsv } from "./actions";
+import {
+  updateLeadStatus,
+  exportLeadsCsv,
+  bulkDeleteLeads,
+  bulkUpdateLeadsStatus,
+} from "./actions";
 import { ExportCsvButton } from "@/components/ui/export-csv-button";
+import { useToast } from "@/components/ui/toast";
 
 type Lead = Tables<"leads">;
 
@@ -64,6 +71,20 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
   const [selectedTags, setSelectedTags] = useState<string[]>(() =>
     parseTags(searchParams.get("tags")),
   );
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [bulkPending, startBulk] = useTransition();
+  const toast = useToast();
+
+  const toggleSelected = useCallback((id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => setSelected(new Set()), []);
 
   const updateUrl = useCallback(
     (params: Record<string, string | undefined>) => {
@@ -145,6 +166,14 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
       selectedTags.includes(tag) ? selectedTags.filter((t) => t !== tag) : [...selectedTags, tag],
     );
   };
+
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const lead of leads) {
+      counts[lead.status] = (counts[lead.status] ?? 0) + 1;
+    }
+    return counts;
+  }, [leads]);
 
   const activeLeads = filteredLeads.filter((l) => l.status !== "won" && l.status !== "lost");
   const totalValue = activeLeads.reduce((sum, l) => sum + (l.value ?? 0), 0);
@@ -255,18 +284,26 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
           </button>
           {STATUSES.map(({ key, label }) => {
             const isActive = statusFilter === key;
+            const count = statusCounts[key] ?? 0;
             return (
               <button
                 key={key}
                 type="button"
                 onClick={() => setStatusFilterAndUrl(key)}
-                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                   isActive
                     ? "bg-navy text-cream-paper border-navy"
                     : "bg-cream-paper text-ink-soft border-ink-line hover:border-ink-soft"
                 }`}
               >
-                {label}
+                <span>{label}</span>
+                <span
+                  className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                    isActive ? "bg-cream-paper/20 text-cream-paper" : "bg-ink-line/40 text-ink-soft"
+                  }`}
+                >
+                  {count}
+                </span>
               </button>
             );
           })}
@@ -325,7 +362,12 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
                 </div>
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                   {group.map((lead) => (
-                    <LeadCard key={lead.id} lead={lead} />
+                    <LeadCard
+                      key={lead.id}
+                      lead={lead}
+                      isSelected={selected.has(lead.id)}
+                      onToggleSelect={() => toggleSelected(lead.id)}
+                    />
                   ))}
                 </div>
               </div>
@@ -334,13 +376,85 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
         </div>
       )}
 
+      {selected.size > 0 && (
+        <div className="bg-navy text-cream-paper fixed bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-2xl px-5 py-3 shadow-lg">
+          <span className="text-sm font-semibold">{selected.size} נבחרו</span>
+          <div className="bg-cream-paper/20 h-5 w-px" />
+          <select
+            disabled={bulkPending}
+            defaultValue=""
+            onChange={(e) => {
+              const status = e.target.value;
+              if (!status) return;
+              const ids = Array.from(selected);
+              startBulk(async () => {
+                const res = await bulkUpdateLeadsStatus(ids, status);
+                if (res.error) toast.error(res.error);
+                else {
+                  toast.success(`עודכנו ${res.count ?? ids.length} לידים`);
+                  clearSelection();
+                }
+              });
+              e.target.value = "";
+            }}
+            className="bg-cream-paper/10 border-cream-paper/30 text-cream-paper rounded-lg border px-2 py-1 text-xs outline-none disabled:opacity-50"
+          >
+            <option value="" className="text-navy">
+              שנה סטטוס ל...
+            </option>
+            {STATUSES.map((s) => (
+              <option key={s.key} value={s.key} className="text-navy">
+                {s.label}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            disabled={bulkPending}
+            onClick={() => {
+              const ids = Array.from(selected);
+              if (!confirm(`למחוק ${ids.length} לידים?`)) return;
+              startBulk(async () => {
+                const res = await bulkDeleteLeads(ids);
+                if (res.error) toast.error(res.error);
+                else {
+                  toast.success(`נמחקו ${res.count ?? ids.length} לידים`);
+                  clearSelection();
+                }
+              });
+            }}
+            className="flex items-center gap-1.5 rounded-lg bg-rose-500/90 px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-rose-500 disabled:opacity-50"
+          >
+            <Trash2 size={13} />
+            מחק
+          </button>
+          <button
+            type="button"
+            onClick={clearSelection}
+            disabled={bulkPending}
+            className="text-cream-paper/80 hover:text-cream-paper text-xs underline disabled:opacity-50"
+          >
+            ביטול
+          </button>
+        </div>
+      )}
+
       {showNew && <NewLeadDialog onClose={() => setShowNew(false)} />}
     </>
   );
 }
 
-function LeadCard({ lead }: { lead: Lead }) {
+function LeadCard({
+  lead,
+  isSelected,
+  onToggleSelect,
+}: {
+  lead: Lead;
+  isSelected: boolean;
+  onToggleSelect: () => void;
+}) {
   const [, startTransition] = useTransition();
+  const [flash, setFlash] = useState(false);
 
   const status = STATUSES.find((s) => s.key === lead.status);
   const initials = lead.name
@@ -351,14 +465,28 @@ function LeadCard({ lead }: { lead: Lead }) {
     .toUpperCase();
 
   function handleStatusChange(next: string) {
+    setFlash(true);
+    setTimeout(() => setFlash(false), 250);
     startTransition(async () => {
       await updateLeadStatus(lead.id, next);
     });
   }
 
   return (
-    <div className="bg-cream-paper border-ink-line hover:border-ink-soft rounded-2xl border p-4 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md">
+    <div
+      className={`bg-cream-paper rounded-2xl border p-4 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md ${
+        isSelected ? "border-navy ring-navy/20 ring-2" : "border-ink-line hover:border-ink-soft"
+      } ${flash ? "bg-navy/5 scale-[0.99]" : ""}`}
+    >
       <div className="mb-3 flex items-start gap-3">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={onToggleSelect}
+          onClick={(e) => e.stopPropagation()}
+          aria-label="בחר ליד"
+          className="accent-navy mt-1 h-4 w-4 shrink-0 cursor-pointer"
+        />
         <div className="bg-cream border-ink-line flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-xs font-bold text-gray-600">
           {initials}
         </div>

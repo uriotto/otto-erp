@@ -1,13 +1,26 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Plus, Mail, Phone, Building2, Search, X, Users, SearchX } from "lucide-react";
+import {
+  Plus,
+  Mail,
+  Phone,
+  Building2,
+  Search,
+  X,
+  Users,
+  SearchX,
+  Trash2,
+  Check,
+} from "lucide-react";
 import type { Tables } from "@/lib/supabase/types";
 import { NewCustomerDialog } from "./new-customer-dialog";
 import { ExportCsvButton } from "@/components/ui/export-csv-button";
-import { exportCustomersCsv } from "./actions";
+import { Spinner } from "@/components/ui/spinner";
+import { useToast } from "@/components/ui/toast";
+import { bulkDeleteCustomers, exportCustomersCsv } from "./actions";
 
 type Customer = Tables<"customers">;
 type StatusFilter = "all" | "active" | "inactive";
@@ -38,7 +51,10 @@ export function CustomersList({ customers }: { customers: Customer[] }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  const toast = useToast();
+  const [pendingDelete, startDeleteTransition] = useTransition();
   const [showNew, setShowNew] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(() =>
     parseStatus(searchParams.get("status")),
@@ -110,6 +126,33 @@ export function CustomersList({ customers }: { customers: Customer[] }) {
     setTags(
       selectedTags.includes(tag) ? selectedTags.filter((t) => t !== tag) : [...selectedTags, tag],
     );
+  };
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleBulkDelete = () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    if (!confirm(`למחוק ${ids.length} לקוחות?`)) return;
+    startDeleteTransition(async () => {
+      const result = await bulkDeleteCustomers(ids);
+      if (result?.error) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success(`נמחקו ${result.deleted ?? ids.length} לקוחות`);
+      setSelectedIds(new Set());
+      router.refresh();
+    });
   };
 
   const clearAll = () => {
@@ -228,8 +271,41 @@ export function CustomersList({ customers }: { customers: Customer[] }) {
       ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((c) => (
-            <CustomerCard key={c.id} customer={c} />
+            <CustomerCard
+              key={c.id}
+              customer={c}
+              selected={selectedIds.has(c.id)}
+              onToggleSelect={() => toggleSelected(c.id)}
+            />
           ))}
+        </div>
+      )}
+
+      {selectedIds.size > 0 && (
+        <div
+          role="region"
+          aria-label="פעולות גורפות"
+          className="bg-navy text-cream-paper fixed bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-2xl px-5 py-3 shadow-lg"
+        >
+          <span className="text-sm font-medium">{selectedIds.size} נבחרו</span>
+          <button
+            type="button"
+            onClick={handleBulkDelete}
+            disabled={pendingDelete}
+            aria-busy={pendingDelete}
+            className="flex items-center gap-1.5 rounded-xl bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {pendingDelete ? <Spinner size={13} /> : <Trash2 size={13} />}
+            {pendingDelete ? "מוחק" : "מחק"}
+          </button>
+          <button
+            type="button"
+            onClick={clearSelection}
+            disabled={pendingDelete}
+            className="text-cream-paper/80 hover:text-cream-paper rounded-xl px-2 py-1.5 text-xs font-medium transition-colors disabled:opacity-60"
+          >
+            ביטול בחירה
+          </button>
         </div>
       )}
 
@@ -238,7 +314,15 @@ export function CustomersList({ customers }: { customers: Customer[] }) {
   );
 }
 
-function CustomerCard({ customer: c }: { customer: Customer }) {
+function CustomerCard({
+  customer: c,
+  selected,
+  onToggleSelect,
+}: {
+  customer: Customer;
+  selected: boolean;
+  onToggleSelect: () => void;
+}) {
   const initials = c.name
     .split(" ")
     .slice(0, 2)
@@ -246,12 +330,36 @@ function CustomerCard({ customer: c }: { customer: Customer }) {
     .join("")
     .toUpperCase();
 
+  const handleCheckboxClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onToggleSelect();
+  };
+
   return (
     <Link
       href={`/customers/${c.id}`}
-      className="focus-visible:outline-navy/40 block focus-visible:rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2"
+      className="focus-visible:outline-navy/40 relative block focus-visible:rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2"
     >
-      <div className="bg-cream-paper border-ink-line hover:border-ink-soft group rounded-2xl border p-5 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.99] active:shadow-sm">
+      <div
+        className={`bg-cream-paper group rounded-2xl border p-5 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.99] active:shadow-sm ${
+          selected ? "border-navy ring-navy/30 ring-2" : "border-ink-line hover:border-ink-soft"
+        }`}
+      >
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={selected}
+          aria-label={selected ? "בטל בחירת לקוח" : "בחר לקוח"}
+          onClick={handleCheckboxClick}
+          className={`absolute end-3 top-3 z-10 flex h-5 w-5 items-center justify-center rounded-md border transition-colors ${
+            selected
+              ? "bg-navy border-navy text-cream-paper"
+              : "border-ink-line bg-white opacity-0 group-hover:opacity-100 focus:opacity-100"
+          }`}
+        >
+          {selected && <Check size={12} strokeWidth={3} />}
+        </button>
         <div className="mb-3 flex items-start gap-3">
           <div className="bg-navy text-cream-paper flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold">
             {initials}
