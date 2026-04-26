@@ -139,7 +139,7 @@ export async function deleteTimeEntry(id: string): Promise<{ error?: string }> {
 }
 
 const TimerSchema = z.object({
-  customer_id: z.string().uuid(),
+  customer_id: z.string().uuid().nullish(),
   project_id: z.string().uuid().nullish(),
   task_id: z.string().uuid().nullish(),
   start_time: z.string().min(1),
@@ -175,7 +175,7 @@ export async function createTimeEntryFromTimer(
     .insert({
       tenant_id: profile.tenant_id,
       user_id: profile.id,
-      customer_id: data.customer_id,
+      customer_id: data.customer_id || null,
       project_id: data.project_id || null,
       task_id: data.task_id || null,
       start_time: startISO,
@@ -183,6 +183,8 @@ export async function createTimeEntryFromTimer(
       duration_minutes: duration,
       notes: data.notes || null,
       billable: data.billable ?? true,
+      // entries without customer cannot be allocated yet — keep pending
+      billing_status: data.customer_id ? "pending" : "pending",
     })
     .select("id")
     .single();
@@ -191,4 +193,36 @@ export async function createTimeEntryFromTimer(
 
   revalidatePath("/time");
   return { entryId: entry.id, durationMinutes: duration };
+}
+
+const AssignCustomerSchema = z.object({
+  entry_id: z.string().uuid(),
+  customer_id: z.string().uuid(),
+});
+
+export async function assignCustomerToEntry(input: {
+  entry_id: string;
+  customer_id: string;
+}): Promise<{ error?: string }> {
+  const parsed = AssignCustomerSchema.safeParse(input);
+  if (!parsed.success) return { error: "קלט לא תקין" };
+
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { error: "לא מחובר" };
+
+  const { error } = await supabase
+    .from("time_entries")
+    .update({ customer_id: parsed.data.customer_id })
+    .eq("id", parsed.data.entry_id)
+    .eq("tenant_id", profile.tenant_id);
+
+  if (error) return { error: error.message };
+
+  // Trigger allocation (entries with billing_status='pending' will allocate via trigger)
+  // The DB function allocate_time_entry_to_bank can be called explicitly
+  await supabase.rpc("allocate_time_entry_to_bank", { p_entry_id: parsed.data.entry_id });
+
+  revalidatePath("/time");
+  revalidatePath(`/customers/${parsed.data.customer_id}`);
+  return {};
 }

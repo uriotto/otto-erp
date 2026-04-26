@@ -101,10 +101,8 @@ export function Timer() {
   const handleStop = async () => {
     setStopping(true);
     const snapshot = stop();
-    if (!snapshot || !snapshot.ctx.customerId) {
-      reset();
+    if (!snapshot) {
       setStopping(false);
-      toast.error("חסר לקוח, הטיימר אופס");
       return;
     }
     const res = await createTimeEntryFromTimer({
@@ -119,8 +117,15 @@ export function Timer() {
     setStopping(false);
     if (res.error) {
       toast.error(res.error);
+      return;
+    }
+    if (!snapshot.ctx.customerId) {
+      toast.show(
+        `נשמרו ${res.durationMinutes ?? 0} דקות ללא שיוך ללקוח. שייך מתוך מסך השעות.`,
+        "info",
+      );
     } else {
-      toast.success(`נשמר ${res.durationMinutes ?? 0} דקות`);
+      toast.success(`נשמרו ${res.durationMinutes ?? 0} דקות`);
     }
   };
 

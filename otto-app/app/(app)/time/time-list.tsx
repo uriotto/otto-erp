@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Plus, Clock, Trash2, Building2, FolderKanban, ListChecks } from "lucide-react";
 import type { Tables } from "@/lib/supabase/types";
 import { useToast } from "@/components/ui/toast";
-import { deleteTimeEntry } from "./actions";
+import { Spinner } from "@/components/ui/spinner";
+import { assignCustomerToEntry, deleteTimeEntry } from "./actions";
 import { NewTimeEntryDialog } from "./new-time-entry-dialog";
 
 export type TimeEntryItem = Pick<
@@ -266,7 +267,7 @@ export function TimeList({
               </div>
               <div className="space-y-1.5">
                 {g.items.map((e) => (
-                  <EntryRow key={e.id} entry={e} onDelete={handleDelete} />
+                  <EntryRow key={e.id} entry={e} customers={customers} onDelete={handleDelete} />
                 ))}
               </div>
             </div>
@@ -320,10 +321,51 @@ function SummaryCard({
   );
 }
 
-function EntryRow({ entry, onDelete }: { entry: TimeEntryItem; onDelete: (id: string) => void }) {
+function EntryRow({
+  entry,
+  customers,
+  onDelete,
+}: {
+  entry: TimeEntryItem;
+  customers: CustomerOpt[];
+  onDelete: (id: string) => void;
+}) {
+  const [assigning, setAssigning] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const router = useRouter();
+  const toast = useToast();
+  const noCustomer = !entry.customer_id;
+
+  const handleAssign = (customerId: string) => {
+    if (!customerId) return;
+    startTransition(async () => {
+      const res = await assignCustomerToEntry({
+        entry_id: entry.id,
+        customer_id: customerId,
+      });
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success("שויך ללקוח");
+      setAssigning(false);
+      router.refresh();
+    });
+  };
+
   return (
-    <div className="bg-cream-paper border-ink-line hover:border-ink-soft group flex items-start gap-3 rounded-xl border p-3 transition-colors">
-      <div className="bg-cream-deep text-navy flex h-9 w-9 shrink-0 items-center justify-center rounded-lg">
+    <div
+      className={`group flex items-start gap-3 rounded-xl border p-3 transition-colors ${
+        noCustomer
+          ? "border-amber-300 bg-amber-50 hover:border-amber-400"
+          : "bg-cream-paper border-ink-line hover:border-ink-soft"
+      }`}
+    >
+      <div
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+          noCustomer ? "bg-amber-200 text-amber-800" : "bg-cream-deep text-navy"
+        }`}
+      >
         <Clock size={16} />
       </div>
       <div className="min-w-0 flex-1">
@@ -337,6 +379,11 @@ function EntryRow({ entry, onDelete }: { entry: TimeEntryItem; onDelete: (id: st
           {!entry.billable && (
             <span className="text-ink-faded border-ink-line bg-cream rounded-md border px-1.5 py-0.5 text-xs">
               לא לחיוב
+            </span>
+          )}
+          {noCustomer && (
+            <span className="rounded-md border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">
+              חסר לקוח
             </span>
           )}
         </div>
@@ -361,6 +408,46 @@ function EntryRow({ entry, onDelete }: { entry: TimeEntryItem; onDelete: (id: st
           )}
         </div>
         {entry.notes && <div className="text-ink-soft mt-1 text-xs">{entry.notes}</div>}
+
+        {noCustomer && (
+          <div className="mt-2">
+            {assigning ? (
+              <div className="flex items-center gap-2">
+                <select
+                  autoFocus
+                  defaultValue=""
+                  onChange={(e) => handleAssign(e.target.value)}
+                  disabled={pending}
+                  className="border-ink-line focus:border-navy rounded-md border bg-white px-2 py-1 text-xs outline-none"
+                >
+                  <option value="">— בחר לקוח —</option>
+                  {customers.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setAssigning(false)}
+                  disabled={pending}
+                  className="text-ink-faded hover:text-navy text-xs"
+                >
+                  ביטול
+                </button>
+                {pending && <Spinner size={12} />}
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAssigning(true)}
+                className="rounded-md border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-200"
+              >
+                + שייך ללקוח
+              </button>
+            )}
+          </div>
+        )}
       </div>
       <button
         type="button"
