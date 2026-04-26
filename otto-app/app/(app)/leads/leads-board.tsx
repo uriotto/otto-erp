@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Plus,
   Mail,
@@ -22,6 +23,7 @@ import { ExportCsvButton } from "@/components/ui/export-csv-button";
 type Lead = Tables<"leads">;
 
 const ALL_SOURCES = "__all__";
+const SEARCH_DEBOUNCE_MS = 200;
 
 const STATUSES: { key: Lead["status"]; label: string; color: string }[] = [
   { key: "new", label: "חדש", color: "bg-blue-50 border-blue-200 text-blue-700" },
@@ -32,11 +34,73 @@ const STATUSES: { key: Lead["status"]; label: string; color: string }[] = [
   { key: "lost", label: "הפסד", color: "bg-gray-100 border-gray-200 text-gray-500" },
 ];
 
+const STATUS_KEYS = STATUSES.map((s) => s.key) as Lead["status"][];
+
+function parseTags(value: string | null): string[] {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
+}
+
+function parseStatusFilter(value: string | null): Lead["status"] | "all" {
+  if (!value) return "all";
+  if ((STATUS_KEYS as string[]).includes(value)) return value as Lead["status"];
+  return "all";
+}
+
 export function LeadsBoard({ leads }: { leads: Lead[] }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   const [showNew, setShowNew] = useState(false);
-  const [query, setQuery] = useState("");
-  const [source, setSource] = useState<string>(ALL_SOURCES);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
+  const [source, setSource] = useState<string>(() => searchParams.get("source") ?? ALL_SOURCES);
+  const [statusFilter, setStatusFilter] = useState<Lead["status"] | "all">(() =>
+    parseStatusFilter(searchParams.get("status")),
+  );
+  const [selectedTags, setSelectedTags] = useState<string[]>(() =>
+    parseTags(searchParams.get("tags")),
+  );
+
+  const updateUrl = useCallback(
+    (params: Record<string, string | undefined>) => {
+      const sp = new URLSearchParams(searchParams.toString());
+      for (const [k, v] of Object.entries(params)) {
+        if (v && v.length > 0) sp.set(k, v);
+        else sp.delete(k);
+      }
+      const qs = sp.toString();
+      router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
+    },
+    [router, pathname, searchParams],
+  );
+
+  // Debounced URL update for the search query
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      updateUrl({ q: query.trim() || undefined });
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
+
+  const setSourceAndUrl = (next: string) => {
+    setSource(next);
+    updateUrl({ source: next === ALL_SOURCES ? undefined : next });
+  };
+
+  const setStatusFilterAndUrl = (next: Lead["status"] | "all") => {
+    setStatusFilter(next);
+    updateUrl({ status: next === "all" ? undefined : next });
+  };
+
+  const setTags = (next: string[]) => {
+    setSelectedTags(next);
+    updateUrl({ tags: next.length > 0 ? next.join(",") : undefined });
+  };
 
   const sourceOptions = useMemo(() => {
     const set = new Set<string>();
@@ -62,6 +126,7 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
     const q = query.trim().toLowerCase();
     return leads.filter((lead) => {
       if (source !== ALL_SOURCES && (lead.source ?? "") !== source) return false;
+      if (statusFilter !== "all" && lead.status !== statusFilter) return false;
       if (selectedTags.length > 0) {
         const tags = lead.tags ?? [];
         if (!selectedTags.some((t) => tags.includes(t))) return false;
@@ -73,22 +138,29 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [leads, query, source, selectedTags]);
+  }, [leads, query, source, statusFilter, selectedTags]);
 
   const toggleTag = (tag: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
+    setTags(
+      selectedTags.includes(tag) ? selectedTags.filter((t) => t !== tag) : [...selectedTags, tag],
     );
   };
 
   const activeLeads = filteredLeads.filter((l) => l.status !== "won" && l.status !== "lost");
   const totalValue = activeLeads.reduce((sum, l) => sum + (l.value ?? 0), 0);
 
-  const hasFilters = query.trim().length > 0 || source !== ALL_SOURCES || selectedTags.length > 0;
+  const hasFilters =
+    query.trim().length > 0 ||
+    source !== ALL_SOURCES ||
+    statusFilter !== "all" ||
+    selectedTags.length > 0;
+
   const clearFilters = () => {
     setQuery("");
     setSource(ALL_SOURCES);
+    setStatusFilter("all");
     setSelectedTags([]);
+    updateUrl({ q: undefined, source: undefined, status: undefined, tags: undefined });
   };
 
   return (
@@ -154,7 +226,7 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
             />
             <select
               value={source}
-              onChange={(e) => setSource(e.target.value)}
+              onChange={(e) => setSourceAndUrl(e.target.value)}
               className="bg-cream-paper border-ink-line text-navy focus:border-navy w-full appearance-none rounded-xl border py-2.5 ps-10 pe-3 text-sm transition-colors outline-none"
             >
               <option value={ALL_SOURCES}>כל המקורות</option>
@@ -165,6 +237,39 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
               ))}
             </select>
           </div>
+        </div>
+      )}
+
+      {leads.length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setStatusFilterAndUrl("all")}
+            className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+              statusFilter === "all"
+                ? "bg-navy text-cream-paper border-navy"
+                : "bg-cream-paper text-ink-soft border-ink-line hover:border-ink-soft"
+            }`}
+          >
+            כל הסטטוסים
+          </button>
+          {STATUSES.map(({ key, label }) => {
+            const isActive = statusFilter === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setStatusFilterAndUrl(key)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                  isActive
+                    ? "bg-navy text-cream-paper border-navy"
+                    : "bg-cream-paper text-ink-soft border-ink-line hover:border-ink-soft"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -190,7 +295,7 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
           {selectedTags.length > 0 && (
             <button
               type="button"
-              onClick={() => setSelectedTags([])}
+              onClick={() => setTags([])}
               className="text-ink-soft hover:text-navy ms-1 text-xs underline"
             >
               נקה תגיות

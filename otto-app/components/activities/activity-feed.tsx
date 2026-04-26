@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, AlertCircle, Clock, Pencil, MessageSquarePlus } from "lucide-react";
 import { ACTIVITY_META, type ActivityType } from "./activity-types";
 import { NewActivityDialog } from "./new-activity-dialog";
 import { EditActivityDialog } from "./edit-activity-dialog";
 import { deleteActivity, toggleActivityComplete } from "@/app/(app)/activities/actions";
+import { useToast } from "@/components/ui/toast";
 
 export type Activity = {
   id: string;
@@ -85,11 +86,17 @@ function ActivityItem({ activity, parentPath }: { activity: Activity; parentPath
   const [pending, startTransition] = useTransition();
   const [showEdit, setShowEdit] = useState(false);
   const router = useRouter();
+  const toast = useToast();
   const meta = ACTIVITY_META[activity.type as ActivityType] ?? ACTIVITY_META.note;
   const Icon = meta.icon;
   const isTask = activity.type === "task";
   const isMeeting = activity.type === "meeting";
-  const isDone = !!activity.completed_at;
+  const serverIsDone = !!activity.completed_at;
+  const [optimisticDone, setOptimisticDone] = useOptimistic(
+    serverIsDone,
+    (_state, next: boolean) => next,
+  );
+  const isDone = optimisticDone;
   const isOverdue = isTask && !isDone && activity.due_at && new Date(activity.due_at) < new Date();
 
   function handleDelete() {
@@ -101,27 +108,34 @@ function ActivityItem({ activity, parentPath }: { activity: Activity; parentPath
   }
 
   function handleToggle() {
+    const next = !isDone;
     startTransition(async () => {
-      await toggleActivityComplete(activity.id, !isDone, parentPath);
+      setOptimisticDone(next);
+      const res = await toggleActivityComplete(activity.id, next, parentPath);
+      if (res?.error) {
+        toast.error(res.error || "שגיאה בעדכון המשימה");
+        return;
+      }
+      if (next) toast.success("✓ הושלם");
       router.refresh();
     });
   }
 
   return (
     <li
-      className={`group flex gap-3 rounded-xl border p-3.5 transition-colors ${
+      className={`group flex gap-3 rounded-xl border p-3.5 transition-all duration-300 ease-out motion-reduce:transition-none ${
         isOverdue
           ? "border-red-200 bg-red-50/40"
           : isDone
             ? "border-ink-line bg-cream-paper/50 opacity-60"
-            : "border-ink-line bg-cream-paper"
+            : "border-ink-line bg-cream-paper opacity-100"
       }`}
     >
       {isTask ? (
         <button
           onClick={handleToggle}
           disabled={pending}
-          className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-colors ${
+          className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-all duration-200 ease-out motion-reduce:transition-none ${
             isDone
               ? "border-green-200 bg-green-50 text-green-600"
               : isOverdue
@@ -129,8 +143,9 @@ function ActivityItem({ activity, parentPath }: { activity: Activity; parentPath
                 : `${meta.color} hover:brightness-95`
           }`}
           aria-label={isDone ? "ביטול סימון כבוצעה" : "סמן כבוצעה"}
+          aria-pressed={isDone}
         >
-          {isDone ? (
+          <span className="relative flex h-4 w-4 items-center justify-center">
             <svg
               width="14"
               height="14"
@@ -138,12 +153,19 @@ function ActivityItem({ activity, parentPath }: { activity: Activity; parentPath
               fill="none"
               stroke="currentColor"
               strokeWidth="3"
+              className={`absolute transition-all duration-200 ease-out motion-reduce:transition-none ${
+                isDone ? "scale-100 opacity-100" : "scale-50 opacity-0"
+              }`}
             >
               <polyline points="20 6 9 17 4 12" />
             </svg>
-          ) : (
-            <Icon size={16} />
-          )}
+            <Icon
+              size={16}
+              className={`absolute transition-all duration-200 ease-out motion-reduce:transition-none ${
+                isDone ? "scale-50 opacity-0" : "scale-100 opacity-100"
+              }`}
+            />
+          </span>
         </button>
       ) : (
         <div
@@ -157,7 +179,9 @@ function ActivityItem({ activity, parentPath }: { activity: Activity; parentPath
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div
-              className={`text-navy truncate text-sm font-semibold ${isDone ? "line-through" : ""}`}
+              className={`text-navy truncate text-sm font-semibold transition-all duration-300 ease-out motion-reduce:transition-none ${
+                isDone ? "line-through decoration-1" : ""
+              }`}
             >
               {activity.title}
             </div>
@@ -215,7 +239,7 @@ function ActivityItem({ activity, parentPath }: { activity: Activity; parentPath
         </div>
         {activity.body && (
           <p
-            className={`text-ink-soft mt-2 text-sm leading-relaxed whitespace-pre-wrap ${isDone ? "line-through" : ""}`}
+            className={`text-ink-soft mt-2 text-sm leading-relaxed whitespace-pre-wrap transition-all duration-300 ease-out motion-reduce:transition-none ${isDone ? "line-through decoration-1" : ""}`}
           >
             {activity.body}
           </p>

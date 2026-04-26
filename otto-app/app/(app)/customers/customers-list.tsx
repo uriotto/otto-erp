@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Plus, Mail, Phone, Building2, Search, X, Users, SearchX } from "lucide-react";
 import type { Tables } from "@/lib/supabase/types";
 import { NewCustomerDialog } from "./new-customer-dialog";
@@ -17,11 +18,66 @@ const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: "inactive", label: "לא פעיל" },
 ];
 
+const SEARCH_DEBOUNCE_MS = 200;
+
+function parseStatus(value: string | null): StatusFilter {
+  if (value === "active" || value === "inactive") return value;
+  return "all";
+}
+
+function parseTags(value: string | null): string[] {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
+}
+
 export function CustomersList({ customers }: { customers: Customer[] }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   const [showNew, setShowNew] = useState(false);
-  const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() =>
+    parseStatus(searchParams.get("status")),
+  );
+  const [selectedTags, setSelectedTags] = useState<string[]>(() =>
+    parseTags(searchParams.get("tags")),
+  );
+
+  const updateUrl = useCallback(
+    (params: Record<string, string | undefined>) => {
+      const sp = new URLSearchParams(searchParams.toString());
+      for (const [k, v] of Object.entries(params)) {
+        if (v && v.length > 0) sp.set(k, v);
+        else sp.delete(k);
+      }
+      const qs = sp.toString();
+      router.replace(`${pathname}${qs ? `?${qs}` : ""}`, { scroll: false });
+    },
+    [router, pathname, searchParams],
+  );
+
+  // Debounced URL update for query
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      updateUrl({ q: query.trim() || undefined });
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
+
+  const setStatus = (next: StatusFilter) => {
+    setStatusFilter(next);
+    updateUrl({ status: next === "all" ? undefined : next });
+  };
+
+  const setTags = (next: string[]) => {
+    setSelectedTags(next);
+    updateUrl({ tags: next.length > 0 ? next.join(",") : undefined });
+  };
 
   const availableTags = useMemo(() => {
     const set = new Set<string>();
@@ -51,9 +107,16 @@ export function CustomersList({ customers }: { customers: Customer[] }) {
   }, [customers, query, statusFilter, selectedTags]);
 
   const toggleTag = (tag: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
+    setTags(
+      selectedTags.includes(tag) ? selectedTags.filter((t) => t !== tag) : [...selectedTags, tag],
     );
+  };
+
+  const clearAll = () => {
+    setQuery("");
+    setStatusFilter("all");
+    setSelectedTags([]);
+    updateUrl({ q: undefined, status: undefined, tags: undefined });
   };
 
   const hasCustomers = customers.length > 0;
@@ -112,7 +175,7 @@ export function CustomersList({ customers }: { customers: Customer[] }) {
                 <button
                   key={key}
                   type="button"
-                  onClick={() => setStatusFilter(key)}
+                  onClick={() => setStatus(key)}
                   className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                     isActive
                       ? "bg-navy text-cream-paper border-navy"
@@ -149,7 +212,7 @@ export function CustomersList({ customers }: { customers: Customer[] }) {
           {selectedTags.length > 0 && (
             <button
               type="button"
-              onClick={() => setSelectedTags([])}
+              onClick={() => setTags([])}
               className="text-ink-soft hover:text-navy ms-1 text-xs underline"
             >
               נקה תגיות
@@ -161,14 +224,7 @@ export function CustomersList({ customers }: { customers: Customer[] }) {
       {customers.length === 0 ? (
         <EmptyState onNew={() => setShowNew(true)} />
       ) : filtered.length === 0 ? (
-        <NoResults
-          query={query}
-          onClear={() => {
-            setQuery("");
-            setStatusFilter("all");
-            setSelectedTags([]);
-          }}
-        />
+        <NoResults query={query} onClear={clearAll} />
       ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((c) => (

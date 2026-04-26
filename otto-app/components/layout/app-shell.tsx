@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { Sidebar } from "./sidebar";
 import { AppHeader } from "./header";
+import { Breadcrumbs } from "./breadcrumbs";
 
 type Props = {
   greeting: string;
@@ -42,6 +43,7 @@ export function AppShell({ greeting, displayName, subline, children }: Props) {
           subline={subline}
           onMenuClick={() => setMobileOpen(true)}
         />
+        <Breadcrumbs />
         {children}
       </main>
     </div>

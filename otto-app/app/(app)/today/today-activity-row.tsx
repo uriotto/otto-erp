@@ -1,10 +1,11 @@
 "use client";
 
-import { useTransition } from "react";
+import { useOptimistic, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ACTIVITY_META, type ActivityType } from "@/components/activities/activity-types";
 import { toggleActivityComplete } from "@/app/(app)/activities/actions";
+import { useToast } from "@/components/ui/toast";
 
 type ActivityWithParent = {
   id: string;
@@ -30,10 +31,16 @@ export function TodayActivityRow({
 }) {
   const [pending, startTransition] = useTransition();
   const router = useRouter();
+  const toast = useToast();
   const meta = ACTIVITY_META[activity.type as ActivityType] ?? ACTIVITY_META.note;
   const Icon = meta.icon;
   const isTask = activity.type === "task";
-  const isDone = !!activity.completed_at;
+  const serverIsDone = !!activity.completed_at;
+  const [optimisticDone, setOptimisticDone] = useOptimistic(
+    serverIsDone,
+    (_state, next: boolean) => next,
+  );
+  const isDone = optimisticDone;
 
   const parentName = activity.customers?.name ?? activity.leads?.name ?? "אישי";
   const parentHref = activity.customer_id
@@ -50,28 +57,40 @@ export function TodayActivityRow({
         : "border-ink-line bg-cream-paper";
 
   function handleToggle() {
+    const next = !isDone;
     startTransition(async () => {
-      await toggleActivityComplete(activity.id, !isDone, "/today");
+      setOptimisticDone(next);
+      const res = await toggleActivityComplete(activity.id, next, "/today");
+      if (res?.error) {
+        toast.error(res.error || "שגיאה בעדכון המשימה");
+        return;
+      }
+      if (next) toast.success("✓ הושלם");
       router.refresh();
     });
   }
 
   return (
-    <div className={`flex items-center gap-3 rounded-xl border p-3 ${tone}`}>
+    <div
+      className={`flex items-center gap-3 rounded-xl border p-3 transition-all duration-300 ease-out motion-reduce:transition-none ${tone} ${
+        isDone ? "opacity-60" : "opacity-100"
+      }`}
+    >
       {isTask ? (
         <button
           onClick={handleToggle}
           disabled={pending}
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors ${
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-all duration-200 ease-out motion-reduce:transition-none ${
             isDone
               ? "border-green-200 bg-green-50 text-green-600"
               : variant === "overdue"
                 ? "border-red-200 bg-red-50 text-red-500 hover:bg-red-100"
                 : `${meta.color} hover:brightness-95`
           }`}
-          aria-label="סמן כבוצעה"
+          aria-label={isDone ? "ביטול סימון כבוצעה" : "סמן כבוצעה"}
+          aria-pressed={isDone}
         >
-          {isDone ? (
+          <span className="relative flex h-4 w-4 items-center justify-center">
             <svg
               width="13"
               height="13"
@@ -79,12 +98,19 @@ export function TodayActivityRow({
               fill="none"
               stroke="currentColor"
               strokeWidth="3"
+              className={`absolute transition-all duration-200 ease-out motion-reduce:transition-none ${
+                isDone ? "scale-100 opacity-100" : "scale-50 opacity-0"
+              }`}
             >
               <polyline points="20 6 9 17 4 12" />
             </svg>
-          ) : (
-            <Icon size={14} />
-          )}
+            <Icon
+              size={14}
+              className={`absolute transition-all duration-200 ease-out motion-reduce:transition-none ${
+                isDone ? "scale-50 opacity-0" : "scale-100 opacity-100"
+              }`}
+            />
+          </span>
         </button>
       ) : (
         <div
@@ -95,7 +121,13 @@ export function TodayActivityRow({
       )}
 
       <div className="min-w-0 flex-1">
-        <div className="text-navy truncate text-sm font-semibold">{activity.title}</div>
+        <div
+          className={`text-navy truncate text-sm font-semibold transition-all duration-300 ease-out motion-reduce:transition-none ${
+            isDone ? "line-through decoration-1" : ""
+          }`}
+        >
+          {activity.title}
+        </div>
         <div className="text-ink-faded mt-0.5 flex items-center gap-2 text-xs">
           {parentHref ? (
             <Link href={parentHref} className="hover:text-navy hover:underline">
