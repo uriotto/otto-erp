@@ -586,7 +586,7 @@ async function createAdvanceInvoiceForBank(input: {
       issue_date: today.toISOString().slice(0, 10),
       due_date: dueIso,
       subtotal,
-      tax_rate: 17,
+      tax_rate: 18,
       currency: "ILS",
       notes: "מקדמה לבנק שעות (טיוטה אוטומטית)",
     })

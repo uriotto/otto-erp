@@ -41,7 +41,7 @@ const CreateInvoiceSchema = z.object({
   number: z.string().max(60).optional().nullable(),
   issue_date: z.string().min(1, "תאריך הוצאה חובה"),
   due_date: z.string().optional().nullable(),
-  tax_rate: z.number().min(0).max(100).default(17),
+  tax_rate: z.number().min(0).max(100).default(18),
   notes: z.string().max(4000).optional().nullable(),
   items: z.array(ItemSchema).min(1, "חובה לפחות שורה אחת"),
 });
@@ -304,6 +304,45 @@ export async function cancelInvoice(id: string): Promise<InvoiceActionResult> {
 
   revalidatePath("/invoices");
   revalidatePath(`/invoices/${id}`);
+  return { ok: true, id };
+}
+
+export async function deleteInvoice(id: string): Promise<InvoiceActionResult> {
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { ok: false, error: "לא מחובר" };
+
+  const { data: inv } = await supabase
+    .from("invoices")
+    .select("id, status, hour_bank_id")
+    .eq("id", id)
+    .eq("tenant_id", profile.tenant_id)
+    .maybeSingle();
+
+  if (!inv) return { ok: false, error: "חשבונית לא נמצאה" };
+
+  const { count: paymentCount } = await supabase
+    .from("payments")
+    .select("id", { count: "exact", head: true })
+    .eq("invoice_id", id)
+    .eq("tenant_id", profile.tenant_id);
+
+  if ((paymentCount ?? 0) > 0) {
+    return { ok: false, error: "לא ניתן למחוק חשבונית עם תשלומים. בטל את התשלומים קודם." };
+  }
+
+  // Delete items first (FK), then invoice
+  await supabase.from("invoice_items").delete().eq("invoice_id", id);
+
+  const { error } = await supabase
+    .from("invoices")
+    .delete()
+    .eq("id", id)
+    .eq("tenant_id", profile.tenant_id);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/invoices");
+  if (inv.hour_bank_id) revalidatePath(`/hour-banks/${inv.hour_bank_id}`);
   return { ok: true, id };
 }
 

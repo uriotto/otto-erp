@@ -62,7 +62,7 @@ export function NewInvoiceDialog({
   const [number, setNumber] = useState("");
   const [issueDate, setIssueDate] = useState(todayISO());
   const [dueDate, setDueDate] = useState(plusDaysISO(30));
-  const [taxRate, setTaxRate] = useState("17");
+  const [taxRate, setTaxRate] = useState("18");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<ItemRow[]>([newRow()]);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -137,7 +137,7 @@ export function NewInvoiceDialog({
         number: number.trim() || null,
         issue_date: issueDate,
         due_date: dueDate || null,
-        tax_rate: Number.isFinite(taxRateNum) ? taxRateNum : 17,
+        tax_rate: Number.isFinite(taxRateNum) ? taxRateNum : 18,
         notes: notes.trim() || null,
         items: parsedItems,
       });

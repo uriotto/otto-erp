@@ -2,10 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Send, Pencil, Wallet, Ban } from "lucide-react";
+import { Send, Pencil, Wallet, Ban, Trash2 } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
-import { cancelInvoice, markInvoiceSent } from "../actions";
+import { cancelInvoice, deleteInvoice, markInvoiceSent } from "../actions";
 import { EditInvoiceDialog } from "./edit-invoice-dialog";
 import { PaymentDialog } from "./payment-dialog";
 import type { InvoiceStatusUI } from "../invoices-list";
@@ -30,11 +30,12 @@ export function InvoiceActionsBar({ invoice }: { invoice: EditableInvoice }) {
   const [showEdit, setShowEdit] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
 
-  const isFinalized = invoice.status === "paid" || invoice.status === "cancelled";
+  const isFinalized = invoice.status === "paid";
   const canSend = invoice.status === "draft" || invoice.status === "pending_review";
   const canCancel = invoice.status !== "paid" && invoice.status !== "cancelled";
   const canEdit = invoice.status !== "paid";
   const canRecordPayment = invoice.status !== "cancelled" && invoice.balance > 0;
+  const canDelete = invoice.status === "draft" || invoice.status === "cancelled";
 
   function handleSend() {
     if (!confirm("לסמן את החשבונית כנשלחה?")) return;
@@ -58,6 +59,19 @@ export function InvoiceActionsBar({ invoice }: { invoice: EditableInvoice }) {
       } else {
         toast.success("החשבונית בוטלה");
         router.refresh();
+      }
+    });
+  }
+
+  function handleDelete() {
+    if (!confirm("למחוק את החשבונית לצמיתות? לא ניתן לשחזר.")) return;
+    startTransition(async () => {
+      const result = await deleteInvoice(invoice.id);
+      if (!result.ok) {
+        toast.error(result.error);
+      } else {
+        toast.success("החשבונית נמחקה");
+        router.push("/invoices");
       }
     });
   }
@@ -110,6 +124,17 @@ export function InvoiceActionsBar({ invoice }: { invoice: EditableInvoice }) {
           >
             <Ban size={14} />
             ביטול חשבונית
+          </button>
+        )}
+        {canDelete && (
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={pending}
+            className={`${canCancel ? "" : "ms-auto"} flex items-center gap-1.5 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 transition-colors hover:bg-rose-100 disabled:opacity-50`}
+          >
+            <Trash2 size={14} />
+            מחיקה
           </button>
         )}
       </div>
