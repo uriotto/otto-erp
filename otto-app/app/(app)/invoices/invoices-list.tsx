@@ -306,19 +306,24 @@ function Th({ children, align }: { children: React.ReactNode; align?: "end" }) {
 }
 
 function InvoiceRow({ inv }: { inv: InvoiceListItem }) {
+  const router = useRouter();
   const remaining = Math.max(inv.total_amount - inv.paid_amount, 0);
   const overdue =
     inv.status !== "paid" && inv.status !== "cancelled" && inv.days_overdue > 0 && remaining > 0;
 
   return (
-    <tr className="border-ink-line hover:bg-cream-deep/40 border-t transition-colors">
+    <tr
+      onClick={() => router.push(`/invoices/${inv.id}`)}
+      className="border-ink-line hover:bg-cream-deep/40 cursor-pointer border-t transition-colors"
+    >
       <td className="px-4 py-3">
         <Link
           href={`/invoices/${inv.id}`}
+          onClick={(e) => e.stopPropagation()}
           className="text-navy hover:text-navy-deep font-mono font-semibold"
           dir="ltr"
         >
-          {inv.number ?? "—"}
+          {inv.number ?? "טיוטה"}
         </Link>
       </td>
       <td className="px-4 py-3">

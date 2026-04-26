@@ -221,7 +221,7 @@ export default async function HourBankPage({ params }: { params: Promise<{ id: s
                     <div className="flex items-center gap-2">
                       <Link
                         href={`/invoices/${inv.id}`}
-                        className="text-navy hover:text-navy-deep text-sm font-semibold"
+                        className="text-navy hover:text-navy-deep text-sm font-semibold underline-offset-2 hover:underline"
                       >
                         {inv.number ?? "טיוטה"}
                       </Link>
