@@ -2,11 +2,11 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Building2, Calendar, Banknote, LayoutGrid, Wallet } from "lucide-react";
+import { Plus, Building2, Calendar, Banknote, FileClock, LayoutGrid, Wallet } from "lucide-react";
 import { HourBankProgress } from "@/components/domain/hour-bank-progress";
 import { NewHourBankDialog } from "./new-hour-bank-dialog";
 
-export type HourBankStatus = "active" | "depleted" | "expired" | "cancelled";
+export type HourBankStatus = "draft" | "active" | "depleted" | "expired" | "cancelled";
 
 export type HourBankListItem = {
   id: string;
@@ -32,6 +32,7 @@ export type CustomerOption = {
 };
 
 const STATUS_LABELS: Record<HourBankStatus, string> = {
+  draft: "טיוטה",
   active: "פעיל",
   depleted: "נוצל",
   expired: "פג תוקף",
@@ -39,6 +40,7 @@ const STATUS_LABELS: Record<HourBankStatus, string> = {
 };
 
 const STATUS_STYLES: Record<HourBankStatus, string> = {
+  draft: "border-amber-200 bg-amber-50 text-amber-700",
   active: "border-emerald-200 bg-emerald-50 text-emerald-700",
   depleted: "border-gray-200 bg-gray-100 text-gray-600",
   expired: "border-rose-200 bg-rose-50 text-rose-700",
@@ -56,6 +58,7 @@ const TABS: Array<{ key: "all" | HourBankStatus; label: string }> = [
 export function HourBanksList({
   banks,
   customers,
+  draftCount,
   defaultHourlyRate,
   defaultExpiryMonths,
   defaultAlertPct,
@@ -63,6 +66,7 @@ export function HourBanksList({
 }: {
   banks: HourBankListItem[];
   customers: CustomerOption[];
+  draftCount: number;
   defaultHourlyRate: number;
   defaultExpiryMonths: number;
   defaultAlertPct: number;
@@ -93,14 +97,25 @@ export function HourBanksList({
           <h1 className="text-display-md text-navy">בנקי שעות</h1>
           <p className="text-ink-soft mt-1 text-sm">{banks.length} בנקים סך הכל</p>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowNew(true)}
-          className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
-        >
-          <Plus size={16} />
-          בנק חדש
-        </button>
+        <div className="flex items-center gap-2">
+          {draftCount > 0 && (
+            <Link
+              href="/hour-banks/draft-renewals"
+              className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-100"
+            >
+              <FileClock size={16} />
+              טיוטות חידוש ({draftCount})
+            </Link>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowNew(true)}
+            className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
+          >
+            <Plus size={16} />
+            בנק חדש
+          </button>
+        </div>
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">

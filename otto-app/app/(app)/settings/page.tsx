@@ -6,7 +6,9 @@ import { TenantCard } from "./tenant-card";
 import { TagsCard } from "./tags-card";
 import { ExportCard } from "./export-card";
 import { DangerZoneCard } from "./danger-zone-card";
-import { listTagsUsage } from "./actions";
+import { BillingCard } from "./billing-card";
+import { IntegrationsCard } from "./integrations-card";
+import { getBillingSettings, listTagsUsage } from "./actions";
 
 export const metadata = { title: "הגדרות — OTTO" };
 
@@ -35,6 +37,9 @@ export default async function SettingsPage() {
   const tagsResult = await listTagsUsage();
   const tags = tagsResult.data ?? [];
 
+  const billingResult = profile.role === "admin" ? await getBillingSettings() : null;
+  const billing = billingResult?.data ?? null;
+
   return (
     <div className="mx-auto max-w-3xl">
       <div className="mb-8">
@@ -58,6 +63,12 @@ export default async function SettingsPage() {
             plan={tenant.plan}
             canEdit={profile.role === "admin"}
           />
+        )}
+
+        {profile.role === "admin" && billing && <BillingCard initial={billing} />}
+
+        {profile.role === "admin" && billing && (
+          <IntegrationsCard initialUrl={billing.make_webhook_url} />
         )}
 
         <TagsCard initialTags={tags} />

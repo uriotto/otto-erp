@@ -183,7 +183,9 @@ export type Database = {
           default_alert_threshold_hours: number;
           default_alert_threshold_pct: number;
           default_hour_bank_expiry_months: number;
+          default_hour_bank_rate: number;
           default_hourly_rate: number;
+          make_webhook_url: string | null;
           tenant_id: string;
           updated_at: string;
         };
@@ -192,7 +194,9 @@ export type Database = {
           default_alert_threshold_hours?: number;
           default_alert_threshold_pct?: number;
           default_hour_bank_expiry_months?: number;
+          default_hour_bank_rate?: number;
           default_hourly_rate?: number;
+          make_webhook_url?: string | null;
           tenant_id: string;
           updated_at?: string;
         };
@@ -201,9 +205,47 @@ export type Database = {
           default_alert_threshold_hours?: number;
           default_alert_threshold_pct?: number;
           default_hour_bank_expiry_months?: number;
+          default_hour_bank_rate?: number;
           default_hourly_rate?: number;
+          make_webhook_url?: string | null;
           tenant_id?: string;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      notifications: {
+        Row: {
+          body: string | null;
+          created_at: string;
+          id: string;
+          link: string | null;
+          read_at: string | null;
+          severity: Database["public"]["Enums"]["notification_severity"];
+          tenant_id: string;
+          title: string;
+          user_id: string | null;
+        };
+        Insert: {
+          body?: string | null;
+          created_at?: string;
+          id?: string;
+          link?: string | null;
+          read_at?: string | null;
+          severity?: Database["public"]["Enums"]["notification_severity"];
+          tenant_id: string;
+          title: string;
+          user_id?: string | null;
+        };
+        Update: {
+          body?: string | null;
+          created_at?: string;
+          id?: string;
+          link?: string | null;
+          read_at?: string | null;
+          severity?: Database["public"]["Enums"]["notification_severity"];
+          tenant_id?: string;
+          title?: string;
+          user_id?: string | null;
         };
         Relationships: [];
       };
@@ -478,12 +520,14 @@ export type Database = {
         Row: {
           billable: boolean;
           billing_status: string;
+          consumed_from_bank_id: string | null;
           customer_id: string | null;
           duration_minutes: number | null;
           end_time: string | null;
           hourly_rate_at_entry: number | null;
           id: string;
           imported_from_toggl: boolean;
+          is_overage: boolean;
           notes: string | null;
           project_id: string | null;
           start_time: string;
@@ -494,12 +538,14 @@ export type Database = {
         Insert: {
           billable?: boolean;
           billing_status?: string;
+          consumed_from_bank_id?: string | null;
           customer_id?: string | null;
           duration_minutes?: number | null;
           end_time?: string | null;
           hourly_rate_at_entry?: number | null;
           id?: string;
           imported_from_toggl?: boolean;
+          is_overage?: boolean;
           notes?: string | null;
           project_id?: string | null;
           start_time: string;
@@ -510,12 +556,14 @@ export type Database = {
         Update: {
           billable?: boolean;
           billing_status?: string;
+          consumed_from_bank_id?: string | null;
           customer_id?: string | null;
           duration_minutes?: number | null;
           end_time?: string | null;
           hourly_rate_at_entry?: number | null;
           id?: string;
           imported_from_toggl?: boolean;
+          is_overage?: boolean;
           notes?: string | null;
           project_id?: string | null;
           start_time?: string;
@@ -625,13 +673,24 @@ export type Database = {
       };
     };
     Functions: {
+      allocate_time_entry_to_bank: {
+        Args: { p_entry_id: string };
+        Returns: {
+          entry_id: string;
+          status: Database["public"]["Enums"]["time_entry_billing_status"];
+        }[];
+      };
+      check_bank_alerts: { Args: { p_bank_id: string }; Returns: undefined };
       convert_lead_to_customer: { Args: { p_lead_id: string }; Returns: string };
       current_customer_id: { Args: never; Returns: string };
       current_tenant_id: { Args: never; Returns: string };
       current_user_role: { Args: never; Returns: string };
+      process_expired_hour_banks: { Args: never; Returns: undefined };
+      recalculate_bank: { Args: { p_bank_id: string }; Returns: undefined };
     };
     Enums: {
-      hour_bank_status: "active" | "depleted" | "expired" | "cancelled";
+      hour_bank_status: "draft" | "active" | "depleted" | "expired" | "cancelled";
+      notification_severity: "info" | "warning" | "critical" | "success";
       project_billing_model: "hourly" | "hour_bank" | "fixed_price" | "retainer";
       project_health: "on_track" | "at_risk" | "off_track";
       project_phase:
@@ -644,6 +703,12 @@ export type Database = {
       project_status: "planning" | "active" | "on_hold" | "completed" | "cancelled";
       task_priority: "low" | "medium" | "high" | "urgent";
       task_status: "todo" | "in_progress" | "review" | "done" | "cancelled";
+      time_entry_billing_status:
+        | "pending"
+        | "allocated_to_bank"
+        | "overage"
+        | "invoiced"
+        | "cancelled";
     };
     CompositeTypes: { [_ in never]: never };
   };

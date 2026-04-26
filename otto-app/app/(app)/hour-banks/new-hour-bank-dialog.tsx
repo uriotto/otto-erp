@@ -4,9 +4,20 @@ import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { createHourBank, type HourBankFormState } from "./actions";
+import { OverageDialog } from "./overage-dialog";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
 import type { CustomerOption } from "./hour-banks-list";
+
+type OverageInfo = {
+  bankId: string;
+  customerId: string;
+  customerName: string;
+  count: number;
+  hours: number;
+  amount: number;
+  entryIds: string[];
+};
 
 const init: HourBankFormState = {};
 
@@ -41,6 +52,7 @@ export function NewHourBankDialog({
 
   const [customerId, setCustomerId] = useState("");
   const [confirmDuplicate, setConfirmDuplicate] = useState(false);
+  const [overage, setOverage] = useState<OverageInfo | null>(null);
 
   const defaultRate = useMemo(() => {
     const c = customers.find((x) => x.id === customerId);
@@ -49,18 +61,58 @@ export function NewHourBankDialog({
   }, [customerId, customers, defaultHourlyRate]);
 
   useEffect(() => {
-    if (state.success) {
+    if (state.success && state.bankId) {
       toast.success("הבנק נוצר");
-      onClose();
-      if (state.bankId) router.push(`/hour-banks/${state.bankId}`);
+      const hasOverage =
+        (state.unhandledOverageCount ?? 0) > 0 &&
+        state.customerId &&
+        state.unhandledOverageEntryIds &&
+        state.unhandledOverageEntryIds.length > 0;
+      if (hasOverage) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setOverage({
+          bankId: state.bankId,
+          customerId: state.customerId!,
+          customerName: state.customerName ?? "הלקוח",
+          count: state.unhandledOverageCount ?? 0,
+          hours: state.unhandledOverageHours ?? 0,
+          amount: state.unhandledOverageAmount ?? 0,
+          entryIds: state.unhandledOverageEntryIds!,
+        });
+      } else {
+        onClose();
+        router.push(`/hour-banks/${state.bankId}`);
+      }
     } else if (state.warning) {
       toast.show(state.warning, "info");
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+
       setConfirmDuplicate(true);
     } else if (state.error) {
       toast.error(state.error);
     }
   }, [state, toast, onClose, router]);
+
+  function handleOverageClose() {
+    const bankId = overage?.bankId;
+    setOverage(null);
+    onClose();
+    if (bankId) router.push(`/hour-banks/${bankId}`);
+  }
+
+  if (overage) {
+    return (
+      <OverageDialog
+        bankId={overage.bankId}
+        customerId={overage.customerId}
+        customerName={overage.customerName}
+        count={overage.count}
+        hours={overage.hours}
+        amount={overage.amount}
+        entryIds={overage.entryIds}
+        onClose={handleOverageClose}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

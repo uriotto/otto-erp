@@ -273,6 +273,153 @@ export async function exportAllData(): Promise<ActionResult<ExportPayload>> {
   };
 }
 
+const BillingSettingsSchema = z.object({
+  default_hourly_rate: z.coerce
+    .number()
+    .positive("התעריף חייב להיות גדול מ-0")
+    .max(100000, "ערך גבוה מדי"),
+  default_hour_bank_rate: z.coerce
+    .number()
+    .positive("התעריף חייב להיות גדול מ-0")
+    .max(100000, "ערך גבוה מדי"),
+  default_alert_threshold_pct: z.coerce
+    .number()
+    .int("חייב להיות מספר שלם")
+    .min(0, "חייב להיות 0 ומעלה")
+    .max(100, "מקסימום 100%"),
+  default_alert_threshold_hours: z.coerce
+    .number()
+    .min(0, "חייב להיות 0 ומעלה")
+    .max(10000, "ערך גבוה מדי"),
+  default_hour_bank_expiry_months: z.coerce
+    .number()
+    .int("חייב להיות מספר שלם")
+    .min(1, "מינימום חודש אחד")
+    .max(120, "מקסימום 120 חודשים"),
+  auto_absorb_overage_default: z.coerce.boolean(),
+});
+
+export type BillingSettingsInput = z.input<typeof BillingSettingsSchema>;
+
+export type BillingSettings = {
+  default_hourly_rate: number;
+  default_hour_bank_rate: number;
+  default_alert_threshold_pct: number;
+  default_alert_threshold_hours: number;
+  default_hour_bank_expiry_months: number;
+  auto_absorb_overage_default: boolean;
+  make_webhook_url: string | null;
+};
+
+export async function getBillingSettings(): Promise<ActionResult<BillingSettings>> {
+  const ctx = await getCurrentTenant();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, tenantId } = ctx;
+
+  const { data, error } = await supabase
+    .from("tenant_settings")
+    .select(
+      "default_hourly_rate, default_hour_bank_rate, default_alert_threshold_pct, default_alert_threshold_hours, default_hour_bank_expiry_months, auto_absorb_overage_default, make_webhook_url",
+    )
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+
+  if (error) return { error: error.message };
+
+  return {
+    data: {
+      default_hourly_rate: Number(data?.default_hourly_rate ?? 500),
+      default_hour_bank_rate: Number(data?.default_hour_bank_rate ?? 450),
+      default_alert_threshold_pct: Number(data?.default_alert_threshold_pct ?? 30),
+      default_alert_threshold_hours: Number(data?.default_alert_threshold_hours ?? 3),
+      default_hour_bank_expiry_months: Number(data?.default_hour_bank_expiry_months ?? 12),
+      auto_absorb_overage_default: Boolean(data?.auto_absorb_overage_default ?? true),
+      make_webhook_url: data?.make_webhook_url ?? null,
+    },
+  };
+}
+
+export async function updateBillingSettings(
+  input: Partial<BillingSettingsInput>,
+): Promise<ActionResult<BillingSettings>> {
+  const ctx = await getCurrentTenant();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, tenantId, role } = ctx;
+  if (role !== "admin") return { error: "רק מנהלים יכולים לעדכן הגדרות חיוב" };
+
+  const parsed = BillingSettingsSchema.safeParse(input);
+  if (!parsed.success) {
+    const first = parsed.error.issues[0];
+    return { error: first?.message ?? "ערכים לא תקינים" };
+  }
+
+  const { error } = await supabase.from("tenant_settings").upsert(
+    {
+      tenant_id: tenantId,
+      default_hourly_rate: parsed.data.default_hourly_rate,
+      default_hour_bank_rate: parsed.data.default_hour_bank_rate,
+      default_alert_threshold_pct: parsed.data.default_alert_threshold_pct,
+      default_alert_threshold_hours: parsed.data.default_alert_threshold_hours,
+      default_hour_bank_expiry_months: parsed.data.default_hour_bank_expiry_months,
+      auto_absorb_overage_default: parsed.data.auto_absorb_overage_default,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "tenant_id" },
+  );
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/settings");
+  revalidatePath("/hour-banks");
+
+  return await getBillingSettings();
+}
+
+const MakeWebhookSchema = z
+  .string()
+  .trim()
+  .max(1000, "URL ארוך מדי")
+  .refine((value) => {
+    if (value.length === 0) return true;
+    try {
+      const url = new URL(value);
+      return url.protocol === "https:" || url.protocol === "http:";
+    } catch {
+      return false;
+    }
+  }, "כתובת URL לא תקינה");
+
+export async function updateMakeWebhook(
+  url: string,
+): Promise<ActionResult<{ make_webhook_url: string | null }>> {
+  const ctx = await getCurrentTenant();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, tenantId, role } = ctx;
+  if (role !== "admin") return { error: "רק מנהלים יכולים לעדכן את כתובת ה-Webhook" };
+
+  const parsed = MakeWebhookSchema.safeParse(url ?? "");
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "כתובת לא תקינה" };
+  }
+
+  const value = parsed.data.length === 0 ? null : parsed.data;
+
+  const { error } = await supabase.from("tenant_settings").upsert(
+    {
+      tenant_id: tenantId,
+      make_webhook_url: value,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "tenant_id" },
+  );
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/settings");
+
+  return { data: { make_webhook_url: value } };
+}
+
 export async function updateTenant(
   _prev: SettingsFormState,
   formData: FormData,

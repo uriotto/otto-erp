@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { fireMakeWebhook } from "@/lib/make-webhook";
 import type { TablesUpdate } from "@/lib/supabase/types";
 
 const CreateSchema = z.object({
@@ -31,6 +32,12 @@ export type HourBankFormState = {
   fieldErrors?: Record<string, string[]>;
   success?: boolean;
   bankId?: string;
+  unhandledOverageCount?: number;
+  unhandledOverageHours?: number;
+  unhandledOverageAmount?: number;
+  unhandledOverageEntryIds?: string[];
+  customerId?: string;
+  customerName?: string;
 };
 
 function num(value: string | undefined): number | null {
@@ -150,8 +157,208 @@ export async function createHourBank(
 
   if (error) return { error: error.message };
 
+  // Fire Make webhook (best-effort, non-blocking semantics)
+  await fireMakeWebhook(profile.tenant_id, "hour_bank.created", {
+    bank_id: bank.id,
+    customer_id: data.customer_id,
+    purchased_hours: purchasedHours,
+    hourly_rate: hourlyRate,
+    purchase_date: purchaseDate,
+    expiry_date: expiryDate,
+  });
+
+  // Detect unhandled overage entries for this customer
+  const { data: overageRows } = await supabase
+    .from("time_entries")
+    .select("id, duration_minutes, hourly_rate_at_entry")
+    .eq("tenant_id", profile.tenant_id)
+    .eq("customer_id", data.customer_id)
+    .eq("is_overage", true)
+    .eq("billing_status", "overage");
+
+  const overage = overageRows ?? [];
+  const overageHours = overage.reduce((sum, e) => sum + (Number(e.duration_minutes) || 0), 0) / 60;
+  const overageAmount = overage.reduce(
+    (sum, e) =>
+      sum +
+      ((Number(e.duration_minutes) || 0) / 60) * (Number(e.hourly_rate_at_entry) || hourlyRate),
+    0,
+  );
+
+  const { data: customerRow } = await supabase
+    .from("customers")
+    .select("name")
+    .eq("id", data.customer_id)
+    .eq("tenant_id", profile.tenant_id)
+    .maybeSingle();
+
   revalidatePath("/hour-banks");
-  return { success: true, bankId: bank.id };
+  return {
+    success: true,
+    bankId: bank.id,
+    unhandledOverageCount: overage.length,
+    unhandledOverageHours: Math.round(overageHours * 100) / 100,
+    unhandledOverageAmount: Math.round(overageAmount * 100) / 100,
+    unhandledOverageEntryIds: overage.map((e) => e.id),
+    customerId: data.customer_id,
+    customerName: customerRow?.name,
+  };
+}
+
+// ---------- Renewal drafts ----------
+
+export async function approveRenewalDraft(draftId: string): Promise<{ error?: string }> {
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { error: "לא מחובר" };
+
+  const { data: bank, error } = await supabase
+    .from("hour_banks")
+    .update({ status: "active" })
+    .eq("id", draftId)
+    .eq("tenant_id", profile.tenant_id)
+    .eq("status", "draft")
+    .select("id, customer_id, parent_bank_id, purchased_hours, hourly_rate, expiry_date")
+    .maybeSingle();
+
+  if (error) return { error: error.message };
+  if (!bank) return { error: "טיוטה לא נמצאה" };
+
+  await fireMakeWebhook(profile.tenant_id, "hour_bank.renewed", {
+    bank_id: bank.id,
+    parent_bank_id: bank.parent_bank_id,
+    customer_id: bank.customer_id,
+    purchased_hours: bank.purchased_hours,
+    hourly_rate: bank.hourly_rate,
+    expiry_date: bank.expiry_date,
+  });
+
+  revalidatePath("/hour-banks");
+  revalidatePath("/hour-banks/draft-renewals");
+  revalidatePath(`/hour-banks/${bank.id}`);
+  return {};
+}
+
+export async function discardRenewalDraft(draftId: string): Promise<{ error?: string }> {
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { error: "לא מחובר" };
+
+  const { error } = await supabase
+    .from("hour_banks")
+    .delete()
+    .eq("id", draftId)
+    .eq("tenant_id", profile.tenant_id)
+    .eq("status", "draft");
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/hour-banks");
+  revalidatePath("/hour-banks/draft-renewals");
+  return {};
+}
+
+// ---------- Overage handling ----------
+
+export async function absorbOverageIntoBank(
+  bankId: string,
+): Promise<{ error?: string; absorbedHours?: number }> {
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { error: "לא מחובר" };
+
+  const { data: bank } = await supabase
+    .from("hour_banks")
+    .select("id, customer_id, absorbed_overage_hours")
+    .eq("id", bankId)
+    .eq("tenant_id", profile.tenant_id)
+    .maybeSingle();
+
+  if (!bank || !bank.customer_id) return { error: "בנק לא נמצא" };
+
+  const { data: entries, error: fetchErr } = await supabase
+    .from("time_entries")
+    .select("id, duration_minutes")
+    .eq("tenant_id", profile.tenant_id)
+    .eq("customer_id", bank.customer_id)
+    .eq("is_overage", true)
+    .eq("billing_status", "overage");
+
+  if (fetchErr) return { error: fetchErr.message };
+  if (!entries || entries.length === 0) return { absorbedHours: 0 };
+
+  const totalHours = entries.reduce((sum, e) => sum + (Number(e.duration_minutes) || 0), 0) / 60;
+
+  const ids = entries.map((e) => e.id);
+
+  const { error: updErr } = await supabase
+    .from("time_entries")
+    .update({
+      billing_status: "allocated_to_bank",
+      consumed_from_bank_id: bankId,
+      is_overage: false,
+    })
+    .in("id", ids)
+    .eq("tenant_id", profile.tenant_id);
+
+  if (updErr) return { error: updErr.message };
+
+  const newAbsorbed =
+    (Number(bank.absorbed_overage_hours) || 0) + Math.round(totalHours * 100) / 100;
+
+  const { error: bankErr } = await supabase
+    .from("hour_banks")
+    .update({ absorbed_overage_hours: newAbsorbed })
+    .eq("id", bankId)
+    .eq("tenant_id", profile.tenant_id);
+
+  if (bankErr) return { error: bankErr.message };
+
+  revalidatePath("/hour-banks");
+  revalidatePath(`/hour-banks/${bankId}`);
+  return { absorbedHours: Math.round(totalHours * 100) / 100 };
+}
+
+export async function invoiceOverageSeparately(
+  customerId: string,
+  overageEntryIds: string[],
+): Promise<{ error?: string }> {
+  if (overageEntryIds.length === 0) return {};
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { error: "לא מחובר" };
+
+  const { error } = await supabase
+    .from("time_entries")
+    .update({ billing_status: "invoiced" })
+    .in("id", overageEntryIds)
+    .eq("tenant_id", profile.tenant_id)
+    .eq("customer_id", customerId);
+
+  if (error) return { error: error.message };
+
+  await fireMakeWebhook(profile.tenant_id, "overage.invoice_requested", {
+    customer_id: customerId,
+    time_entry_ids: overageEntryIds,
+  });
+
+  revalidatePath("/hour-banks");
+  revalidatePath("/time");
+  return {};
+}
+
+export async function cancelOverageEntries(overageEntryIds: string[]): Promise<{ error?: string }> {
+  if (overageEntryIds.length === 0) return {};
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { error: "לא מחובר" };
+
+  const { error } = await supabase
+    .from("time_entries")
+    .update({ billing_status: "cancelled" })
+    .in("id", overageEntryIds)
+    .eq("tenant_id", profile.tenant_id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/hour-banks");
+  revalidatePath("/time");
+  return {};
 }
 
 export async function updateHourBank(
@@ -209,4 +416,109 @@ export async function cancelHourBank(id: string): Promise<{ error?: string }> {
   revalidatePath("/hour-banks");
   revalidatePath(`/hour-banks/${id}`);
   return {};
+}
+
+// ---------- Phase 3.9: Expiry management ----------
+
+const ExtendExpirySchema = z.object({
+  id: z.string().uuid(),
+  expiry_date: z.string().min(1, "תאריך חובה"),
+});
+
+export async function extendBankExpiry(input: {
+  id: string;
+  expiry_date: string;
+}): Promise<{ error?: string }> {
+  const parsed = ExtendExpirySchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "ערכים לא תקינים" };
+  }
+
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { error: "לא מחובר" };
+
+  const today = new Date().toISOString().slice(0, 10);
+  if (parsed.data.expiry_date <= today) {
+    return { error: "תאריך התפוגה חייב להיות עתידי" };
+  }
+
+  const { error } = await supabase
+    .from("hour_banks")
+    .update({ expiry_date: parsed.data.expiry_date, status: "active" })
+    .eq("id", parsed.data.id)
+    .eq("tenant_id", profile.tenant_id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/hour-banks");
+  revalidatePath("/hour-banks/expired");
+  revalidatePath(`/hour-banks/${parsed.data.id}`);
+  return {};
+}
+
+const PartialRefundSchema = z.object({
+  id: z.string().uuid(),
+  notes: z.string().min(1, "הערה חובה").max(2000, "הערה ארוכה מדי"),
+});
+
+export async function partialRefundExpiredBank(input: {
+  id: string;
+  notes: string;
+}): Promise<{ error?: string }> {
+  const parsed = PartialRefundSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "ערכים לא תקינים" };
+  }
+
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { error: "לא מחובר" };
+
+  const { data: bank, error: loadErr } = await supabase
+    .from("hour_banks")
+    .select("notes")
+    .eq("id", parsed.data.id)
+    .eq("tenant_id", profile.tenant_id)
+    .maybeSingle();
+
+  if (loadErr) return { error: loadErr.message };
+  if (!bank) return { error: "בנק לא נמצא" };
+
+  const stamp = new Date().toISOString().slice(0, 10);
+  const refundLine = `[${stamp}] החזר חלקי: ${parsed.data.notes}`;
+  const combinedNotes = bank.notes ? `${bank.notes}\n${refundLine}` : refundLine;
+
+  const { error } = await supabase
+    .from("hour_banks")
+    .update({ status: "cancelled", notes: combinedNotes })
+    .eq("id", parsed.data.id)
+    .eq("tenant_id", profile.tenant_id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/hour-banks");
+  revalidatePath("/hour-banks/expired");
+  revalidatePath(`/hour-banks/${parsed.data.id}`);
+  return {};
+}
+
+export async function runExpiryCheckNow(): Promise<{ error?: string; processed?: boolean }> {
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { error: "לא מחובר" };
+
+  const { data: roleRow } = await supabase
+    .from("users")
+    .select("role")
+    .eq("id", profile.id)
+    .single();
+
+  if (!roleRow || roleRow.role !== "admin") {
+    return { error: "רק מנהלים יכולים להריץ בדיקת תפוגות" };
+  }
+
+  const { error } = await supabase.rpc("process_expired_hour_banks");
+  if (error) return { error: error.message };
+
+  revalidatePath("/hour-banks");
+  revalidatePath("/hour-banks/expired");
+  return { processed: true };
 }

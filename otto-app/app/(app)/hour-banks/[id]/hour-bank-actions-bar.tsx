@@ -10,7 +10,7 @@ import { EditHourBankDialog } from "./edit-hour-bank-dialog";
 
 export type EditableBank = {
   id: string;
-  status: "active" | "depleted" | "expired" | "cancelled";
+  status: "draft" | "active" | "depleted" | "expired" | "cancelled";
   expiry_date: string | null;
   alert_threshold_pct: number;
   alert_threshold_hours: number;

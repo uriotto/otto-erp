@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { Menu, Settings } from "lucide-react";
 
+import { NotificationBell } from "@/components/notifications/notification-bell";
+
 import { HeaderSearch } from "./header-search";
 import { Timer } from "./timer";
 
@@ -42,6 +44,7 @@ export function AppHeader({ greeting, displayName, subline, onMenuClick }: Props
 
       <div className="flex flex-1 items-center justify-end gap-2.5 md:max-w-[640px]">
         <Timer />
+        <NotificationBell />
 
         <div className="flex-1 md:w-[400px] md:flex-none">
           <HeaderSearch />
