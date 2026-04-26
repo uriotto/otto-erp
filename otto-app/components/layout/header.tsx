@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Menu, Settings } from "lucide-react";
 
 import { HeaderSearch } from "./header-search";
+import { Timer } from "./timer";
 
 type Props = {
   greeting: string;
@@ -40,11 +41,7 @@ export function AppHeader({ greeting, displayName, subline, onMenuClick }: Props
       </div>
 
       <div className="flex flex-1 items-center justify-end gap-2.5 md:max-w-[640px]">
-        <div className="bg-cream-paper border-ink-line text-navy hover:border-navy hidden items-center gap-3 rounded-full border px-4 py-2.5 text-sm font-semibold transition-colors lg:flex">
-          <span className="bg-navy h-2 w-2 animate-pulse rounded-full" aria-hidden />
-          <span dir="ltr">00:00:00</span>
-          <span className="text-ink-faded text-xs font-medium">— אין טיימר פעיל</span>
-        </div>
+        <Timer />
 
         <div className="flex-1 md:w-[400px] md:flex-none">
           <HeaderSearch />
