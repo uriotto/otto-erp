@@ -52,36 +52,7 @@ export type Database = {
           title?: string;
           type?: string;
         };
-        Relationships: [
-          {
-            foreignKeyName: "activities_created_by_fkey";
-            columns: ["created_by"];
-            isOneToOne: false;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "activities_customer_id_fkey";
-            columns: ["customer_id"];
-            isOneToOne: false;
-            referencedRelation: "customers";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "activities_lead_id_fkey";
-            columns: ["lead_id"];
-            isOneToOne: false;
-            referencedRelation: "leads";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "activities_tenant_id_fkey";
-            columns: ["tenant_id"];
-            isOneToOne: false;
-            referencedRelation: "tenants";
-            referencedColumns: ["id"];
-          },
-        ];
+        Relationships: [];
       };
       customers: {
         Row: {
@@ -129,15 +100,7 @@ export type Database = {
           updated_at?: string;
           website?: string | null;
         };
-        Relationships: [
-          {
-            foreignKeyName: "customers_tenant_id_fkey";
-            columns: ["tenant_id"];
-            isOneToOne: false;
-            referencedRelation: "tenants";
-            referencedColumns: ["id"];
-          },
-        ];
+        Relationships: [];
       };
       leads: {
         Row: {
@@ -191,29 +154,154 @@ export type Database = {
           updated_at?: string;
           value?: number | null;
         };
-        Relationships: [
-          {
-            foreignKeyName: "leads_assigned_to_fkey";
-            columns: ["assigned_to"];
-            isOneToOne: false;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "leads_converted_to_customer_id_fkey";
-            columns: ["converted_to_customer_id"];
-            isOneToOne: false;
-            referencedRelation: "customers";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "leads_tenant_id_fkey";
-            columns: ["tenant_id"];
-            isOneToOne: false;
-            referencedRelation: "tenants";
-            referencedColumns: ["id"];
-          },
-        ];
+        Relationships: [];
+      };
+      milestones: {
+        Row: {
+          completed_at: string | null;
+          created_at: string;
+          description: string | null;
+          due_date: string | null;
+          id: string;
+          name: string;
+          order_index: number;
+          project_id: string;
+          tenant_id: string;
+        };
+        Insert: {
+          completed_at?: string | null;
+          created_at?: string;
+          description?: string | null;
+          due_date?: string | null;
+          id?: string;
+          name: string;
+          order_index?: number;
+          project_id: string;
+          tenant_id: string;
+        };
+        Update: {
+          completed_at?: string | null;
+          created_at?: string;
+          description?: string | null;
+          due_date?: string | null;
+          id?: string;
+          name?: string;
+          order_index?: number;
+          project_id?: string;
+          tenant_id?: string;
+        };
+        Relationships: [];
+      };
+      project_templates: {
+        Row: {
+          created_at: string;
+          default_billing_model: Database["public"]["Enums"]["project_billing_model"] | null;
+          default_estimated_hours: number | null;
+          description: string | null;
+          id: string;
+          name: string;
+          phases_template: Json;
+          tasks_template: Json;
+          tenant_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          default_billing_model?: Database["public"]["Enums"]["project_billing_model"] | null;
+          default_estimated_hours?: number | null;
+          description?: string | null;
+          id?: string;
+          name: string;
+          phases_template?: Json;
+          tasks_template?: Json;
+          tenant_id: string;
+        };
+        Update: {
+          created_at?: string;
+          default_billing_model?: Database["public"]["Enums"]["project_billing_model"] | null;
+          default_estimated_hours?: number | null;
+          description?: string | null;
+          id?: string;
+          name?: string;
+          phases_template?: Json;
+          tasks_template?: Json;
+          tenant_id?: string;
+        };
+        Relationships: [];
+      };
+      projects: {
+        Row: {
+          billing_model: Database["public"]["Enums"]["project_billing_model"];
+          budget: number | null;
+          completed_at: string | null;
+          created_at: string;
+          created_by: string | null;
+          customer_id: string | null;
+          deleted_at: string | null;
+          description: string | null;
+          due_date: string | null;
+          estimated_hours: number | null;
+          google_drive_folder_id: string | null;
+          health: Database["public"]["Enums"]["project_health"];
+          id: string;
+          name: string;
+          parent_project_id: string | null;
+          phase: Database["public"]["Enums"]["project_phase"] | null;
+          start_date: string | null;
+          status: Database["public"]["Enums"]["project_status"];
+          tags: string[];
+          template_id: string | null;
+          tenant_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          billing_model?: Database["public"]["Enums"]["project_billing_model"];
+          budget?: number | null;
+          completed_at?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          customer_id?: string | null;
+          deleted_at?: string | null;
+          description?: string | null;
+          due_date?: string | null;
+          estimated_hours?: number | null;
+          google_drive_folder_id?: string | null;
+          health?: Database["public"]["Enums"]["project_health"];
+          id?: string;
+          name: string;
+          parent_project_id?: string | null;
+          phase?: Database["public"]["Enums"]["project_phase"] | null;
+          start_date?: string | null;
+          status?: Database["public"]["Enums"]["project_status"];
+          tags?: string[];
+          template_id?: string | null;
+          tenant_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          billing_model?: Database["public"]["Enums"]["project_billing_model"];
+          budget?: number | null;
+          completed_at?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          customer_id?: string | null;
+          deleted_at?: string | null;
+          description?: string | null;
+          due_date?: string | null;
+          estimated_hours?: number | null;
+          google_drive_folder_id?: string | null;
+          health?: Database["public"]["Enums"]["project_health"];
+          id?: string;
+          name?: string;
+          parent_project_id?: string | null;
+          phase?: Database["public"]["Enums"]["project_phase"] | null;
+          start_date?: string | null;
+          status?: Database["public"]["Enums"]["project_status"];
+          tags?: string[];
+          template_id?: string | null;
+          tenant_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
       };
       tenants: {
         Row: {
@@ -282,159 +370,38 @@ export type Database = {
           settings?: Json;
           tenant_id?: string;
         };
-        Relationships: [
-          {
-            foreignKeyName: "users_customer_id_fkey";
-            columns: ["customer_id"];
-            isOneToOne: false;
-            referencedRelation: "customers";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "users_tenant_id_fkey";
-            columns: ["tenant_id"];
-            isOneToOne: false;
-            referencedRelation: "tenants";
-            referencedColumns: ["id"];
-          },
-        ];
+        Relationships: [];
       };
     };
-    Views: {
-      [_ in never]: never;
-    };
+    Views: { [_ in never]: never };
     Functions: {
+      convert_lead_to_customer: { Args: { p_lead_id: string }; Returns: string };
       current_customer_id: { Args: never; Returns: string };
       current_tenant_id: { Args: never; Returns: string };
       current_user_role: { Args: never; Returns: string };
-      convert_lead_to_customer: { Args: { p_lead_id: string }; Returns: string };
     };
     Enums: {
-      [_ in never]: never;
+      project_billing_model: "hourly" | "hour_bank" | "fixed_price" | "retainer";
+      project_health: "on_track" | "at_risk" | "off_track";
+      project_phase:
+        | "discovery"
+        | "specification"
+        | "development"
+        | "qa"
+        | "launch"
+        | "maintenance";
+      project_status: "planning" | "active" | "on_hold" | "completed" | "cancelled";
     };
-    CompositeTypes: {
-      [_ in never]: never;
-    };
+    CompositeTypes: { [_ in never]: never };
   };
 };
 
 type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">;
-
 type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">];
 
-export type Tables<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals;
-  }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
-}
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
-      Row: infer R;
-    }
-    ? R
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] & DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R;
-      }
-      ? R
-      : never
-    : never;
-
-export type TablesInsert<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals;
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I;
-    }
-    ? I
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I;
-      }
-      ? I
-      : never
-    : never;
-
-export type TablesUpdate<
-  DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals;
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
-}
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U;
-    }
-    ? U
-    : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U;
-      }
-      ? U
-      : never
-    : never;
-
-export type Enums<
-  DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals;
-  }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
-> = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
-}
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never;
-
-export type CompositeTypes<
-  PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals;
-  }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
-> = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
-}
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never;
-
-export const Constants = {
-  public: {
-    Enums: {},
-  },
-} as const;
+export type Tables<T extends keyof DefaultSchema["Tables"]> = DefaultSchema["Tables"][T]["Row"];
+export type TablesInsert<T extends keyof DefaultSchema["Tables"]> =
+  DefaultSchema["Tables"][T]["Insert"];
+export type TablesUpdate<T extends keyof DefaultSchema["Tables"]> =
+  DefaultSchema["Tables"][T]["Update"];
+export type Enums<T extends keyof DefaultSchema["Enums"]> = DefaultSchema["Enums"][T];
