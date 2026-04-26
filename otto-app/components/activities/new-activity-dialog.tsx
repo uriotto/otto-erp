@@ -199,27 +199,6 @@ function ActivityForm({
 
 // ---------------- Task form ----------------
 
-type DueOption = "today" | "tomorrow" | "this_week" | "none";
-
-const DUE_LABELS: Record<DueOption, string> = {
-  today: "היום",
-  tomorrow: "מחר",
-  this_week: "השבוע",
-  none: "ללא תאריך",
-};
-
-function dateFor(option: DueOption): string | null {
-  if (option === "none") return null;
-  const d = new Date();
-  if (option === "tomorrow") d.setDate(d.getDate() + 1);
-  if (option === "this_week") {
-    const dow = d.getDay();
-    const offset = (5 - dow + 7) % 7;
-    d.setDate(d.getDate() + offset);
-  }
-  return d.toISOString().slice(0, 10);
-}
-
 const PRIORITIES: { value: "low" | "medium" | "high" | "urgent"; label: string }[] = [
   { value: "low", label: "נמוכה" },
   { value: "medium", label: "בינונית" },
@@ -240,8 +219,6 @@ function TaskForm({
 }) {
   const router = useRouter();
   const toast = useToast();
-  const [title, setTitle] = useState("");
-  const [due, setDue] = useState<DueOption>("today");
   const [priority, setPriority] = useState<"low" | "medium" | "high" | "urgent">("medium");
   const [pending, startTransition] = useTransition();
   const [parent, setParent] = useState<{ kind: "customer" | "lead" | "personal"; id?: string }>(
@@ -252,16 +229,21 @@ function TaskForm({
         : { kind: "personal" },
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!title.trim() || pending) return;
+    const fd = new FormData(e.currentTarget);
+    const title = (fd.get("title") as string)?.trim() ?? "";
+    if (!title || pending) return;
+
+    const dueAt = fd.get("due_at") as string | null;
+
     startTransition(async () => {
       const res = await quickCreateTask({
-        title: title.trim(),
+        title,
         customer_id: parent.kind === "customer" ? (parent.id ?? null) : null,
         lead_id: parent.kind === "lead" ? (parent.id ?? null) : null,
         priority,
-        due_date: dateFor(due),
+        due_at: dueAt && dueAt.length > 0 ? dueAt : null,
       });
       if (res.error) {
         toast.error(res.error);
@@ -291,32 +273,17 @@ function TaskForm({
       <div>
         <label className="text-micro text-ink-soft mb-1 block uppercase">כותרת *</label>
         <input
+          name="title"
           autoFocus
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          required
           placeholder="לדוגמה: לחזור ללקוח עם הצעת מחיר"
           className="border-ink-line focus:border-navy placeholder:text-ink-faded w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none"
         />
       </div>
 
       <div>
-        <label className="text-micro text-ink-soft mb-2 block uppercase">תאריך יעד</label>
-        <div className="flex flex-wrap gap-1.5">
-          {(Object.keys(DUE_LABELS) as DueOption[]).map((opt) => (
-            <button
-              key={opt}
-              type="button"
-              onClick={() => setDue(opt)}
-              className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                due === opt
-                  ? "border-navy bg-navy text-cream-paper"
-                  : "border-ink-line text-ink-soft hover:border-navy bg-white"
-              }`}
-            >
-              {DUE_LABELS[opt]}
-            </button>
-          ))}
-        </div>
+        <label className="text-micro text-ink-soft mb-2 block uppercase">תאריך ושעה</label>
+        <DateTimePicker name="due_at" defaultDaysFromNow={0} defaultTime={currentRoundedTime()} />
       </div>
 
       <div>
@@ -339,7 +306,7 @@ function TaskForm({
         </div>
       </div>
 
-      <FormButtons pending={pending} onClose={onClose} disabled={!title.trim()} />
+      <FormButtons pending={pending} onClose={onClose} />
     </form>
   );
 }

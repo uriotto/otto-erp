@@ -416,6 +416,7 @@ export type Database = {
           created_by: string | null;
           customer_id: string | null;
           description: string | null;
+          due_at: string | null;
           due_date: string | null;
           id: string;
           lead_id: string | null;
@@ -436,6 +437,7 @@ export type Database = {
           created_by?: string | null;
           customer_id?: string | null;
           description?: string | null;
+          due_at?: string | null;
           due_date?: string | null;
           id?: string;
           lead_id?: string | null;
@@ -456,6 +458,7 @@ export type Database = {
           created_by?: string | null;
           customer_id?: string | null;
           description?: string | null;
+          due_at?: string | null;
           due_date?: string | null;
           id?: string;
           lead_id?: string | null;

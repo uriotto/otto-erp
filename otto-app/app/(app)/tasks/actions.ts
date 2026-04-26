@@ -18,6 +18,7 @@ const TaskSchema = z.object({
   priority: z.enum(TASK_PRIORITIES).default("medium"),
   assigned_to: z.string().uuid().optional().or(z.literal("")),
   due_date: z.string().optional(),
+  due_at: z.string().optional(),
 });
 
 export type TaskFormState = {
@@ -63,7 +64,8 @@ export async function createTask(_prev: TaskFormState, formData: FormData): Prom
       status: data.status,
       priority: data.priority,
       assigned_to: data.assigned_to || null,
-      due_date: dateOrNull(data.due_date),
+      due_at: dateOrNull(data.due_at),
+      due_date: dateOrNull(data.due_date) ?? (data.due_at ? data.due_at.slice(0, 10) : null),
       completed_at: data.status === "done" ? new Date().toISOString() : null,
     })
     .select()
@@ -105,7 +107,8 @@ export async function updateTask(_prev: TaskFormState, formData: FormData): Prom
       status: data.status,
       priority: data.priority,
       assigned_to: data.assigned_to || null,
-      due_date: dateOrNull(data.due_date),
+      due_at: dateOrNull(data.due_at),
+      due_date: dateOrNull(data.due_date) ?? (data.due_at ? data.due_at.slice(0, 10) : null),
       completed_at: data.status === "done" ? new Date().toISOString() : null,
     })
     .eq("id", id)
@@ -189,6 +192,7 @@ const QuickCaptureSchema = z.object({
   assigned_to: z.string().uuid().optional().nullable(),
   priority: z.enum(TASK_PRIORITIES).optional(),
   due_date: z.string().optional().nullable(),
+  due_at: z.string().optional().nullable(),
 });
 
 export async function quickCreateTask(input: {
@@ -199,6 +203,7 @@ export async function quickCreateTask(input: {
   assigned_to?: string | null;
   priority?: (typeof TASK_PRIORITIES)[number];
   due_date?: string | null;
+  due_at?: string | null;
 }): Promise<{ error?: string; taskId?: string }> {
   const parsed = QuickCaptureSchema.safeParse(input);
   if (!parsed.success) return { error: "כותרת חובה" };
@@ -218,7 +223,9 @@ export async function quickCreateTask(input: {
       assigned_to: parsed.data.assigned_to || null,
       priority: parsed.data.priority ?? "medium",
       status: "todo",
-      due_date: parsed.data.due_date || null,
+      due_at: parsed.data.due_at || null,
+      due_date:
+        parsed.data.due_date || (parsed.data.due_at ? parsed.data.due_at.slice(0, 10) : null),
     })
     .select("id")
     .single();

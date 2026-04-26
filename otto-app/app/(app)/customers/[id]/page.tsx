@@ -134,7 +134,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
       </div>
 
       <div className="mt-6">
-        <TasksSection tasks={tasks} customerId={customer.id} />
+        <TasksSection tasks={tasks} />
       </div>
 
       <div className="mt-6">

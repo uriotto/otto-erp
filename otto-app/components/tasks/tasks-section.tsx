@@ -6,7 +6,6 @@ import { CheckSquare, Square, Trash2, AlertTriangle, Calendar, CheckCheck } from
 import { deleteTask, toggleTaskComplete } from "@/app/(app)/tasks/actions";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
-import { QuickAddTask } from "./quick-add-task";
 
 export type TasksSectionItem = {
   id: string;
@@ -31,15 +30,7 @@ const PRIORITY_STYLES: Record<string, string> = {
   urgent: "border-rose-200 bg-rose-50 text-rose-700",
 };
 
-export function TasksSection({
-  tasks,
-  customerId,
-  leadId,
-}: {
-  tasks: TasksSectionItem[];
-  customerId?: string;
-  leadId?: string;
-}) {
+export function TasksSection({ tasks }: { tasks: TasksSectionItem[] }) {
   const open = tasks.filter((t) => t.status !== "done" && t.status !== "cancelled");
   const completed = tasks.filter((t) => t.status === "done");
 
@@ -50,10 +41,6 @@ export function TasksSection({
         <span className="text-ink-faded text-xs">
           {open.length} פתוחות · {completed.length} הושלמו
         </span>
-      </div>
-
-      <div className="mb-3">
-        <QuickAddTask customerId={customerId} leadId={leadId} />
       </div>
 
       {tasks.length === 0 ? (

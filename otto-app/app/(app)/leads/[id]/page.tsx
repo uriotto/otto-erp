@@ -146,7 +146,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       </div>
 
       <div className="mt-6">
-        <TasksSection tasks={tasks} leadId={lead.id} />
+        <TasksSection tasks={tasks} />
       </div>
 
       <div className="mt-6">
