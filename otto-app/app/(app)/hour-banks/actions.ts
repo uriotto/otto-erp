@@ -20,6 +20,8 @@ const CreateSchema = z.object({
 
 const UpdateSchema = z.object({
   id: z.string().uuid(),
+  purchased_hours: z.string().optional(),
+  hourly_rate: z.string().optional(),
   expiry_date: z.string().optional(),
   alert_threshold_pct: z.string().optional(),
   alert_threshold_hours: z.string().optional(),
@@ -377,6 +379,14 @@ export async function updateHourBank(
   const data = parsed.data;
 
   const update: TablesUpdate<"hour_banks"> = {};
+  if (data.purchased_hours !== undefined) {
+    const v = num(data.purchased_hours);
+    if (v != null && v > 0) update.purchased_hours = v;
+  }
+  if (data.hourly_rate !== undefined) {
+    const v = num(data.hourly_rate);
+    if (v != null && v > 0) update.hourly_rate = v;
+  }
   if (data.expiry_date !== undefined) update.expiry_date = dateOrNull(data.expiry_date);
   if (data.alert_threshold_pct !== undefined) {
     const v = num(data.alert_threshold_pct);

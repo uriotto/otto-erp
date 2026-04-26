@@ -147,6 +147,8 @@ export default async function HourBankPage({ params }: { params: Promise<{ id: s
           bank={{
             id: bank.id,
             status,
+            purchased_hours: Number(bank.purchased_hours),
+            hourly_rate: Number(bank.hourly_rate),
             expiry_date: bank.expiry_date,
             alert_threshold_pct: alertPct,
             alert_threshold_hours: alertHours,

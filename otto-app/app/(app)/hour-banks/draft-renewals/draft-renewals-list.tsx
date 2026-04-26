@@ -63,6 +63,8 @@ export function DraftRenewalsList({ drafts }: { drafts: DraftRenewalItem[] }) {
           bank={{
             id: editDraft.id,
             status: "draft",
+            purchased_hours: Number(editDraft.purchased_hours),
+            hourly_rate: Number(editDraft.hourly_rate),
             expiry_date: editDraft.expiry_date,
             alert_threshold_pct: editDraft.alert_threshold_pct,
             alert_threshold_hours: editDraft.alert_threshold_hours,

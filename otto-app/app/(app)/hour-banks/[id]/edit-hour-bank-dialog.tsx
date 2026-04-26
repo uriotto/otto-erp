@@ -41,6 +41,25 @@ export function EditHourBankDialog({ bank, onClose }: { bank: EditableBank; onCl
         <form action={action} className="space-y-4">
           <input type="hidden" name="id" value={bank.id} />
 
+          <div className="grid grid-cols-2 gap-3">
+            <Field
+              label="שעות שנרכשו *"
+              name="purchased_hours"
+              type="number"
+              step="0.25"
+              min="0.25"
+              defaultValue={String(bank.purchased_hours)}
+            />
+            <Field
+              label="מחיר לשעה (₪)"
+              name="hourly_rate"
+              type="number"
+              step="0.01"
+              min="0"
+              defaultValue={String(bank.hourly_rate)}
+            />
+          </div>
+
           <Field
             label="תאריך תפוגה"
             name="expiry_date"

@@ -39,7 +39,8 @@ async function getTenant() {
 function diffMinutes(start: string, end: string): number {
   const s = new Date(start).getTime();
   const e = new Date(end).getTime();
-  return Math.max(0, Math.round((e - s) / 60000));
+  // Minimum 1 minute — DB constraint requires duration_minutes > 0
+  return Math.max(1, Math.round((e - s) / 60000));
 }
 
 export async function createTimeEntry(
@@ -162,7 +163,11 @@ export async function createTimeEntryFromTimer(
 
   const data = parsed.data;
   const startISO = new Date(data.start_time).toISOString();
-  const endISO = new Date(data.end_time).toISOString();
+  const startMs = new Date(data.start_time).getTime();
+  const endMs = new Date(data.end_time).getTime();
+  // Ensure end > start by at least 60s; minimum duration is 1 minute
+  const safeEndMs = Math.max(endMs, startMs + 60000);
+  const endISO = new Date(safeEndMs).toISOString();
   const duration = diffMinutes(startISO, endISO);
 
   const { data: entry, error } = await supabase

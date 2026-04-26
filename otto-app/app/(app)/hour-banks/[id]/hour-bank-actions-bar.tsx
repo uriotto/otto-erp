@@ -11,6 +11,8 @@ import { EditHourBankDialog } from "./edit-hour-bank-dialog";
 export type EditableBank = {
   id: string;
   status: "draft" | "active" | "depleted" | "expired" | "cancelled";
+  purchased_hours: number;
+  hourly_rate: number;
   expiry_date: string | null;
   alert_threshold_pct: number;
   alert_threshold_hours: number;
