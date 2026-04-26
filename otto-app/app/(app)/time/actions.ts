@@ -102,6 +102,16 @@ export async function updateTimeEntry(
   const startISO = new Date(data.start_time).toISOString();
   const endISO = new Date(data.end_time).toISOString();
 
+  // Capture previous bank/overage state to recalc after the change
+  const { data: prevEntry } = await supabase
+    .from("time_entries")
+    .select("consumed_from_bank_id, billing_status, is_overage, customer_id")
+    .eq("id", data.id)
+    .eq("tenant_id", profile.tenant_id)
+    .maybeSingle();
+
+  // Reset bank linkage so the new state will be recomputed
+  // billing_status=pending forces the allocation function to redo the math
   const { error } = await supabase
     .from("time_entries")
     .update({
@@ -113,18 +123,34 @@ export async function updateTimeEntry(
       duration_minutes: diffMinutes(startISO, endISO),
       notes: data.notes || null,
       billable: data.billable,
+      billing_status: "pending",
+      consumed_from_bank_id: null,
+      is_overage: false,
     })
     .eq("id", data.id)
     .eq("tenant_id", profile.tenant_id);
 
   if (error) return { error: error.message };
 
-  // Re-allocate after edit if customer set + still billable
+  // If the entry was previously linked to a bank, recompute its status
+  // (might transition depleted → active when freed time comes back)
+  if (prevEntry?.consumed_from_bank_id) {
+    await supabase.rpc("recalculate_bank", { p_bank_id: prevEntry.consumed_from_bank_id });
+  }
+
+  // Re-allocate. If still billable + has customer, it'll allocate to current
+  // active bank (FIFO). Will split if duration exceeds remaining.
   if (data.customer_id && data.billable) {
     await supabase.rpc("allocate_time_entry_to_bank", { p_entry_id: data.id });
   }
 
+  // Old customer's hour-banks page should also refresh if customer changed
+  if (prevEntry?.customer_id && prevEntry.customer_id !== data.customer_id) {
+    revalidatePath(`/customers/${prevEntry.customer_id}`);
+  }
+
   revalidatePath("/time");
+  revalidatePath("/hour-banks");
   if (data.customer_id) revalidatePath(`/customers/${data.customer_id}`);
   return { success: true, entryId: data.id };
 }
@@ -133,6 +159,14 @@ export async function deleteTimeEntry(id: string): Promise<{ error?: string }> {
   const { supabase, profile } = await getTenant();
   if (!profile) return { error: "לא מחובר" };
 
+  // Capture bank before delete so we can recalc its status after
+  const { data: prevEntry } = await supabase
+    .from("time_entries")
+    .select("consumed_from_bank_id, customer_id")
+    .eq("id", id)
+    .eq("tenant_id", profile.tenant_id)
+    .maybeSingle();
+
   const { error } = await supabase
     .from("time_entries")
     .delete()
@@ -140,7 +174,14 @@ export async function deleteTimeEntry(id: string): Promise<{ error?: string }> {
     .eq("tenant_id", profile.tenant_id);
 
   if (error) return { error: error.message };
+
+  if (prevEntry?.consumed_from_bank_id) {
+    await supabase.rpc("recalculate_bank", { p_bank_id: prevEntry.consumed_from_bank_id });
+  }
+
   revalidatePath("/time");
+  revalidatePath("/hour-banks");
+  if (prevEntry?.customer_id) revalidatePath(`/customers/${prevEntry.customer_id}`);
   return {};
 }
 
