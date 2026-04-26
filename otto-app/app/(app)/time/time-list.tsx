@@ -2,12 +2,13 @@
 
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Plus, Clock, Trash2, Building2, FolderKanban, ListChecks } from "lucide-react";
+import { Plus, Clock, Trash2, Building2, FolderKanban, ListChecks, Edit2 } from "lucide-react";
 import type { Tables } from "@/lib/supabase/types";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
 import { assignCustomerToEntry, deleteTimeEntry } from "./actions";
 import { NewTimeEntryDialog } from "./new-time-entry-dialog";
+import { EditTimeEntryDialog } from "./edit-time-entry-dialog";
 
 export type TimeEntryItem = Pick<
   Tables<"time_entries">,
@@ -87,6 +88,7 @@ export function TimeList({
   const toast = useToast();
 
   const [showNew, setShowNew] = useState(false);
+  const [editEntry, setEditEntry] = useState<TimeEntryItem | null>(null);
   const [view, setView] = useState<View>(() => (searchParams.get("view") as View) || "daily");
   const [customerFilter, setCustomerFilter] = useState<string>(
     () => searchParams.get("customer") ?? "all",
@@ -267,7 +269,13 @@ export function TimeList({
               </div>
               <div className="space-y-1.5">
                 {g.items.map((e) => (
-                  <EntryRow key={e.id} entry={e} customers={customers} onDelete={handleDelete} />
+                  <EntryRow
+                    key={e.id}
+                    entry={e}
+                    customers={customers}
+                    onDelete={handleDelete}
+                    onEdit={() => setEditEntry(e)}
+                  />
                 ))}
               </div>
             </div>
@@ -281,6 +289,16 @@ export function TimeList({
           projects={projects}
           tasks={tasks}
           onClose={() => setShowNew(false)}
+        />
+      )}
+
+      {editEntry && (
+        <EditTimeEntryDialog
+          entry={editEntry}
+          customers={customers}
+          projects={projects}
+          tasks={tasks}
+          onClose={() => setEditEntry(null)}
         />
       )}
     </div>
@@ -325,10 +343,12 @@ function EntryRow({
   entry,
   customers,
   onDelete,
+  onEdit,
 }: {
   entry: TimeEntryItem;
   customers: CustomerOpt[];
   onDelete: (id: string) => void;
+  onEdit: () => void;
 }) {
   const [assigning, setAssigning] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -449,14 +469,24 @@ function EntryRow({
           </div>
         )}
       </div>
-      <button
-        type="button"
-        onClick={() => onDelete(entry.id)}
-        className="text-ink-faded opacity-0 transition-opacity group-hover:opacity-100 hover:text-rose-600"
-        aria-label="מחק רשומה"
-      >
-        <Trash2 size={16} />
-      </button>
+      <div className="flex shrink-0 flex-col items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+        <button
+          type="button"
+          onClick={onEdit}
+          className="text-ink-faded hover:text-navy"
+          aria-label="ערוך רשומה"
+        >
+          <Edit2 size={15} />
+        </button>
+        <button
+          type="button"
+          onClick={() => onDelete(entry.id)}
+          className="text-ink-faded hover:text-rose-600"
+          aria-label="מחק רשומה"
+        >
+          <Trash2 size={16} />
+        </button>
+      </div>
     </div>
   );
 }

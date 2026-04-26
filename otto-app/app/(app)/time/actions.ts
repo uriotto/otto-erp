@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 
 const TimeEntrySchema = z
   .object({
-    customer_id: z.string().uuid("בחר לקוח"),
+    customer_id: z.string().uuid().optional().or(z.literal("")),
     project_id: z.string().uuid().optional().or(z.literal("")),
     task_id: z.string().uuid().optional().or(z.literal("")),
     start_time: z.string().min(1, "שעת התחלה חובה"),
@@ -105,7 +105,7 @@ export async function updateTimeEntry(
   const { error } = await supabase
     .from("time_entries")
     .update({
-      customer_id: data.customer_id,
+      customer_id: data.customer_id || null,
       project_id: data.project_id || null,
       task_id: data.task_id || null,
       start_time: startISO,
@@ -119,7 +119,13 @@ export async function updateTimeEntry(
 
   if (error) return { error: error.message };
 
+  // Re-allocate after edit if customer set + still billable
+  if (data.customer_id && data.billable) {
+    await supabase.rpc("allocate_time_entry_to_bank", { p_entry_id: data.id });
+  }
+
   revalidatePath("/time");
+  if (data.customer_id) revalidatePath(`/customers/${data.customer_id}`);
   return { success: true, entryId: data.id };
 }
 
