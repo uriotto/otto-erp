@@ -53,6 +53,10 @@ export async function createCustomer(
   if (error) return { error: error.message };
 
   revalidatePath("/customers");
+  revalidatePath("/hour-banks");
+  revalidatePath("/tasks");
+  revalidatePath("/projects");
+  revalidatePath("/time");
   return { success: true };
 }
 
@@ -99,6 +103,8 @@ export async function updateCustomer(
 
   revalidatePath("/customers");
   revalidatePath(`/customers/${id}`);
+  revalidatePath("/hour-banks");
+  revalidatePath("/tasks");
   return { success: true };
 }
 
