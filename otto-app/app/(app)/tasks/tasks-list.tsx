@@ -513,29 +513,102 @@ function PriorityPill({ priority }: { priority: string }) {
 }
 
 function KanbanView({ tasks }: { tasks: TaskListItem[] }) {
+  const toast = useToast();
+  const router = useRouter();
+  const [, startTransition] = useTransition();
+  const [overrides, setOverrides] = useState<Record<string, string>>({});
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverCol, setDragOverCol] = useState<string | null>(null);
+
+  const effectiveTasks = useMemo<TaskListItem[]>(
+    () =>
+      tasks.map((t) =>
+        overrides[t.id] ? { ...t, status: overrides[t.id] as TaskListItem["status"] } : t,
+      ),
+    [tasks, overrides],
+  );
+
   const grouped = useMemo(() => {
     const map = new Map<string, TaskListItem[]>();
     for (const s of STATUS_ORDER) map.set(s, []);
-    for (const t of tasks) {
+    for (const t of effectiveTasks) {
       const arr = map.get(t.status);
       if (arr) arr.push(t);
     }
     return map;
-  }, [tasks]);
+  }, [effectiveTasks]);
+
+  const handleDrop = (targetStatus: string, taskId: string, fromStatus: string) => {
+    setDragOverCol(null);
+    setDraggingId(null);
+    if (targetStatus === fromStatus) return;
+    setOverrides((prev) => ({ ...prev, [taskId]: targetStatus }));
+    startTransition(async () => {
+      const res = await updateTaskStatus(taskId, targetStatus);
+      if (res.error) {
+        toast.error(res.error);
+        setOverrides((prev) => {
+          const next = { ...prev };
+          delete next[taskId];
+          return next;
+        });
+      } else {
+        router.refresh();
+      }
+    });
+  };
 
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
       {STATUS_ORDER.map((s) => {
         const items = grouped.get(s) ?? [];
+        const isOver = dragOverCol === s;
         return (
-          <div key={s} className="bg-cream-deep/50 rounded-2xl p-3">
+          <div
+            key={s}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+            }}
+            onDragEnter={(e) => {
+              e.preventDefault();
+              setDragOverCol(s);
+            }}
+            onDragLeave={(e) => {
+              if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+              setDragOverCol((cur) => (cur === s ? null : cur));
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              const taskId = e.dataTransfer.getData("application/x-task-id");
+              const fromStatus = e.dataTransfer.getData("application/x-task-status");
+              if (taskId) handleDrop(s, taskId, fromStatus);
+            }}
+            className={`bg-cream-deep/50 rounded-2xl p-3 transition-all ${
+              isOver ? "ring-navy/40 ring-2" : ""
+            }`}
+          >
             <div className="mb-3 flex items-center justify-between px-1">
               <h3 className="text-navy text-sm font-semibold">{STATUS_LABELS[s]}</h3>
               <span className="text-ink-soft text-xs">{items.length}</span>
             </div>
             <div className="flex flex-col gap-2">
               {items.map((t) => (
-                <KanbanCard key={t.id} task={t} />
+                <KanbanCard
+                  key={t.id}
+                  task={t}
+                  isDragging={draggingId === t.id}
+                  onDragStart={(e) => {
+                    e.dataTransfer.effectAllowed = "move";
+                    e.dataTransfer.setData("application/x-task-id", t.id);
+                    e.dataTransfer.setData("application/x-task-status", t.status);
+                    setDraggingId(t.id);
+                  }}
+                  onDragEnd={() => {
+                    setDraggingId(null);
+                    setDragOverCol(null);
+                  }}
+                />
               ))}
               {items.length === 0 && (
                 <div className="text-ink-faded py-4 text-center text-xs">אין משימות</div>
@@ -548,7 +621,17 @@ function KanbanView({ tasks }: { tasks: TaskListItem[] }) {
   );
 }
 
-function KanbanCard({ task }: { task: TaskListItem }) {
+function KanbanCard({
+  task,
+  isDragging,
+  onDragStart,
+  onDragEnd,
+}: {
+  task: TaskListItem;
+  isDragging: boolean;
+  onDragStart: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragEnd: (e: React.DragEvent<HTMLDivElement>) => void;
+}) {
   const due = task.due_date ? new Date(task.due_date) : null;
   const isOverdue =
     due &&
@@ -559,7 +642,14 @@ function KanbanCard({ task }: { task: TaskListItem }) {
   const initial = task.assignee_name?.trim().slice(0, 1) ?? null;
 
   return (
-    <div className="bg-cream-paper border-ink-line hover:border-ink-soft rounded-xl border p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+    <div
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      className={`bg-cream-paper border-ink-line hover:border-ink-soft cursor-grab rounded-xl border p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md active:cursor-grabbing ${
+        isDragging ? "opacity-50" : ""
+      }`}
+    >
       <div className="text-navy mb-2 text-sm font-medium">{task.title}</div>
       {task.project_name && (
         <div className="text-ink-soft mb-2 flex items-center gap-1 text-xs">

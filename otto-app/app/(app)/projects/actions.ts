@@ -62,6 +62,23 @@ export async function createProject(
 
   const data = parsed.data;
 
+  // Validate parent-child same customer
+  if (data.parent_project_id) {
+    const { data: parent } = await supabase
+      .from("projects")
+      .select("customer_id")
+      .eq("id", data.parent_project_id)
+      .eq("tenant_id", profile.tenant_id)
+      .maybeSingle();
+    if (parent?.customer_id) {
+      if (data.customer_id && data.customer_id !== parent.customer_id) {
+        return { error: "פרויקט אב שייך ללקוח אחר. אי אפשר לערבב לקוחות." };
+      }
+      // Inherit customer from parent if not set
+      if (!data.customer_id) data.customer_id = parent.customer_id;
+    }
+  }
+
   // If template chosen, copy defaults that weren't overridden
   let billingModel = data.billing_model;
   let estimatedHours = num(data.estimated_hours);
@@ -147,6 +164,23 @@ export async function updateProject(
   if (!profile) return { error: "לא מחובר" };
 
   const data = parsed.data;
+
+  // Validate parent-child same customer (also on update)
+  if (data.parent_project_id) {
+    const { data: parent } = await supabase
+      .from("projects")
+      .select("customer_id")
+      .eq("id", data.parent_project_id)
+      .eq("tenant_id", profile.tenant_id)
+      .maybeSingle();
+    if (parent?.customer_id) {
+      if (data.customer_id && data.customer_id !== parent.customer_id) {
+        return { error: "פרויקט אב שייך ללקוח אחר. אי אפשר לערבב לקוחות." };
+      }
+      if (!data.customer_id) data.customer_id = parent.customer_id;
+    }
+  }
+
   const { error } = await supabase
     .from("projects")
     .update({

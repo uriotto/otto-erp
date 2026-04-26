@@ -37,7 +37,7 @@ type ActivityFeedRow = {
 type TaskRow = {
   id: string;
   title: string;
-  due_at: string | null;
+  due_date: string | null;
   customer_id: string | null;
   lead_id: string | null;
   customers: { id: string; name: string } | null;
@@ -56,6 +56,8 @@ export default async function DashboardPage() {
   endOfToday.setHours(23, 59, 59, 999);
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+  const todayDateStr = startOfToday.toISOString().slice(0, 10);
 
   const [
     { count: customersTotal },
@@ -76,23 +78,19 @@ export default async function DashboardPage() {
     supabase.from("leads").select("*", { count: "exact", head: true }),
     supabase.from("leads").select("value, status").not("status", "in", '("won","lost")'),
     supabase
-      .from("activities")
+      .from("tasks")
       .select("*", { count: "exact", head: true })
-      .eq("type", "task")
-      .is("completed_at", null),
+      .not("status", "in", '("done","cancelled")'),
     supabase
-      .from("activities")
+      .from("tasks")
       .select("*", { count: "exact", head: true })
-      .eq("type", "task")
-      .is("completed_at", null)
-      .lt("due_at", startOfToday.toISOString()),
+      .not("status", "in", '("done","cancelled")')
+      .lt("due_date", todayDateStr),
     supabase
-      .from("activities")
+      .from("tasks")
       .select("*", { count: "exact", head: true })
-      .eq("type", "task")
-      .is("completed_at", null)
-      .gte("due_at", startOfToday.toISOString())
-      .lte("due_at", endOfToday.toISOString()),
+      .not("status", "in", '("done","cancelled")')
+      .eq("due_date", todayDateStr),
     supabase
       .from("activities")
       .select("*", { count: "exact", head: true })
@@ -112,13 +110,11 @@ export default async function DashboardPage() {
       .order("occurred_at", { ascending: false })
       .limit(8),
     supabase
-      .from("activities")
-      .select("id, title, due_at, customer_id, lead_id, customers(id, name), leads(id, name)")
-      .eq("type", "task")
-      .is("completed_at", null)
-      .gte("due_at", startOfToday.toISOString())
-      .lte("due_at", endOfToday.toISOString())
-      .order("due_at", { ascending: true })
+      .from("tasks")
+      .select("id, title, due_date, customer_id, lead_id, customers(id, name), leads(id, name)")
+      .not("status", "in", '("done","cancelled")')
+      .eq("due_date", todayDateStr)
+      .order("due_date", { ascending: true })
       .limit(5),
   ]);
 
@@ -281,8 +277,6 @@ function activityIcon(type: string) {
       return <Mail size={size} className="text-blue-600" />;
     case "meeting":
       return <Calendar size={size} className="text-orange-600" />;
-    case "task":
-      return <CheckCircle2 size={size} className="text-purple-600" />;
     case "note":
       return <StickyNote size={size} className="text-amber-600" />;
     default:

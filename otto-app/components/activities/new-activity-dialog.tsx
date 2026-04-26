@@ -25,7 +25,7 @@ export function NewActivityDialog({
   onClose: () => void;
 }) {
   const [state, action, pending] = useActionState(createActivity, init);
-  const [type, setType] = useState<ActivityType>(defaultType ?? "task");
+  const [type, setType] = useState<ActivityType>(defaultType ?? "meeting");
   const toast = useToast();
 
   useEffect(() => {
@@ -37,9 +37,8 @@ export function NewActivityDialog({
     }
   }, [state, toast, onClose]);
 
-  const showDue = type === "task";
   const showStartEnd = type === "meeting";
-  const showSimpleWhen = !showDue && !showStartEnd;
+  const showSimpleWhen = !showStartEnd;
 
   const showParentPicker = !customerId && !leadId && parentItems !== undefined;
 
@@ -115,13 +114,6 @@ export function NewActivityDialog({
             />
           </div>
 
-          {showDue && (
-            <div>
-              <label className="text-micro text-ink-soft mb-2 block uppercase">תאריך יעד</label>
-              <DateTimePicker name="due_at" defaultDaysFromNow={1} defaultTime="09:00" />
-            </div>
-          )}
-
           {showStartEnd && (
             <>
               <div>
@@ -188,8 +180,6 @@ function titlePlaceholder(type: ActivityType): string {
       return "לדוגמה: ווטסאפ עם פרטי הפגישה";
     case "meeting":
       return "לדוגמה: פגישת היכרות";
-    case "task":
-      return "לדוגמה: לחזור עם תשובה";
     case "note":
       return "לדוגמה: לקוח חדש מהמלצה";
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { createProject, type ProjectFormState } from "./actions";
@@ -24,6 +24,12 @@ export function NewProjectDialog({
   const [state, action, pending] = useActionState(createProject, init);
   const toast = useToast();
   const router = useRouter();
+  const [selectedCustomer, setSelectedCustomer] = useState<string>("");
+
+  const filteredParents = useMemo(() => {
+    if (!selectedCustomer) return parentProjects;
+    return parentProjects.filter((p) => !p.customer_id || p.customer_id === selectedCustomer);
+  }, [parentProjects, selectedCustomer]);
 
   useEffect(() => {
     if (state.success) {
@@ -52,10 +58,23 @@ export function NewProjectDialog({
           <Field label="שם הפרויקט *" name="name" error={state.fieldErrors?.name?.[0]} />
 
           <div className="grid grid-cols-2 gap-3">
-            <Select label="לקוח" name="customer_id" options={customers}>
-              <option value="">— ללא —</option>
-            </Select>
-            <Select label="פרויקט אב" name="parent_project_id" options={parentProjects}>
+            <div>
+              <label className="text-micro text-ink-soft mb-1 block uppercase">לקוח</label>
+              <select
+                name="customer_id"
+                value={selectedCustomer}
+                onChange={(e) => setSelectedCustomer(e.target.value)}
+                className="border-ink-line focus:border-navy w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none"
+              >
+                <option value="">— ללא —</option>
+                {customers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <Select label="פרויקט אב" name="parent_project_id" options={filteredParents}>
               <option value="">— ראשי —</option>
             </Select>
           </div>

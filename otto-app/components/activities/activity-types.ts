@@ -1,14 +1,6 @@
-import {
-  Phone,
-  Mail,
-  Calendar,
-  FileText,
-  CheckSquare,
-  MessageCircle,
-  type LucideIcon,
-} from "lucide-react";
+import { Phone, Mail, Calendar, FileText, MessageCircle, type LucideIcon } from "lucide-react";
 
-export type ActivityType = "call" | "email" | "whatsapp" | "meeting" | "note" | "task";
+export type ActivityType = "call" | "email" | "whatsapp" | "meeting" | "note";
 
 export const ACTIVITY_META: Record<
   ActivityType,
@@ -39,20 +31,8 @@ export const ACTIVITY_META: Record<
     icon: FileText,
     color: "bg-gray-50 text-gray-700 border-gray-200",
   },
-  task: {
-    label: "משימה",
-    icon: CheckSquare,
-    color: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  },
 };
 
-export const ACTIVITY_TYPES: ActivityType[] = [
-  "task",
-  "meeting",
-  "call",
-  "email",
-  "whatsapp",
-  "note",
-];
+export const ACTIVITY_TYPES: ActivityType[] = ["meeting", "call", "email", "whatsapp", "note"];
 
 export const LOGGED_ACTIVITY_TYPES: ActivityType[] = ["call", "email", "whatsapp"];

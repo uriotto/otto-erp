@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { AlertCircle, Clock, Calendar, ArrowLeft, TrendingUp, Coffee } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { ACTIVITY_META, type ActivityType } from "@/components/activities/activity-types";
 import type { ParentSearchItem } from "@/components/activities/parent-picker";
 import { TodayActivityRow } from "./today-activity-row";
+import { TodayTaskRow, type TodayTaskItem } from "./today-task-row";
 import { TodayNewButton } from "./today-new-button";
 
 export const metadata = { title: "היום — OTTO" };
@@ -30,16 +30,16 @@ export default async function TodayPage() {
   startOfToday.setHours(0, 0, 0, 0);
   const endOfToday = new Date();
   endOfToday.setHours(23, 59, 59, 999);
+  const todayDateStr = startOfToday.toISOString().slice(0, 10);
 
   // Open tasks (any due date), ordered by due ASC
   const { data: tasks } = await supabase
-    .from("activities")
+    .from("tasks")
     .select(
-      "id, type, title, body, occurred_at, due_at, end_at, completed_at, customer_id, lead_id, customers(id, name), leads(id, name)",
+      "id, title, description, status, priority, due_date, completed_at, customer_id, lead_id, customers(id, name), leads(id, name)",
     )
-    .eq("type", "task")
-    .is("completed_at", null)
-    .order("due_at", { ascending: true, nullsFirst: false });
+    .not("status", "in", '("done","cancelled")')
+    .order("due_date", { ascending: true, nullsFirst: false });
 
   // Today's meetings
   const { data: meetings } = await supabase
@@ -52,8 +52,7 @@ export default async function TodayPage() {
     .lte("occurred_at", endOfToday.toISOString())
     .order("occurred_at", { ascending: true });
 
-  // Supabase מחזיר את ה-join כ-array או null. נורמליזציה ל-object יחיד.
-  const normalize = (rows: unknown[] | null): ActivityWithParent[] =>
+  const normalizeMeetings = (rows: unknown[] | null): ActivityWithParent[] =>
     (rows ?? []).map((r) => {
       const row = r as Record<string, unknown>;
       const customers = Array.isArray(row.customers) ? row.customers[0] : row.customers;
@@ -65,8 +64,27 @@ export default async function TodayPage() {
       };
     });
 
-  const allTasks = normalize(tasks);
-  const allMeetings = normalize(meetings);
+  const normalizeTasks = (rows: unknown[] | null): TodayTaskItem[] =>
+    (rows ?? []).map((r) => {
+      const row = r as Record<string, unknown>;
+      const customers = Array.isArray(row.customers) ? row.customers[0] : row.customers;
+      const leads = Array.isArray(row.leads) ? row.leads[0] : row.leads;
+      return {
+        id: row.id as string,
+        title: row.title as string,
+        status: row.status as string,
+        priority: row.priority as string,
+        due_date: (row.due_date as string | null) ?? null,
+        completed_at: (row.completed_at as string | null) ?? null,
+        customer_id: (row.customer_id as string | null) ?? null,
+        lead_id: (row.lead_id as string | null) ?? null,
+        customers: (customers as { id: string; name: string } | null) ?? null,
+        leads: (leads as { id: string; name: string } | null) ?? null,
+      };
+    });
+
+  const allTasks = normalizeTasks(tasks);
+  const allMeetings = normalizeMeetings(meetings);
 
   // לקוחות + לידים לבורר ה-parent
   const [{ data: customers }, { data: leads }] = await Promise.all([
@@ -78,12 +96,10 @@ export default async function TodayPage() {
     ...(leads ?? []).map((l) => ({ id: l.id, name: l.name, kind: "lead" as const })),
   ];
 
-  const overdue = allTasks.filter((t) => t.due_at && new Date(t.due_at) < startOfToday);
-  const dueToday = allTasks.filter(
-    (t) => t.due_at && new Date(t.due_at) >= startOfToday && new Date(t.due_at) <= endOfToday,
-  );
-  const upcoming = allTasks.filter((t) => t.due_at && new Date(t.due_at) > endOfToday);
-  const noDueDate = allTasks.filter((t) => !t.due_at);
+  const overdue = allTasks.filter((t) => t.due_date && t.due_date < todayDateStr);
+  const dueToday = allTasks.filter((t) => t.due_date === todayDateStr);
+  const upcoming = allTasks.filter((t) => t.due_date && t.due_date > todayDateStr);
+  const noDueDate = allTasks.filter((t) => !t.due_date);
 
   const greeting = getGreeting();
   const dateLabel = new Date().toLocaleDateString("he-IL", {
@@ -130,7 +146,7 @@ export default async function TodayPage() {
           count={overdue.length}
         >
           {overdue.map((t) => (
-            <TodayActivityRow key={t.id} activity={t} variant="overdue" />
+            <TodayTaskRow key={t.id} task={t} variant="overdue" />
           ))}
         </Section>
       )}
@@ -154,7 +170,7 @@ export default async function TodayPage() {
           count={dueToday.length}
         >
           {dueToday.map((t) => (
-            <TodayActivityRow key={t.id} activity={t} variant="task" />
+            <TodayTaskRow key={t.id} task={t} variant="task" />
           ))}
         </Section>
       )}
@@ -166,7 +182,7 @@ export default async function TodayPage() {
           count={upcoming.length}
         >
           {upcoming.map((t) => (
-            <TodayActivityRow key={t.id} activity={t} variant="upcoming" />
+            <TodayTaskRow key={t.id} task={t} variant="upcoming" />
           ))}
         </Section>
       )}
@@ -178,7 +194,7 @@ export default async function TodayPage() {
           count={noDueDate.length}
         >
           {noDueDate.map((t) => (
-            <TodayActivityRow key={t.id} activity={t} variant="upcoming" />
+            <TodayTaskRow key={t.id} task={t} variant="upcoming" />
           ))}
         </Section>
       )}

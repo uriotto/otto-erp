@@ -18,13 +18,7 @@ export function TodayNewButton({ parentItems }: { parentItems: ParentSearchItem[
         פריט חדש
       </button>
 
-      {open && (
-        <NewActivityDialog
-          parentItems={parentItems}
-          defaultType="task"
-          onClose={() => setOpen(false)}
-        />
-      )}
+      {open && <NewActivityDialog parentItems={parentItems} onClose={() => setOpen(false)} />}
     </>
   );
 }

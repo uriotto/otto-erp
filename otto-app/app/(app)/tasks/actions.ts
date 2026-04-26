@@ -12,6 +12,8 @@ const TaskSchema = z.object({
   description: z.string().optional(),
   project_id: z.string().uuid().optional().or(z.literal("")),
   parent_task_id: z.string().uuid().optional().or(z.literal("")),
+  customer_id: z.string().uuid().optional().or(z.literal("")),
+  lead_id: z.string().uuid().optional().or(z.literal("")),
   status: z.enum(TASK_STATUSES).default("todo"),
   priority: z.enum(TASK_PRIORITIES).default("medium"),
   assigned_to: z.string().uuid().optional().or(z.literal("")),
@@ -56,6 +58,8 @@ export async function createTask(_prev: TaskFormState, formData: FormData): Prom
       description: data.description || null,
       project_id: data.project_id || null,
       parent_task_id: data.parent_task_id || null,
+      customer_id: data.customer_id || null,
+      lead_id: data.lead_id || null,
       status: data.status,
       priority: data.priority,
       assigned_to: data.assigned_to || null,
@@ -68,6 +72,9 @@ export async function createTask(_prev: TaskFormState, formData: FormData): Prom
   if (error) return { error: error.message };
 
   revalidatePath("/tasks");
+  if (data.customer_id) revalidatePath(`/customers/${data.customer_id}`);
+  if (data.lead_id) revalidatePath(`/leads/${data.lead_id}`);
+  revalidatePath("/today");
   return { success: true, taskId: task.id };
 }
 
@@ -93,6 +100,8 @@ export async function updateTask(_prev: TaskFormState, formData: FormData): Prom
       description: data.description || null,
       project_id: data.project_id || null,
       parent_task_id: data.parent_task_id || null,
+      customer_id: data.customer_id || null,
+      lead_id: data.lead_id || null,
       status: data.status,
       priority: data.priority,
       assigned_to: data.assigned_to || null,
@@ -105,6 +114,9 @@ export async function updateTask(_prev: TaskFormState, formData: FormData): Prom
   if (error) return { error: error.message };
 
   revalidatePath("/tasks");
+  if (data.customer_id) revalidatePath(`/customers/${data.customer_id}`);
+  if (data.lead_id) revalidatePath(`/leads/${data.lead_id}`);
+  revalidatePath("/today");
   return { success: true, taskId: id };
 }
 
@@ -141,6 +153,7 @@ export async function toggleTaskComplete(
 
   if (error) return { error: error.message };
   revalidatePath("/tasks");
+  revalidatePath("/today");
   return {};
 }
 
@@ -164,12 +177,15 @@ export async function updateTaskStatus(id: string, status: string): Promise<{ er
 
   if (error) return { error: error.message };
   revalidatePath("/tasks");
+  revalidatePath("/today");
   return {};
 }
 
 const QuickCaptureSchema = z.object({
   title: z.string().min(1, "כותרת חובה"),
   project_id: z.string().uuid().optional().nullable(),
+  customer_id: z.string().uuid().optional().nullable(),
+  lead_id: z.string().uuid().optional().nullable(),
   assigned_to: z.string().uuid().optional().nullable(),
   priority: z.enum(TASK_PRIORITIES).optional(),
 });
@@ -177,6 +193,8 @@ const QuickCaptureSchema = z.object({
 export async function quickCreateTask(input: {
   title: string;
   project_id?: string | null;
+  customer_id?: string | null;
+  lead_id?: string | null;
   assigned_to?: string | null;
   priority?: (typeof TASK_PRIORITIES)[number];
 }): Promise<{ error?: string; taskId?: string }> {
@@ -193,6 +211,8 @@ export async function quickCreateTask(input: {
       created_by: profile.id,
       title: parsed.data.title,
       project_id: parsed.data.project_id || null,
+      customer_id: parsed.data.customer_id || null,
+      lead_id: parsed.data.lead_id || null,
       assigned_to: parsed.data.assigned_to || null,
       priority: parsed.data.priority ?? "medium",
       status: "todo",
@@ -202,5 +222,8 @@ export async function quickCreateTask(input: {
 
   if (error) return { error: error.message };
   revalidatePath("/tasks");
+  if (parsed.data.customer_id) revalidatePath(`/customers/${parsed.data.customer_id}`);
+  if (parsed.data.lead_id) revalidatePath(`/leads/${parsed.data.lead_id}`);
+  revalidatePath("/today");
   return { taskId: data.id };
 }

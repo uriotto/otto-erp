@@ -5,11 +5,10 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 
 const ActivitySchema = z.object({
-  type: z.enum(["call", "email", "whatsapp", "meeting", "note", "task"]),
+  type: z.enum(["call", "email", "whatsapp", "meeting", "note"]),
   title: z.string().min(1, "כותרת חובה"),
   body: z.string().optional(),
   occurred_at: z.string().optional(),
-  due_at: z.string().optional(),
   end_at: z.string().optional(),
   customer_id: z.string().uuid().optional(),
   lead_id: z.string().uuid().optional(),
@@ -36,7 +35,6 @@ export async function createActivity(
     title: formData.get("title") as string,
     body: (formData.get("body") as string) || undefined,
     occurred_at: (formData.get("occurred_at") as string) || undefined,
-    due_at: (formData.get("due_at") as string) || undefined,
     end_at: (formData.get("end_at") as string) || undefined,
     customer_id: (formData.get("customer_id") as string) || undefined,
     lead_id: (formData.get("lead_id") as string) || undefined,
@@ -47,7 +45,6 @@ export async function createActivity(
     return { fieldErrors: parsed.error.flatten().fieldErrors };
   }
 
-  // משימות אישיות (ללא לקוח/ליד) מותרות
   const supabase = await createClient();
   const { data: profile } = await supabase.from("users").select("tenant_id, id").single();
   if (!profile) return { error: "לא מחובר" };
@@ -61,7 +58,7 @@ export async function createActivity(
     title: parsed.data.title,
     body: parsed.data.body || null,
     occurred_at: occurredAt,
-    due_at: parsed.data.type === "task" ? toIsoOrNull(parsed.data.due_at) : null,
+    due_at: null,
     end_at: parsed.data.type === "meeting" ? toIsoOrNull(parsed.data.end_at) : null,
     customer_id: parsed.data.customer_id || null,
     lead_id: parsed.data.lead_id || null,
@@ -87,7 +84,6 @@ export async function updateActivity(
     title: formData.get("title") as string,
     body: (formData.get("body") as string) || undefined,
     occurred_at: (formData.get("occurred_at") as string) || undefined,
-    due_at: (formData.get("due_at") as string) || undefined,
     end_at: (formData.get("end_at") as string) || undefined,
   };
 
@@ -109,7 +105,7 @@ export async function updateActivity(
       title: parsed.data.title,
       body: parsed.data.body || null,
       occurred_at: occurredAt,
-      due_at: parsed.data.type === "task" ? toIsoOrNull(parsed.data.due_at) : null,
+      due_at: null,
       end_at: parsed.data.type === "meeting" ? toIsoOrNull(parsed.data.end_at) : null,
     })
     .eq("id", id)

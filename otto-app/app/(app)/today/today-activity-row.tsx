@@ -34,7 +34,7 @@ export function TodayActivityRow({
   const toast = useToast();
   const meta = ACTIVITY_META[activity.type as ActivityType] ?? ACTIVITY_META.note;
   const Icon = meta.icon;
-  const isTask = activity.type === "task";
+  const isTask = false;
   const serverIsDone = !!activity.completed_at;
   const [optimisticDone, setOptimisticDone] = useOptimistic(
     serverIsDone,
@@ -151,9 +151,6 @@ function whenLabel(a: ActivityWithParent, variant: string): string {
     const start = formatTime(a.occurred_at);
     const end = a.end_at ? formatTime(a.end_at) : null;
     return end ? `${start} – ${end}` : start;
-  }
-  if (a.type === "task" && a.due_at) {
-    return formatRelative(a.due_at);
   }
   return formatRelative(a.occurred_at);
 }

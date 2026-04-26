@@ -98,8 +98,6 @@ function typeLabel(t: string): string {
       return "אימייל";
     case "meeting":
       return "פגישה";
-    case "task":
-      return "משימה";
     case "note":
       return "הערה";
     default:

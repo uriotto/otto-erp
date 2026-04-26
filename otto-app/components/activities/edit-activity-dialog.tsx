@@ -42,9 +42,9 @@ export function EditActivityDialog({
     }
   }, [state, toast, onClose]);
 
-  const showDue = type === "task";
+  const showDue = false;
   const showStartEnd = type === "meeting";
-  const showSimpleWhen = !showDue && !showStartEnd;
+  const showSimpleWhen = !showStartEnd;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

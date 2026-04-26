@@ -414,9 +414,11 @@ export type Database = {
           completed_at: string | null;
           created_at: string;
           created_by: string | null;
+          customer_id: string | null;
           description: string | null;
           due_date: string | null;
           id: string;
+          lead_id: string | null;
           order_index: number;
           parent_task_id: string | null;
           priority: Database["public"]["Enums"]["task_priority"];
@@ -432,9 +434,11 @@ export type Database = {
           completed_at?: string | null;
           created_at?: string;
           created_by?: string | null;
+          customer_id?: string | null;
           description?: string | null;
           due_date?: string | null;
           id?: string;
+          lead_id?: string | null;
           order_index?: number;
           parent_task_id?: string | null;
           priority?: Database["public"]["Enums"]["task_priority"];
@@ -450,9 +454,11 @@ export type Database = {
           completed_at?: string | null;
           created_at?: string;
           created_by?: string | null;
+          customer_id?: string | null;
           description?: string | null;
           due_date?: string | null;
           id?: string;
+          lead_id?: string | null;
           order_index?: number;
           parent_task_id?: string | null;
           priority?: Database["public"]["Enums"]["task_priority"];
