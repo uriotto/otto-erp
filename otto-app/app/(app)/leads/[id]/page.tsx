@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRight, Mail, Phone, Building2, TrendingUp } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { ActivityFeed } from "@/components/activities/activity-feed";
+import { TasksSection, type TasksSectionItem } from "@/components/tasks/tasks-section";
 import { LeadActionsBar } from "./lead-actions-bar";
 import { LeadTagsEditor } from "./lead-tags-editor";
 import { RecentTracker } from "@/components/search/recent-tracker";
@@ -40,6 +41,14 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     .select("id, type, title, body, occurred_at, due_at, end_at, completed_at")
     .eq("lead_id", id)
     .order("occurred_at", { ascending: false });
+
+  const { data: tasksData } = await supabase
+    .from("tasks")
+    .select("id, title, status, priority, due_date, completed_at")
+    .eq("lead_id", id)
+    .order("due_date", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: false });
+  const tasks = (tasksData ?? []) as TasksSectionItem[];
 
   const initials = lead.name
     .split(" ")
@@ -134,6 +143,10 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           </p>
           <LeadActionsBar lead={lead} />
         </div>
+      </div>
+
+      <div className="mt-6">
+        <TasksSection tasks={tasks} leadId={lead.id} />
       </div>
 
       <div className="mt-6">

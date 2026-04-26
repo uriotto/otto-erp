@@ -1,19 +1,12 @@
 "use client";
 
-import { useOptimistic, useState, useTransition } from "react";
+import { useOptimistic, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Plus,
-  CheckSquare,
-  Square,
-  Trash2,
-  AlertTriangle,
-  Calendar,
-  CheckCheck,
-} from "lucide-react";
-import { deleteTask, toggleTaskComplete, quickCreateTask } from "@/app/(app)/tasks/actions";
+import { CheckSquare, Square, Trash2, AlertTriangle, Calendar, CheckCheck } from "lucide-react";
+import { deleteTask, toggleTaskComplete } from "@/app/(app)/tasks/actions";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
+import { QuickAddTask } from "./quick-add-task";
 
 export type TasksSectionItem = {
   id: string;
@@ -47,33 +40,8 @@ export function TasksSection({
   customerId?: string;
   leadId?: string;
 }) {
-  const router = useRouter();
-  const toast = useToast();
-  const [value, setValue] = useState("");
-  const [isPending, startTransition] = useTransition();
-
   const open = tasks.filter((t) => t.status !== "done" && t.status !== "cancelled");
   const completed = tasks.filter((t) => t.status === "done");
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const title = value.trim();
-    if (!title || isPending) return;
-    startTransition(async () => {
-      const res = await quickCreateTask({
-        title,
-        customer_id: customerId ?? null,
-        lead_id: leadId ?? null,
-      });
-      if (res.error) {
-        toast.error(res.error);
-        return;
-      }
-      setValue("");
-      toast.success("המשימה נוצרה");
-      router.refresh();
-    });
-  };
 
   return (
     <div>
@@ -84,23 +52,9 @@ export function TasksSection({
         </span>
       </div>
 
-      <form
-        onSubmit={handleSubmit}
-        className="bg-cream-paper border-ink-line mb-3 flex items-center gap-2 rounded-xl border p-2.5"
-      >
-        <div className="bg-navy text-cream-paper flex h-7 w-7 shrink-0 items-center justify-center rounded-lg">
-          <Plus size={14} />
-        </div>
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder="הוסף משימה במהירות... (Enter לשמירה)"
-          className="placeholder:text-ink-faded flex-1 bg-transparent text-sm outline-none"
-          disabled={isPending}
-        />
-        {isPending && <Spinner size={14} className="text-navy" />}
-      </form>
+      <div className="mb-3">
+        <QuickAddTask customerId={customerId} leadId={leadId} />
+      </div>
 
       {tasks.length === 0 ? (
         <div className="border-ink-line bg-cream-paper/40 flex flex-col items-center justify-center rounded-2xl border border-dashed px-6 py-12 text-center">

@@ -188,6 +188,7 @@ const QuickCaptureSchema = z.object({
   lead_id: z.string().uuid().optional().nullable(),
   assigned_to: z.string().uuid().optional().nullable(),
   priority: z.enum(TASK_PRIORITIES).optional(),
+  due_date: z.string().optional().nullable(),
 });
 
 export async function quickCreateTask(input: {
@@ -197,6 +198,7 @@ export async function quickCreateTask(input: {
   lead_id?: string | null;
   assigned_to?: string | null;
   priority?: (typeof TASK_PRIORITIES)[number];
+  due_date?: string | null;
 }): Promise<{ error?: string; taskId?: string }> {
   const parsed = QuickCaptureSchema.safeParse(input);
   if (!parsed.success) return { error: "כותרת חובה" };
@@ -216,6 +218,7 @@ export async function quickCreateTask(input: {
       assigned_to: parsed.data.assigned_to || null,
       priority: parsed.data.priority ?? "medium",
       status: "todo",
+      due_date: parsed.data.due_date || null,
     })
     .select("id")
     .single();

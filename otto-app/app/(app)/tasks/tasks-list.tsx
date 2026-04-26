@@ -168,7 +168,7 @@ export function TasksList({
     updateUrl({ view: v === "kanban" ? "kanban" : undefined });
   };
 
-  const handleQuickCapture = async (title: string) => {
+  const handleQuickCapture = async (title: string, dueDate: string | null) => {
     const res = await quickCreateTask({
       title,
       project_id: projectFilter !== "all" ? projectFilter : null,
@@ -177,6 +177,7 @@ export function TasksList({
         priorityFilter !== "all"
           ? (priorityFilter as "low" | "medium" | "high" | "urgent")
           : undefined,
+      due_date: dueDate,
     });
     if (res.error) {
       toast.error(res.error);
@@ -336,16 +337,46 @@ function ViewToggle({ view, onChange }: { view: ViewMode; onChange: (v: ViewMode
   );
 }
 
-function QuickCapture({ onSubmit }: { onSubmit: (title: string) => Promise<boolean> }) {
+type DueOption = "today" | "tomorrow" | "this_week" | "none";
+
+const QC_DUE_LABELS: Record<DueOption, string> = {
+  today: "היום",
+  tomorrow: "מחר",
+  this_week: "השבוע",
+  none: "ללא תאריך",
+};
+
+function qcDateFor(option: DueOption): string | null {
+  if (option === "none") return null;
+  const d = new Date();
+  if (option === "tomorrow") d.setDate(d.getDate() + 1);
+  if (option === "this_week") {
+    const dow = d.getDay();
+    const offset = (5 - dow + 7) % 7;
+    d.setDate(d.getDate() + offset);
+  }
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function QuickCapture({
+  onSubmit,
+}: {
+  onSubmit: (title: string, dueDate: string | null) => Promise<boolean>;
+}) {
   const [value, setValue] = useState("");
+  const [due, setDue] = useState<DueOption>("none");
   const [isPending, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && value.trim().length > 0 && !isPending) {
       const title = value.trim();
+      const dueDate = qcDateFor(due);
       startTransition(async () => {
-        const ok = await onSubmit(title);
+        const ok = await onSubmit(title, dueDate);
         if (ok) setValue("");
         inputRef.current?.focus();
       });
@@ -353,21 +384,42 @@ function QuickCapture({ onSubmit }: { onSubmit: (title: string) => Promise<boole
   };
 
   return (
-    <div className="bg-cream-paper border-ink-line mb-4 flex items-center gap-3 rounded-2xl border p-3 shadow-sm">
-      <div className="bg-navy text-cream-paper flex h-9 w-9 shrink-0 items-center justify-center rounded-xl">
-        <Plus size={18} />
+    <div className="bg-cream-paper border-ink-line mb-4 rounded-2xl border p-3 shadow-sm">
+      <div className="flex items-center gap-3">
+        <div className="bg-navy text-cream-paper flex h-9 w-9 shrink-0 items-center justify-center rounded-xl">
+          <Plus size={18} />
+        </div>
+        <input
+          ref={inputRef}
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKey}
+          placeholder="הוסף משימה במהירות... (Enter לשמירה)"
+          className="placeholder:text-ink-faded flex-1 bg-transparent text-sm outline-none"
+          disabled={isPending}
+        />
+        {isPending && <Spinner size={14} className="text-navy" />}
       </div>
-      <input
-        ref={inputRef}
-        type="text"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={handleKey}
-        placeholder="הוסף משימה במהירות... (Enter לשמירה)"
-        className="placeholder:text-ink-faded flex-1 bg-transparent text-sm outline-none"
-        disabled={isPending}
-      />
-      {isPending && <Spinner size={14} className="text-navy" />}
+      <div className="mt-2 flex flex-wrap gap-1.5 ps-12">
+        {(Object.keys(QC_DUE_LABELS) as DueOption[]).map((opt) => {
+          const isActive = due === opt;
+          return (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => setDue(opt)}
+              className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
+                isActive
+                  ? "border-navy bg-navy text-cream-paper"
+                  : "border-ink-line text-ink-soft hover:border-navy bg-white"
+              }`}
+            >
+              {QC_DUE_LABELS[opt]}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
