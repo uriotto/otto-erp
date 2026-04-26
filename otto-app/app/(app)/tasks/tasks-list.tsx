@@ -63,17 +63,23 @@ export type TaskListItem = Pick<
   | "due_date"
   | "completed_at"
   | "project_id"
+  | "customer_id"
+  | "lead_id"
   | "assigned_to"
   | "tags"
   | "order_index"
   | "created_at"
 > & {
   project_name: string | null;
+  customer_name: string | null;
+  lead_name: string | null;
   assignee_name: string | null;
 };
 
 export type ProjectOption = { id: string; name: string };
 export type UserOption = { id: string; name: string };
+export type CustomerOption = { id: string; name: string };
+export type LeadOption = { id: string; name: string };
 
 const SEARCH_DEBOUNCE_MS = 200;
 
@@ -83,10 +89,14 @@ export function TasksList({
   tasks,
   projects,
   users,
+  customers,
+  leads,
 }: {
   tasks: TaskListItem[];
   projects: ProjectOption[];
   users: UserOption[];
+  customers: CustomerOption[];
+  leads: LeadOption[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -300,6 +310,8 @@ export function TasksList({
         <NewTaskDialog
           projects={projects}
           users={users}
+          customers={customers}
+          leads={leads}
           defaultProjectId={projectFilter !== "all" ? projectFilter : undefined}
           onClose={() => setShowNew(false)}
         />

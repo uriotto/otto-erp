@@ -6,18 +6,22 @@ import { X } from "lucide-react";
 import { createTask, type TaskFormState } from "./actions";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
-import type { ProjectOption, UserOption } from "./tasks-list";
+import type { CustomerOption, LeadOption, ProjectOption, UserOption } from "./tasks-list";
 
 const init: TaskFormState = {};
 
 export function NewTaskDialog({
   projects,
   users,
+  customers,
+  leads,
   defaultProjectId,
   onClose,
 }: {
   projects: ProjectOption[];
   users: UserOption[];
+  customers: CustomerOption[];
+  leads: LeadOption[];
   defaultProjectId?: string;
   onClose: () => void;
 }) {
@@ -63,6 +67,15 @@ export function NewTaskDialog({
               <option value="">— ללא —</option>
             </SelectOptions>
             <SelectOptions label="משובץ ל" name="assigned_to" options={users}>
+              <option value="">— ללא —</option>
+            </SelectOptions>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <SelectOptions label="לקוח" name="customer_id" options={customers}>
+              <option value="">— ללא —</option>
+            </SelectOptions>
+            <SelectOptions label="ליד" name="lead_id" options={leads}>
               <option value="">— ללא —</option>
             </SelectOptions>
           </div>

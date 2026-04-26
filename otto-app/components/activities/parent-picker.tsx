@@ -17,11 +17,17 @@ export type ParentSearchItem = {
 export function ParentPicker({
   items,
   initial,
+  onChange,
 }: {
   items: ParentSearchItem[];
   initial?: ParentOption;
+  onChange?: (selected: ParentOption) => void;
 }) {
-  const [selected, setSelected] = useState<ParentOption>(initial ?? { kind: "personal" });
+  const [selected, setSelectedRaw] = useState<ParentOption>(initial ?? { kind: "personal" });
+  const setSelected = (v: ParentOption) => {
+    setSelectedRaw(v);
+    onChange?.(v);
+  };
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const ref = useRef<HTMLDivElement>(null);
