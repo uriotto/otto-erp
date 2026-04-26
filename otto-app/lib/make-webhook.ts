@@ -1,10 +1,13 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
+import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
 
 /**
  * Fires a Make.com webhook for tenant-scoped automations.
  * Reads the webhook URL from `tenant_settings.make_webhook_url`.
+ * Uses service-role admin if available, otherwise falls back to the user's
+ * authenticated server client (works inside server actions / route handlers).
  * Errors are swallowed (logged) so they never break the calling action.
  */
 export async function fireMakeWebhook(
@@ -15,16 +18,15 @@ export async function fireMakeWebhook(
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!url || !serviceKey) {
-      console.error("[make-webhook] missing supabase env vars");
-      return;
-    }
 
-    const admin = createSupabaseClient<Database>(url, serviceKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
+    const reader =
+      url && serviceKey
+        ? createSupabaseClient<Database>(url, serviceKey, {
+            auth: { persistSession: false, autoRefreshToken: false },
+          })
+        : await createClient();
 
-    const { data: settings, error } = await admin
+    const { data: settings, error } = await reader
       .from("tenant_settings")
       .select("make_webhook_url")
       .eq("tenant_id", tenantId)
