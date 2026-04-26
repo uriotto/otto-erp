@@ -39,8 +39,8 @@ async function getTenant() {
 function diffMinutes(start: string, end: string): number {
   const s = new Date(start).getTime();
   const e = new Date(end).getTime();
-  // Minimum 1 minute — DB constraint requires duration_minutes > 0
-  return Math.max(1, Math.round((e - s) / 60000));
+  // Always round UP to next minute. Minimum 1 minute (any positive duration → 1 min).
+  return Math.max(1, Math.ceil((e - s) / 60000));
 }
 
 export async function createTimeEntry(
