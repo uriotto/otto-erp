@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ActivityFeed } from "@/components/activities/activity-feed";
 import { CustomerActionsBar } from "./customer-actions-bar";
 import { CustomerTagsEditor } from "./customer-tags-editor";
+import { RecentTracker } from "@/components/search/recent-tracker";
 
 export const metadata = { title: "לקוח — OTTO" };
 
@@ -30,6 +31,12 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
 
   return (
     <div className="mx-auto max-w-2xl">
+      <RecentTracker
+        type="customer"
+        id={customer.id}
+        label={customer.name}
+        sublabel={customer.company ?? undefined}
+      />
       <div className="mb-6">
         <Link
           href="/customers"

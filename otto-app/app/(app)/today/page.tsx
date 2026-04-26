@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertCircle, CheckCircle2, Clock, Calendar, ArrowLeft, TrendingUp } from "lucide-react";
+import { AlertCircle, Clock, Calendar, ArrowLeft, TrendingUp, Coffee } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { ACTIVITY_META, type ActivityType } from "@/components/activities/activity-types";
 import type { ParentSearchItem } from "@/components/activities/parent-picker";
@@ -184,20 +184,24 @@ export default async function TodayPage() {
       )}
 
       {allTasks.length === 0 && allMeetings.length === 0 && (
-        <div className="border-ink-line bg-cream-paper rounded-2xl border border-dashed py-16 text-center">
-          <CheckCircle2 size={40} className="text-ink-faded mx-auto mb-3" />
-          <p className="text-navy mb-1 font-semibold">אין משימות פתוחות. כל הכבוד 👏</p>
-          <p className="text-ink-soft text-sm">הוסף משימות חדשות בדף של לקוח או ליד.</p>
-          <div className="mt-4 flex justify-center gap-2">
+        <div className="border-ink-line bg-cream-paper/40 flex flex-col items-center justify-center rounded-2xl border border-dashed px-6 py-16 text-center">
+          <div className="bg-cream-deep mb-5 flex h-20 w-20 items-center justify-center rounded-full">
+            <Coffee size={48} className="text-navy/60" />
+          </div>
+          <h3 className="text-display-sm text-navy mb-2">היום הזה פנוי</h3>
+          <p className="text-ink-soft mx-auto mb-6 max-w-md text-sm leading-relaxed">
+            אין משימות או פגישות מתוזמנות. אולי זה זמן ליצור פעילות חדשה או לקפוץ ללקוחות?
+          </p>
+          <div className="flex flex-wrap justify-center gap-2">
             <Link
               href="/customers"
-              className="border-ink-line text-navy hover:border-navy flex items-center gap-1 rounded-lg border px-3 py-1.5 text-sm font-semibold transition-colors"
+              className="border-ink-line text-navy hover:border-navy bg-cream-paper flex items-center gap-1 rounded-xl border px-4 py-2 text-sm font-semibold transition-colors"
             >
               לקוחות <ArrowLeft size={13} />
             </Link>
             <Link
               href="/leads"
-              className="border-ink-line text-navy hover:border-navy flex items-center gap-1 rounded-lg border px-3 py-1.5 text-sm font-semibold transition-colors"
+              className="border-ink-line text-navy hover:border-navy bg-cream-paper flex items-center gap-1 rounded-xl border px-4 py-2 text-sm font-semibold transition-colors"
             >
               לידים <ArrowLeft size={13} />
             </Link>

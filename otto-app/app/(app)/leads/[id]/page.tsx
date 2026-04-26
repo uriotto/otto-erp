@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ActivityFeed } from "@/components/activities/activity-feed";
 import { LeadActionsBar } from "./lead-actions-bar";
 import { LeadTagsEditor } from "./lead-tags-editor";
+import { RecentTracker } from "@/components/search/recent-tracker";
 
 export const metadata = { title: "ליד — OTTO" };
 
@@ -48,6 +49,12 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
 
   return (
     <div className="mx-auto max-w-2xl">
+      <RecentTracker
+        type="lead"
+        id={lead.id}
+        label={lead.name}
+        sublabel={lead.company ?? undefined}
+      />
       <div className="mb-6">
         <Link
           href="/leads"

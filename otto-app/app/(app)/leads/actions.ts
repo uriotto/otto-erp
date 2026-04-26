@@ -146,6 +146,58 @@ export async function convertLeadToCustomer(
   return { customerId };
 }
 
+function escapeCsvCell(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  const str = String(value);
+  if (/[",\n\r]/.test(str)) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
+function formatDate(iso: string | null | undefined): string {
+  if (!iso) return "";
+  return iso.slice(0, 10);
+}
+
+export async function exportLeadsCsv(): Promise<
+  { csv: string; filename: string } | { error: string }
+> {
+  const supabase = await createClient();
+  const { data: profile } = await supabase.from("users").select("tenant_id").single();
+  if (!profile) return { error: "לא מחובר" };
+
+  const { data: leads, error } = await supabase
+    .from("leads")
+    .select("*")
+    .eq("tenant_id", profile.tenant_id)
+    .order("created_at", { ascending: false });
+
+  if (error) return { error: error.message };
+
+  const headers = ["שם", "חברה", "אימייל", "טלפון", "מקור", "סטטוס", "ערך", "הערות", "תאריך יצירה"];
+
+  const rows = (leads ?? []).map((l) =>
+    [
+      l.name,
+      l.company,
+      l.email,
+      l.phone,
+      l.source,
+      l.status,
+      l.value,
+      l.notes,
+      formatDate(l.created_at),
+    ]
+      .map(escapeCsvCell)
+      .join(","),
+  );
+
+  const csv = "﻿" + [headers.map(escapeCsvCell).join(","), ...rows].join("\r\n");
+  const filename = `otto-leads-${new Date().toISOString().slice(0, 10)}.csv`;
+  return { csv, filename };
+}
+
 export async function deleteLead(id: string): Promise<{ error?: string }> {
   const supabase = await createClient();
   const { data: profile } = await supabase.from("users").select("tenant_id").single();

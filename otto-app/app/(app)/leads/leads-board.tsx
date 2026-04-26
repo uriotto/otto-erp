@@ -2,10 +2,22 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { Plus, Mail, Phone, Building2, TrendingUp, Search, X, Filter } from "lucide-react";
+import {
+  Plus,
+  Mail,
+  Phone,
+  Building2,
+  TrendingUp,
+  Search,
+  X,
+  Filter,
+  Sparkles,
+  SearchX,
+} from "lucide-react";
 import type { Tables } from "@/lib/supabase/types";
 import { NewLeadDialog } from "./new-lead-dialog";
-import { updateLeadStatus } from "./actions";
+import { updateLeadStatus, exportLeadsCsv } from "./actions";
+import { ExportCsvButton } from "@/components/ui/export-csv-button";
 
 type Lead = Tables<"leads">;
 
@@ -98,13 +110,16 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
             )}
           </div>
         </div>
-        <button
-          onClick={() => setShowNew(true)}
-          className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors"
-        >
-          <Plus size={16} />
-          ליד חדש
-        </button>
+        <div className="flex items-center gap-2">
+          <ExportCsvButton label="ייצא CSV" action={exportLeadsCsv} />
+          <button
+            onClick={() => setShowNew(true)}
+            className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors"
+          >
+            <Plus size={16} />
+            ליד חדש
+          </button>
+        </div>
       </div>
 
       {leads.length > 0 && (
@@ -187,7 +202,7 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
       {leads.length === 0 ? (
         <EmptyState onNew={() => setShowNew(true)} />
       ) : filteredLeads.length === 0 ? (
-        <NoResults onClear={clearFilters} />
+        <NoResults query={query} onClear={clearFilters} />
       ) : (
         <div className="space-y-6">
           {STATUSES.map(({ key, label, color }) => {
@@ -290,20 +305,33 @@ function LeadCard({ lead }: { lead: Lead }) {
   );
 }
 
-function NoResults({ onClear }: { onClear: () => void }) {
+function NoResults({ query, onClear }: { query: string; onClear: () => void }) {
+  const trimmed = query.trim();
   return (
-    <div className="border-ink-line flex flex-col items-center justify-center rounded-2xl border border-dashed py-16 text-center">
-      <div className="bg-cream-paper mb-4 rounded-2xl p-4">
-        <Search size={28} className="text-ink-faded" />
+    <div className="border-ink-line bg-cream-paper/40 flex flex-col items-center justify-center rounded-2xl border border-dashed py-16 text-center">
+      <div className="bg-cream-deep mb-5 flex h-20 w-20 items-center justify-center rounded-full">
+        <SearchX size={48} className="text-navy/60" />
       </div>
-      <p className="text-navy mb-1 font-semibold">לא נמצאו לידים התואמים לחיפוש</p>
-      <p className="text-ink-soft mb-5 text-sm">נסה לשנות את החיפוש או המקור</p>
+      <h3 className="text-display-sm text-navy mb-2">
+        {trimmed ? "לא מצאנו לידים שתואמים את החיפוש" : "לא מצאנו לידים שתואמים את הסינון"}
+      </h3>
+      <p className="text-ink-soft mx-auto mb-5 max-w-md text-sm">
+        {trimmed ? (
+          <>
+            לא נמצאו תוצאות עבור <span className="text-navy font-semibold">{`"${trimmed}"`}</span>.
+            נסו ביטוי אחר או נקו את הסינון.
+          </>
+        ) : (
+          "אף ליד לא תואם לסינון הנוכחי. נסו לשנות את המקור או התגיות."
+        )}
+      </p>
       <button
+        type="button"
         onClick={onClear}
-        className="border-ink-line text-navy hover:bg-cream-paper flex items-center gap-2 rounded-xl border bg-transparent px-4 py-2 text-sm font-semibold transition-colors"
+        className="text-navy hover:text-navy-deep inline-flex items-center gap-1.5 text-sm font-semibold underline-offset-4 hover:underline"
       >
         <X size={14} />
-        נקה סינון
+        נקה חיפוש וסינון
       </button>
     </div>
   );
@@ -311,15 +339,17 @@ function NoResults({ onClear }: { onClear: () => void }) {
 
 function EmptyState({ onNew }: { onNew: () => void }) {
   return (
-    <div className="border-ink-line flex flex-col items-center justify-center rounded-2xl border border-dashed py-20 text-center">
-      <div className="bg-cream-paper mb-4 rounded-2xl p-4">
-        <TrendingUp size={32} className="text-ink-faded" />
+    <div className="border-ink-line bg-cream-paper/40 flex flex-col items-center justify-center rounded-2xl border border-dashed px-6 py-16 text-center">
+      <div className="bg-cream-deep mb-5 flex h-20 w-20 items-center justify-center rounded-full">
+        <Sparkles size={48} className="text-navy/60" />
       </div>
-      <p className="text-navy mb-1 font-semibold">אין עדיין לידים</p>
-      <p className="text-ink-soft mb-5 text-sm">הוסף את הליד הראשון שלך</p>
+      <h3 className="text-display-sm text-navy mb-2">התחל לעקוב אחרי לידים</h3>
+      <p className="text-ink-soft mx-auto mb-6 max-w-md text-sm leading-relaxed">
+        הוסיפו לידים חדשים, נהלו את הסטטוס שלהם בלוח, והמירו אותם ללקוחות בלחיצה.
+      </p>
       <button
         onClick={onNew}
-        className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors"
+        className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors"
       >
         <Plus size={16} />
         ליד חדש

@@ -2,9 +2,11 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Mail, Phone, Building2, Search, X } from "lucide-react";
+import { Plus, Mail, Phone, Building2, Search, X, Users, SearchX } from "lucide-react";
 import type { Tables } from "@/lib/supabase/types";
 import { NewCustomerDialog } from "./new-customer-dialog";
+import { ExportCsvButton } from "@/components/ui/export-csv-button";
+import { exportCustomersCsv } from "./actions";
 
 type Customer = Tables<"customers">;
 type StatusFilter = "all" | "active" | "inactive";
@@ -65,13 +67,16 @@ export function CustomersList({ customers }: { customers: Customer[] }) {
             {hasCustomers ? `${filtered.length} מתוך ${customers.length} לקוחות` : "0 לקוחות"}
           </p>
         </div>
-        <button
-          onClick={() => setShowNew(true)}
-          className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors"
-        >
-          <Plus size={16} />
-          לקוח חדש
-        </button>
+        <div className="flex items-center gap-2">
+          <ExportCsvButton label="ייצא CSV" action={exportCustomersCsv} />
+          <button
+            onClick={() => setShowNew(true)}
+            className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors"
+          >
+            <Plus size={16} />
+            לקוח חדש
+          </button>
+        </div>
       </div>
 
       {hasCustomers && (
@@ -156,7 +161,14 @@ export function CustomersList({ customers }: { customers: Customer[] }) {
       {customers.length === 0 ? (
         <EmptyState onNew={() => setShowNew(true)} />
       ) : filtered.length === 0 ? (
-        <NoResults />
+        <NoResults
+          query={query}
+          onClear={() => {
+            setQuery("");
+            setStatusFilter("all");
+            setSelectedTags([]);
+          }}
+        />
       ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((c) => (
@@ -247,29 +259,51 @@ function StatusPill({ status }: { status: string }) {
   );
 }
 
-function NoResults() {
+function NoResults({ query, onClear }: { query: string; onClear: () => void }) {
+  const trimmed = query.trim();
   return (
-    <div className="border-ink-line flex flex-col items-center justify-center rounded-2xl border border-dashed py-16 text-center">
-      <div className="bg-cream-paper mb-4 rounded-2xl p-4">
-        <Search size={28} className="text-ink-faded" />
+    <div className="border-ink-line bg-cream-paper/40 flex flex-col items-center justify-center rounded-2xl border border-dashed py-16 text-center">
+      <div className="bg-cream-deep mb-5 flex h-20 w-20 items-center justify-center rounded-full">
+        <SearchX size={48} className="text-navy/60" />
       </div>
-      <p className="text-navy mb-1 font-semibold">לא נמצאו לקוחות התואמים לחיפוש</p>
-      <p className="text-ink-soft text-sm">נסה לשנות את החיפוש או את הסינון</p>
+      <h3 className="text-display-sm text-navy mb-2">
+        {trimmed ? "לא מצאנו לקוחות שתואמים את החיפוש" : "לא מצאנו לקוחות שתואמים את הסינון"}
+      </h3>
+      <p className="text-ink-soft mx-auto mb-5 max-w-md text-sm">
+        {trimmed ? (
+          <>
+            לא נמצאו תוצאות עבור <span className="text-navy font-semibold">{`"${trimmed}"`}</span>.
+            נסו ביטוי אחר או נקו את הסינון.
+          </>
+        ) : (
+          "אף לקוח לא תואם לסינון הנוכחי. נסו לשנות את הפילטרים."
+        )}
+      </p>
+      <button
+        type="button"
+        onClick={onClear}
+        className="text-navy hover:text-navy-deep inline-flex items-center gap-1.5 text-sm font-semibold underline-offset-4 hover:underline"
+      >
+        <X size={14} />
+        נקה חיפוש וסינון
+      </button>
     </div>
   );
 }
 
 function EmptyState({ onNew }: { onNew: () => void }) {
   return (
-    <div className="border-ink-line flex flex-col items-center justify-center rounded-2xl border border-dashed py-20 text-center">
-      <div className="bg-cream-paper mb-4 rounded-2xl p-4">
-        <Building2 size={32} className="text-ink-faded" />
+    <div className="border-ink-line bg-cream-paper/40 flex flex-col items-center justify-center rounded-2xl border border-dashed px-6 py-16 text-center">
+      <div className="bg-cream-deep mb-5 flex h-20 w-20 items-center justify-center rounded-full">
+        <Users size={48} className="text-navy/60" />
       </div>
-      <p className="text-navy mb-1 font-semibold">אין עדיין לקוחות</p>
-      <p className="text-ink-soft mb-5 text-sm">הוסף את הלקוח הראשון שלך</p>
+      <h3 className="text-display-sm text-navy mb-2">הוסף את הלקוח הראשון</h3>
+      <p className="text-ink-soft mx-auto mb-6 max-w-md text-sm leading-relaxed">
+        כאן תנהל את כל הלקוחות שלך — פרטי קשר, פעילויות, תגיות והיסטוריה במקום אחד.
+      </p>
       <button
         onClick={onNew}
-        className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors"
+        className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors"
       >
         <Plus size={16} />
         לקוח חדש

@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, X, Users, TrendingUp, FileText, Loader2 } from "lucide-react";
+import { Search, X, Users, TrendingUp, FileText, Loader2, Clock } from "lucide-react";
 import type { SearchResults, SearchResultItem } from "@/app/api/search/route";
+import { clearRecent, getRecent, type RecentItem } from "./recent-items";
+
+const RECENT_LIMIT = 8;
 
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
@@ -15,8 +18,11 @@ export function CommandPalette() {
   });
   const [loading, setLoading] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [recent, setRecent] = useState<RecentItem[]>([]);
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const showRecent = query.trim().length < 2;
 
   // Open with Cmd+K / Ctrl+K, או דרך event מ-header
   useEffect(() => {
@@ -40,12 +46,14 @@ export function CommandPalette() {
     };
   }, [open]);
 
-  // Focus on open
+  // Focus on open + load recent items
   useEffect(() => {
     if (open) {
       setTimeout(() => inputRef.current?.focus(), 50);
-    } else {
       // eslint-disable-next-line react-hooks/set-state-in-effect
+      setRecent(getRecent(RECENT_LIMIT));
+    } else {
+       
       setQuery("");
       setResults({ customers: [], leads: [], activities: [] });
       setActiveIndex(0);
@@ -79,30 +87,52 @@ export function CommandPalette() {
     };
   }, [query]);
 
-  const flatList: SearchResultItem[] = [
-    ...results.customers,
-    ...results.leads,
-    ...results.activities,
-  ];
-  const total = flatList.length;
+  const searchFlatList: SearchResultItem[] = useMemo(
+    () => [...results.customers, ...results.leads, ...results.activities],
+    [results],
+  );
 
-  function navigate(item: SearchResultItem) {
+  const navItemsLength = showRecent ? recent.length : searchFlatList.length;
+
+  // Reset active index when switching mode or recent list changes
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setActiveIndex(0);
+  }, [showRecent, recent.length]);
+
+  function navigateSearch(item: SearchResultItem) {
     setOpen(false);
     router.push(item.href);
+  }
+
+  function navigateRecent(item: RecentItem) {
+    setOpen(false);
+    const href = item.type === "customer" ? `/customers/${item.id}` : `/leads/${item.id}`;
+    router.push(href);
   }
 
   function onInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActiveIndex((i) => Math.min(total - 1, i + 1));
+      setActiveIndex((i) => Math.min(navItemsLength - 1, i + 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setActiveIndex((i) => Math.max(0, i - 1));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      const item = flatList[activeIndex];
-      if (item) navigate(item);
+      if (showRecent) {
+        const item = recent[activeIndex];
+        if (item) navigateRecent(item);
+      } else {
+        const item = searchFlatList[activeIndex];
+        if (item) navigateSearch(item);
+      }
     }
+  }
+
+  function handleClearRecent() {
+    clearRecent();
+    setRecent([]);
   }
 
   if (!open) return null;
@@ -137,28 +167,15 @@ export function CommandPalette() {
         </div>
 
         <div className="max-h-[60vh] overflow-y-auto">
-          {query.length < 2 ? (
-            <div className="text-ink-soft px-4 py-8 text-center text-sm">
-              הקלד לפחות 2 תווים לחיפוש
-              <div className="text-ink-faded mt-2 text-xs">
-                <kbd className="bg-cream-paper border-ink-line rounded border px-1.5 py-0.5 text-[10px]">
-                  ↑
-                </kbd>{" "}
-                <kbd className="bg-cream-paper border-ink-line rounded border px-1.5 py-0.5 text-[10px]">
-                  ↓
-                </kbd>{" "}
-                לניווט,{" "}
-                <kbd className="bg-cream-paper border-ink-line rounded border px-1.5 py-0.5 text-[10px]">
-                  Enter
-                </kbd>{" "}
-                לבחירה,{" "}
-                <kbd className="bg-cream-paper border-ink-line rounded border px-1.5 py-0.5 text-[10px]">
-                  Esc
-                </kbd>{" "}
-                לסגור
-              </div>
-            </div>
-          ) : total === 0 && !loading ? (
+          {showRecent ? (
+            <RecentSection
+              recent={recent}
+              activeIndex={activeIndex}
+              onSelect={navigateRecent}
+              onHover={setActiveIndex}
+              onClear={handleClearRecent}
+            />
+          ) : searchFlatList.length === 0 && !loading ? (
             <div className="text-ink-soft px-4 py-8 text-center text-sm">לא נמצאו תוצאות</div>
           ) : (
             <>
@@ -166,33 +183,109 @@ export function CommandPalette() {
                 title="לקוחות"
                 icon={<Users size={13} className="text-blue-600" />}
                 items={results.customers}
-                flatList={flatList}
+                flatList={searchFlatList}
                 activeIndex={activeIndex}
-                onSelect={navigate}
+                onSelect={navigateSearch}
                 onHover={setActiveIndex}
               />
               <ResultGroup
                 title="לידים"
                 icon={<TrendingUp size={13} className="text-purple-600" />}
                 items={results.leads}
-                flatList={flatList}
+                flatList={searchFlatList}
                 activeIndex={activeIndex}
-                onSelect={navigate}
+                onSelect={navigateSearch}
                 onHover={setActiveIndex}
               />
               <ResultGroup
                 title="פעילויות"
                 icon={<FileText size={13} className="text-gray-600" />}
                 items={results.activities}
-                flatList={flatList}
+                flatList={searchFlatList}
                 activeIndex={activeIndex}
-                onSelect={navigate}
+                onSelect={navigateSearch}
                 onHover={setActiveIndex}
               />
             </>
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function RecentSection({
+  recent,
+  activeIndex,
+  onSelect,
+  onHover,
+  onClear,
+}: {
+  recent: RecentItem[];
+  activeIndex: number;
+  onSelect: (item: RecentItem) => void;
+  onHover: (idx: number) => void;
+  onClear: () => void;
+}) {
+  if (recent.length === 0) {
+    return (
+      <div className="text-ink-soft px-4 py-8 text-center text-sm">
+        אין פעילות אחרונה
+        <div className="text-ink-faded mt-2 text-xs">
+          הקלד לפחות 2 תווים לחיפוש{" "}
+          <kbd className="bg-cream-paper border-ink-line rounded border px-1.5 py-0.5 text-[10px]">
+            ↑
+          </kbd>{" "}
+          <kbd className="bg-cream-paper border-ink-line rounded border px-1.5 py-0.5 text-[10px]">
+            ↓
+          </kbd>{" "}
+          לניווט,{" "}
+          <kbd className="bg-cream-paper border-ink-line rounded border px-1.5 py-0.5 text-[10px]">
+            Enter
+          </kbd>{" "}
+          לבחירה
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border-ink-line border-b last:border-b-0">
+      <div className="text-micro text-ink-faded flex items-center justify-between px-4 py-2 uppercase">
+        <span className="flex items-center gap-1.5">
+          <Clock size={13} className="text-ink-soft" />
+          פריטים אחרונים
+        </span>
+        <button
+          type="button"
+          onClick={onClear}
+          className="text-ink-faded hover:text-navy text-[10px] normal-case transition-colors"
+        >
+          נקה
+        </button>
+      </div>
+      {recent.map((item, idx) => {
+        const isActive = idx === activeIndex;
+        const typeLabel = item.type === "customer" ? "לקוח" : "ליד";
+        return (
+          <button
+            key={`${item.type}-${item.id}`}
+            onClick={() => onSelect(item)}
+            onMouseEnter={() => onHover(idx)}
+            className={`flex w-full items-center gap-3 px-4 py-2.5 text-right transition-colors ${
+              isActive ? "bg-navy/5" : "hover:bg-cream-paper"
+            }`}
+          >
+            <div className="min-w-0 flex-1">
+              <div className="text-navy truncate text-sm font-medium">{item.label}</div>
+              <div className="text-ink-faded truncate text-xs">
+                {typeLabel}
+                {item.sublabel ? ` · ${item.sublabel}` : ""}
+              </div>
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 }

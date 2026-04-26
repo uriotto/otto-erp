@@ -4,6 +4,7 @@ import { useActionState, useEffect } from "react";
 import { X } from "lucide-react";
 import { updateProfile, type SettingsFormState } from "./actions";
 import { useToast } from "@/components/ui/toast";
+import { Spinner } from "@/components/ui/spinner";
 
 const init: SettingsFormState = {};
 
@@ -65,9 +66,17 @@ export function EditProfileDialog({ initialFullName, onClose }: Props) {
             <button
               type="submit"
               disabled={pending}
-              className="bg-navy text-cream-paper hover:bg-navy-deep rounded-lg px-5 py-2 text-sm font-semibold transition-colors disabled:opacity-50"
+              aria-busy={pending}
+              className="bg-navy text-cream-paper hover:bg-navy-deep rounded-lg px-5 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {pending ? "שומר..." : "שמור"}
+              {pending ? (
+                <span className="flex items-center gap-2">
+                  <Spinner size={14} />
+                  <span>שומר</span>
+                </span>
+              ) : (
+                "שמור"
+              )}
             </button>
           </div>
         </form>

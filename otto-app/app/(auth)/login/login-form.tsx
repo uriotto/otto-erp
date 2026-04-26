@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 
 import { signInWithEmail, type LoginState } from "./actions";
+import { Spinner } from "@/components/ui/spinner";
 
 const initialState: LoginState = null;
 
@@ -30,9 +31,17 @@ export function LoginForm() {
       <button
         type="submit"
         disabled={pending}
-        className="bg-navy text-cream-paper hover:bg-navy-deep w-full rounded-lg px-5 py-3 font-semibold transition-colors disabled:opacity-60"
+        aria-busy={pending}
+        className="bg-navy text-cream-paper hover:bg-navy-deep w-full rounded-lg px-5 py-3 font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {pending ? "שולח..." : "שלח לי קישור התחברות"}
+        {pending ? (
+          <span className="flex items-center justify-center gap-2">
+            <Spinner size={16} />
+            <span>שולח</span>
+          </span>
+        ) : (
+          "שלח לי קישור התחברות"
+        )}
       </button>
 
       {state && (

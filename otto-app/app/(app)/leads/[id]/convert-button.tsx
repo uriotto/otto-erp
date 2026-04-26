@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRightLeft, CheckCircle2 } from "lucide-react";
 import { convertLeadToCustomer } from "../actions";
 import { useToast } from "@/components/ui/toast";
+import { Spinner } from "@/components/ui/spinner";
 
 export function ConvertButton({
   leadId,
@@ -51,10 +52,11 @@ export function ConvertButton({
     <button
       onClick={handleConvert}
       disabled={pending}
-      className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors disabled:opacity-50"
+      aria-busy={pending}
+      className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
     >
-      <ArrowRightLeft size={14} />
-      {pending ? "ממיר..." : "המר ללקוח"}
+      {pending ? <Spinner size={14} /> : <ArrowRightLeft size={14} />}
+      {pending ? "ממיר" : "המר ללקוח"}
     </button>
   );
 }

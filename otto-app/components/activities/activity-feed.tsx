@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, AlertCircle, Clock, Pencil } from "lucide-react";
+import { Plus, Trash2, AlertCircle, Clock, Pencil, MessageSquarePlus } from "lucide-react";
 import { ACTIVITY_META, type ActivityType } from "./activity-types";
 import { NewActivityDialog } from "./new-activity-dialog";
 import { EditActivityDialog } from "./edit-activity-dialog";
@@ -46,8 +46,21 @@ export function ActivityFeed({
       </div>
 
       {activities.length === 0 ? (
-        <div className="border-ink-line text-ink-soft rounded-xl border border-dashed py-10 text-center text-sm">
-          עדיין אין פעילויות. הוסף את הראשונה.
+        <div className="border-ink-line bg-cream-paper/40 flex flex-col items-center justify-center rounded-2xl border border-dashed px-6 py-16 text-center">
+          <div className="bg-cream-deep mb-5 flex h-20 w-20 items-center justify-center rounded-full">
+            <MessageSquarePlus size={48} className="text-navy/60" />
+          </div>
+          <h3 className="text-display-sm text-navy mb-2">אין עדיין פעילות</h3>
+          <p className="text-ink-soft mx-auto mb-6 max-w-md text-sm leading-relaxed">
+            הוסיפו משימה, פגישה או הערה כדי להתחיל לתעד את ההיסטוריה.
+          </p>
+          <button
+            onClick={() => setShowNew(true)}
+            className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors"
+          >
+            <Plus size={16} />
+            הוסף פעילות
+          </button>
         </div>
       ) : (
         <ol className="relative space-y-3">

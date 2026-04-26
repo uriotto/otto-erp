@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { deleteCustomer } from "../actions";
 import { useToast } from "@/components/ui/toast";
+import { Spinner } from "@/components/ui/spinner";
 
 export function DeleteCustomerButton({ id }: { id: string }) {
   const [pending, startTransition] = useTransition();
@@ -28,10 +29,11 @@ export function DeleteCustomerButton({ id }: { id: string }) {
     <button
       onClick={handleDelete}
       disabled={pending}
-      className="text-ink-faded flex items-center gap-1.5 text-xs transition-colors hover:text-red-600 disabled:opacity-50"
+      aria-busy={pending}
+      className="text-ink-faded flex items-center gap-1.5 text-xs transition-colors hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
     >
-      <Trash2 size={13} />
-      {pending ? "מוחק..." : "מחק לקוח"}
+      {pending ? <Spinner size={13} /> : <Trash2 size={13} />}
+      {pending ? "מוחק" : "מחק לקוח"}
     </button>
   );
 }
