@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
@@ -18,7 +19,7 @@ type Crumb = {
   href: string;
 };
 
-function buildCrumbs(pathname: string): Crumb[] {
+function buildCrumbs(pathname: string, entityLabel: string | null): Crumb[] {
   const segments = pathname.split("/").filter(Boolean);
   if (segments.length === 0) return [];
 
@@ -36,10 +37,9 @@ function buildCrumbs(pathname: string): Crumb[] {
       continue;
     }
 
-    // Unknown segment — likely an entity id under a known parent
     const parent = i > 0 ? segments[i - 1] : undefined;
     if (parent === "customers" || parent === "leads") {
-      crumbs.push({ label: "פרטים", href: acc });
+      crumbs.push({ label: entityLabel ?? "פרטים", href: acc });
       continue;
     }
 
@@ -51,9 +51,28 @@ function buildCrumbs(pathname: string): Crumb[] {
 
 export function Breadcrumbs() {
   const pathname = usePathname() ?? "/";
-  const crumbs = buildCrumbs(pathname);
+  const [entityLabel, setEntityLabel] = useState<string | null>(null);
 
-  // Hide on dashboard root or when there are fewer than 2 segments and the path is /dashboard
+  useEffect(() => {
+    function onLabel(e: Event) {
+      const ce = e as CustomEvent<{ pathname: string; label: string }>;
+      if (!ce.detail) return;
+      if (ce.detail.pathname === pathname) {
+        setEntityLabel(ce.detail.label);
+      }
+    }
+    window.addEventListener("otto:breadcrumb-label", onLabel);
+    return () => window.removeEventListener("otto:breadcrumb-label", onLabel);
+  }, [pathname]);
+
+  // Reset label when path changes
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setEntityLabel(null);
+  }, [pathname]);
+
+  const crumbs = buildCrumbs(pathname, entityLabel);
+
   if (crumbs.length === 0) return null;
   if (pathname === "/dashboard" || pathname === "/") return null;
 

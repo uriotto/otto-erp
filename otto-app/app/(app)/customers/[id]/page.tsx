@@ -6,6 +6,7 @@ import { ActivityFeed } from "@/components/activities/activity-feed";
 import { CustomerActionsBar } from "./customer-actions-bar";
 import { CustomerTagsEditor } from "./customer-tags-editor";
 import { RecentTracker } from "@/components/search/recent-tracker";
+import { BreadcrumbLabel } from "@/components/layout/breadcrumb-label";
 
 export const metadata = { title: "לקוח — OTTO" };
 
@@ -37,6 +38,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
         label={customer.name}
         sublabel={customer.company ?? undefined}
       />
+      <BreadcrumbLabel label={customer.name} />
       <div className="mb-6">
         <Link
           href="/customers"

@@ -6,6 +6,7 @@ import { ActivityFeed } from "@/components/activities/activity-feed";
 import { LeadActionsBar } from "./lead-actions-bar";
 import { LeadTagsEditor } from "./lead-tags-editor";
 import { RecentTracker } from "@/components/search/recent-tracker";
+import { BreadcrumbLabel } from "@/components/layout/breadcrumb-label";
 
 export const metadata = { title: "ליד — OTTO" };
 
@@ -55,6 +56,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
         label={lead.name}
         sublabel={lead.company ?? undefined}
       />
+      <BreadcrumbLabel label={lead.name} />
       <div className="mb-6">
         <Link
           href="/leads"
