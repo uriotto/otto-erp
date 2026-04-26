@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { NavProgress } from "@/components/layout/nav-progress";
+import { CommandPalette } from "@/components/search/command-palette";
+import { ToastProvider } from "@/components/ui/toast";
 import { createClient } from "@/lib/supabase/server";
 
 function getGreeting(): string {
@@ -26,8 +29,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const displayName = profile?.full_name?.split(" ")[0] ?? profile?.email?.split("@")[0] ?? "אורי";
 
   return (
-    <AppShell greeting={getGreeting()} displayName={displayName} subline="automate your success">
-      {children}
-    </AppShell>
+    <ToastProvider>
+      <NavProgress />
+      <AppShell greeting={getGreeting()} displayName={displayName} subline="automate your success">
+        {children}
+        <CommandPalette />
+      </AppShell>
+    </ToastProvider>
   );
 }

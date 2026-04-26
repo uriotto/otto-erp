@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Menu, Search, Settings } from "lucide-react";
 
 type Props = {
@@ -45,19 +46,23 @@ export function AppHeader({ greeting, displayName, subline, onMenuClick }: Props
 
         <button
           type="button"
-          aria-label="חיפוש"
-          className="bg-cream-paper border-ink-line text-ink-soft hover:border-navy hover:text-navy flex h-10 w-10 items-center justify-center rounded-full border transition-colors"
+          aria-label="חיפוש (Cmd+K)"
+          onClick={() => window.dispatchEvent(new Event("otto:command-palette:open"))}
+          className="bg-cream-paper border-ink-line text-ink-soft hover:border-navy hover:text-navy flex h-10 items-center gap-2 rounded-full border px-3 transition-colors"
         >
           <Search className="h-[18px] w-[18px]" />
+          <kbd className="text-ink-faded hidden text-[10px] font-medium sm:inline-block" dir="ltr">
+            ⌘K
+          </kbd>
         </button>
 
-        <button
-          type="button"
+        <Link
+          href="/settings"
           aria-label="הגדרות"
           className="bg-cream-paper border-ink-line text-ink-soft hover:border-navy hover:text-navy flex h-10 w-10 items-center justify-center rounded-full border transition-colors"
         >
           <Settings className="h-[18px] w-[18px]" />
-        </button>
+        </Link>
       </div>
     </header>
   );

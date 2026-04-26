@@ -42,3 +42,8 @@ supabase/.temp
 # Word files (PRD source — נשאר ב-otto-docs רק כ-MD)
 *.docx
 ~$*.docx
+
+# Local tooling / vault (not project source)
+.obsidian/
+.claude/
+vault/
