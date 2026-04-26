@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
+import type { LucideIcon } from "lucide-react";
 
 import { NAV_SECTIONS } from "./sidebar-nav";
 
@@ -12,12 +12,6 @@ type Props = {
 
 export function Sidebar({ onNavigate }: Props) {
   const pathname = usePathname();
-  const [pendingHref, setPendingHref] = useState<string | null>(null);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPendingHref(null);
-  }, [pathname]);
 
   return (
     <aside className="bg-cream-paper border-ink-line h-full overflow-y-auto border-l px-5 py-8">
@@ -41,47 +35,27 @@ export function Sidebar({ onNavigate }: Props) {
 
             <ul className="space-y-px">
               {section.items.map((item) => {
-                const Icon = item.icon;
                 const isActive =
                   pathname === item.href ||
                   (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
-                const isPending = pendingHref === item.href && !isActive;
 
                 return (
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      onClick={() => {
-                        if (item.href !== pathname) setPendingHref(item.href);
-                        onNavigate?.();
-                      }}
-                      aria-busy={isPending}
+                      onClick={onNavigate}
                       className={`group focus-visible:ring-navy/40 flex items-center gap-3 rounded-lg px-3.5 py-2.5 text-sm font-medium transition-all duration-200 ease-out focus-visible:ring-2 focus-visible:outline-none active:scale-[0.98] ${
                         isActive
                           ? "bg-navy text-cream-paper font-semibold"
-                          : isPending
-                            ? "bg-cream-deep text-navy"
-                            : "text-ink-soft hover:bg-cream-deep hover:text-navy"
+                          : "text-ink-soft hover:bg-cream-deep hover:text-navy"
                       }`}
                     >
-                      {isPending ? (
-                        <span
-                          className="border-navy/30 border-t-navy h-[18px] w-[18px] shrink-0 animate-spin rounded-full border-2"
-                          aria-hidden
-                        />
-                      ) : (
-                        <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
-                      )}
-                      <span className="flex-1">{item.label}</span>
-                      {item.badge !== undefined && (
-                        <span
-                          className={`min-w-[18px] rounded-full px-2 py-0.5 text-center text-[10px] font-bold ${
-                            isActive ? "bg-cream-paper text-navy" : "bg-navy text-cream-paper"
-                          }`}
-                        >
-                          {item.badge}
-                        </span>
-                      )}
+                      <NavItemContent
+                        Icon={item.icon}
+                        label={item.label}
+                        badge={item.badge}
+                        isActive={isActive}
+                      />
                     </Link>
                   </li>
                 );
@@ -91,5 +65,43 @@ export function Sidebar({ onNavigate }: Props) {
         ))}
       </nav>
     </aside>
+  );
+}
+
+function NavItemContent({
+  Icon,
+  label,
+  badge,
+  isActive,
+}: {
+  Icon: LucideIcon;
+  label: string;
+  badge?: number;
+  isActive: boolean;
+}) {
+  const { pending } = useLinkStatus();
+  const showSpinner = pending && !isActive;
+
+  return (
+    <>
+      {showSpinner ? (
+        <span
+          className="border-navy/30 border-t-navy h-[18px] w-[18px] shrink-0 animate-spin rounded-full border-2"
+          aria-hidden
+        />
+      ) : (
+        <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
+      )}
+      <span className="flex-1">{label}</span>
+      {badge !== undefined && (
+        <span
+          className={`min-w-[18px] rounded-full px-2 py-0.5 text-center text-[10px] font-bold ${
+            isActive ? "bg-cream-paper text-navy" : "bg-navy text-cream-paper"
+          }`}
+        >
+          {badge}
+        </span>
+      )}
+    </>
   );
 }
