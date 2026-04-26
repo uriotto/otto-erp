@@ -77,7 +77,7 @@ export function EditTimeEntryDialog({
   // When start changes, keep duration constant → adjust end
   useEffect(() => {
     if (editing.current !== "start") return;
-     
+
     setEndT(addMinutesToTime(startT, duration));
     editing.current = null;
   }, [startT, duration]);

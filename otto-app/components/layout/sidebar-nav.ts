@@ -8,6 +8,7 @@ import {
   Timer,
   LayoutGrid,
   Banknote,
+  Receipt,
   FileText,
   FolderOpen,
   Mic,
@@ -50,6 +51,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     label: "כסף ומסמכים",
     items: [
+      { label: "חשבוניות", href: "/invoices", icon: Receipt },
       { label: "פיננסים", href: "/finance", icon: Banknote },
       { label: "הצעות מחיר", href: "/quotes", icon: FileText },
       { label: "מסמכים", href: "/documents", icon: FolderOpen },

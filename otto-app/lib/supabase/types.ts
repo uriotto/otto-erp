@@ -642,6 +642,204 @@ export type Database = {
         };
         Relationships: [];
       };
+      invoices: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          currency: string;
+          customer_id: string;
+          due_date: string | null;
+          finbot_invoice_id: string | null;
+          finbot_url: string | null;
+          hour_bank_id: string | null;
+          id: string;
+          issue_date: string;
+          notes: string | null;
+          number: string | null;
+          paid_at: string | null;
+          project_id: string | null;
+          status: Database["public"]["Enums"]["invoice_status"];
+          subtotal: number;
+          tax_amount: number | null;
+          tax_rate: number;
+          tenant_id: string;
+          total_amount: number | null;
+          type: Database["public"]["Enums"]["invoice_type"];
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          currency?: string;
+          customer_id: string;
+          due_date?: string | null;
+          finbot_invoice_id?: string | null;
+          finbot_url?: string | null;
+          hour_bank_id?: string | null;
+          id?: string;
+          issue_date?: string;
+          notes?: string | null;
+          number?: string | null;
+          paid_at?: string | null;
+          project_id?: string | null;
+          status?: Database["public"]["Enums"]["invoice_status"];
+          subtotal?: number;
+          tax_amount?: number | null;
+          tax_rate?: number;
+          tenant_id: string;
+          total_amount?: number | null;
+          type?: Database["public"]["Enums"]["invoice_type"];
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          currency?: string;
+          customer_id?: string;
+          due_date?: string | null;
+          finbot_invoice_id?: string | null;
+          finbot_url?: string | null;
+          hour_bank_id?: string | null;
+          id?: string;
+          issue_date?: string;
+          notes?: string | null;
+          number?: string | null;
+          paid_at?: string | null;
+          project_id?: string | null;
+          status?: Database["public"]["Enums"]["invoice_status"];
+          subtotal?: number;
+          tax_amount?: number | null;
+          tax_rate?: number;
+          tenant_id?: string;
+          total_amount?: number | null;
+          type?: Database["public"]["Enums"]["invoice_type"];
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      invoice_items: {
+        Row: {
+          amount: number | null;
+          description: string;
+          id: string;
+          invoice_id: string;
+          order_index: number;
+          quantity: number;
+          unit_price: number;
+        };
+        Insert: {
+          amount?: number | null;
+          description: string;
+          id?: string;
+          invoice_id: string;
+          order_index?: number;
+          quantity?: number;
+          unit_price?: number;
+        };
+        Update: {
+          amount?: number | null;
+          description?: string;
+          id?: string;
+          invoice_id?: string;
+          order_index?: number;
+          quantity?: number;
+          unit_price?: number;
+        };
+        Relationships: [];
+      };
+      payments: {
+        Row: {
+          amount: number;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          invoice_id: string;
+          method: Database["public"]["Enums"]["payment_method"];
+          notes: string | null;
+          paid_at: string;
+          reference: string | null;
+          tenant_id: string;
+        };
+        Insert: {
+          amount: number;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          invoice_id: string;
+          method?: Database["public"]["Enums"]["payment_method"];
+          notes?: string | null;
+          paid_at?: string;
+          reference?: string | null;
+          tenant_id: string;
+        };
+        Update: {
+          amount?: number;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          invoice_id?: string;
+          method?: Database["public"]["Enums"]["payment_method"];
+          notes?: string | null;
+          paid_at?: string;
+          reference?: string | null;
+          tenant_id?: string;
+        };
+        Relationships: [];
+      };
+      expenses: {
+        Row: {
+          amount: number;
+          category: string;
+          created_at: string;
+          created_by: string | null;
+          currency: string;
+          customer_id: string | null;
+          description: string | null;
+          id: string;
+          invoice_id: string | null;
+          invoiced: boolean;
+          occurred_on: string;
+          project_id: string | null;
+          receipt_url: string | null;
+          reimbursable: boolean;
+          tenant_id: string;
+        };
+        Insert: {
+          amount: number;
+          category: string;
+          created_at?: string;
+          created_by?: string | null;
+          currency?: string;
+          customer_id?: string | null;
+          description?: string | null;
+          id?: string;
+          invoice_id?: string | null;
+          invoiced?: boolean;
+          occurred_on?: string;
+          project_id?: string | null;
+          receipt_url?: string | null;
+          reimbursable?: boolean;
+          tenant_id: string;
+        };
+        Update: {
+          amount?: number;
+          category?: string;
+          created_at?: string;
+          created_by?: string | null;
+          currency?: string;
+          customer_id?: string | null;
+          description?: string | null;
+          id?: string;
+          invoice_id?: string | null;
+          invoiced?: boolean;
+          occurred_on?: string;
+          project_id?: string | null;
+          receipt_url?: string | null;
+          reimbursable?: boolean;
+          tenant_id?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       hour_banks_summary: {
@@ -671,6 +869,22 @@ export type Database = {
         };
         Relationships: [];
       };
+      invoices_aging: {
+        Row: {
+          age_bucket: string | null;
+          customer_id: string | null;
+          days_overdue: number | null;
+          due_date: string | null;
+          id: string | null;
+          issue_date: string | null;
+          number: string | null;
+          paid_amount: number | null;
+          status: Database["public"]["Enums"]["invoice_status"] | null;
+          tenant_id: string | null;
+          total_amount: number | null;
+        };
+        Relationships: [];
+      };
     };
     Functions: {
       allocate_time_entry_to_bank: {
@@ -690,6 +904,16 @@ export type Database = {
     };
     Enums: {
       hour_bank_status: "draft" | "active" | "depleted" | "expired" | "cancelled";
+      invoice_status:
+        | "draft"
+        | "pending_review"
+        | "sent"
+        | "partial"
+        | "paid"
+        | "overdue"
+        | "cancelled";
+      invoice_type: "advance" | "monthly_hours" | "project" | "expense" | "overage" | "other";
+      payment_method: "bank_transfer" | "credit_card" | "bit" | "cash" | "check" | "other";
       notification_severity: "info" | "warning" | "critical" | "success";
       project_billing_model: "hourly" | "hour_bank" | "fixed_price" | "retainer";
       project_health: "on_track" | "at_risk" | "off_track";

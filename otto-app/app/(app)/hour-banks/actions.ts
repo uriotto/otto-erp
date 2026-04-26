@@ -159,6 +159,17 @@ export async function createHourBank(
 
   if (error) return { error: error.message };
 
+  // Auto-create an advance invoice draft linked to this bank
+  await createAdvanceInvoiceForBank({
+    supabase,
+    tenant_id: profile.tenant_id,
+    created_by: profile.id,
+    customer_id: data.customer_id,
+    bank_id: bank.id,
+    purchased_hours: purchasedHours,
+    hourly_rate: hourlyRate,
+  });
+
   // Fire Make webhook (best-effort, non-blocking semantics)
   await fireMakeWebhook(profile.tenant_id, "hour_bank.created", {
     bank_id: bank.id,
@@ -224,6 +235,17 @@ export async function approveRenewalDraft(draftId: string): Promise<{ error?: st
 
   if (error) return { error: error.message };
   if (!bank) return { error: "טיוטה לא נמצאה" };
+
+  // Auto-create an advance invoice draft for the renewed bank
+  await createAdvanceInvoiceForBank({
+    supabase,
+    tenant_id: profile.tenant_id,
+    created_by: profile.id,
+    customer_id: bank.customer_id,
+    bank_id: bank.id,
+    purchased_hours: Number(bank.purchased_hours),
+    hourly_rate: Number(bank.hourly_rate),
+  });
 
   await fireMakeWebhook(profile.tenant_id, "hour_bank.renewed", {
     bank_id: bank.id,
@@ -531,4 +553,63 @@ export async function runExpiryCheckNow(): Promise<{ error?: string; processed?:
   revalidatePath("/hour-banks");
   revalidatePath("/hour-banks/expired");
   return { processed: true };
+}
+
+// ---------- Internal helper: auto-create advance invoice for a bank ----------
+
+type SupabaseLike = Awaited<ReturnType<typeof createClient>>;
+
+async function createAdvanceInvoiceForBank(input: {
+  supabase: SupabaseLike;
+  tenant_id: string;
+  created_by: string;
+  customer_id: string;
+  bank_id: string;
+  purchased_hours: number;
+  hourly_rate: number;
+}): Promise<void> {
+  const subtotal = Math.round(input.purchased_hours * input.hourly_rate * 100) / 100;
+  const today = new Date();
+  const due = new Date(today);
+  due.setDate(due.getDate() + 14);
+  const dueIso = due.toISOString().slice(0, 10);
+
+  const { data: invoice, error } = await input.supabase
+    .from("invoices")
+    .insert({
+      tenant_id: input.tenant_id,
+      created_by: input.created_by,
+      customer_id: input.customer_id,
+      hour_bank_id: input.bank_id,
+      type: "advance",
+      status: "draft",
+      issue_date: today.toISOString().slice(0, 10),
+      due_date: dueIso,
+      subtotal,
+      tax_rate: 17,
+      currency: "ILS",
+      notes: "מקדמה לבנק שעות (טיוטה אוטומטית)",
+    })
+    .select("id, total_amount")
+    .single();
+
+  if (error || !invoice) return;
+
+  await input.supabase.from("invoice_items").insert({
+    invoice_id: invoice.id,
+    description: `מקדמה — ${input.purchased_hours} שעות`,
+    quantity: input.purchased_hours,
+    unit_price: input.hourly_rate,
+    order_index: 0,
+  });
+
+  // Fire Make webhook for the new invoice draft
+  await fireMakeWebhook(input.tenant_id, "invoice.draft_for_bank", {
+    invoice_id: invoice.id,
+    bank_id: input.bank_id,
+    customer_id: input.customer_id,
+    total_amount: invoice.total_amount,
+    purchased_hours: input.purchased_hours,
+    hourly_rate: input.hourly_rate,
+  });
 }
