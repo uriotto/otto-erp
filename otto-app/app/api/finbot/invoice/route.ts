@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { timingSafeEqual } from "crypto";
 import { z } from "zod";
 import type { Database } from "@/lib/supabase/types";
 
@@ -25,8 +26,16 @@ export async function POST(req: Request) {
   }
 
   const auth = req.headers.get("authorization") ?? "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
-  if (!token || token !== expected) return unauthorized("invalid token");
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  let authorized = false;
+  try {
+    authorized =
+      token.length === expected.length &&
+      timingSafeEqual(Buffer.from(token), Buffer.from(expected));
+  } catch {
+    authorized = false;
+  }
+  if (!authorized) return unauthorized("invalid token");
 
   let json: unknown;
   try {

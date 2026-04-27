@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { timingSafeEqual } from "crypto";
 import { fireMakeWebhook } from "@/lib/make-webhook";
 import type { Database } from "@/lib/supabase/types";
 
@@ -28,11 +29,20 @@ function dueDate(): string {
 
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = req.headers.get("authorization") ?? "";
-    if (auth !== `Bearer ${secret}`) {
-      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-    }
+  if (!secret) {
+    return NextResponse.json({ ok: false, error: "server not configured" }, { status: 500 });
+  }
+  const auth = req.headers.get("authorization") ?? "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  let authorized = false;
+  try {
+    authorized =
+      token.length === secret.length && timingSafeEqual(Buffer.from(token), Buffer.from(secret));
+  } catch {
+    authorized = false;
+  }
+  if (!authorized) {
+    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

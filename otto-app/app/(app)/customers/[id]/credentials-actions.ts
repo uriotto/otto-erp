@@ -2,7 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+
+const credentialFieldSchema = z.array(
+  z.object({
+    key: z.string().min(1).max(200),
+    value: z.string().max(10000),
+    hidden: z.boolean(),
+  }),
+);
 
 export type CredentialField = {
   key: string;
@@ -79,11 +88,11 @@ export async function addCredential(
     .maybeSingle();
   if (!customerCheck) return { error: "לקוח לא נמצא" };
 
-  // H-2: safe JSON.parse
   let fields: CredentialField[] = [];
   try {
     const fieldsJson = formData.get("fields") as string;
-    fields = fieldsJson ? JSON.parse(fieldsJson) : [];
+    const parsed = fieldsJson ? JSON.parse(fieldsJson) : [];
+    fields = credentialFieldSchema.parse(parsed);
   } catch {
     return { error: "נתונים לא תקינים" };
   }
@@ -120,11 +129,19 @@ export async function updateCredential(
   const { supabase, profile } = await getTenant();
   if (!profile) return { error: "לא מחובר" };
 
-  // H-2: safe JSON.parse
+  const { data: customerCheck } = await supabase
+    .from("customers")
+    .select("id")
+    .eq("id", customerId)
+    .eq("tenant_id", profile.tenant_id)
+    .maybeSingle();
+  if (!customerCheck) return { error: "לקוח לא נמצא" };
+
   let fields: CredentialField[] = [];
   try {
     const fieldsJson = formData.get("fields") as string;
-    fields = fieldsJson ? JSON.parse(fieldsJson) : [];
+    const parsed = fieldsJson ? JSON.parse(fieldsJson) : [];
+    fields = credentialFieldSchema.parse(parsed);
   } catch {
     return { error: "נתונים לא תקינים" };
   }
@@ -141,7 +158,7 @@ export async function updateCredential(
     username: (formData.get("username") as string) || null,
     url: sanitizeUrl(formData.get("url") as string | null), // H-3
     notes: (formData.get("notes") as string) || null,
-    ...(fields.length > 0 ? { secret_encrypted: encrypt(JSON.stringify(fields)) } : {}),
+    secret_encrypted: fields.length > 0 ? encrypt(JSON.stringify(fields)) : null,
   };
 
   const { error } = await supabase
@@ -175,6 +192,7 @@ export async function deleteCredential(
 
 export async function revealFields(
   id: string,
+  customerId: string,
 ): Promise<{ fields?: CredentialField[]; error?: string }> {
   const { supabase, profile } = await getTenant();
   if (!profile) return { error: "לא מחובר" };
@@ -184,6 +202,7 @@ export async function revealFields(
     .select("secret_encrypted")
     .eq("id", id)
     .eq("tenant_id", profile.tenant_id)
+    .eq("customer_id", customerId)
     .maybeSingle();
 
   if (!data?.secret_encrypted) return { fields: [] };

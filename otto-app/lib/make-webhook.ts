@@ -43,6 +43,21 @@ export async function fireMakeWebhook(
       return;
     }
 
+    // SSRF guard: only allow https to make.com domains
+    try {
+      const parsed = new URL(webhookUrl);
+      const allowed =
+        parsed.protocol === "https:" &&
+        (parsed.hostname.endsWith(".make.com") || parsed.hostname.endsWith(".eu1.make.com"));
+      if (!allowed) {
+        console.error("[make-webhook] blocked non-make.com URL for tenant", tenantId);
+        return;
+      }
+    } catch {
+      console.error("[make-webhook] invalid webhook URL for tenant", tenantId);
+      return;
+    }
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
 

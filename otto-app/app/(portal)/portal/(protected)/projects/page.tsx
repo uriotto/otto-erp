@@ -27,17 +27,21 @@ function formatDate(iso: string | null) {
 export default async function PortalProjectsPage() {
   const { supabase, customer } = await getPortalCustomer();
 
-  const [{ data: projects }, { data: milestones }] = await Promise.all([
-    supabase
-      .from("projects")
-      .select("id, name, status, description, created_at, due_date, phase")
-      .eq("customer_id", customer.id)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("milestones")
-      .select("id, project_id, name, due_date, completed_at, order_index")
-      .order("order_index", { ascending: true }),
-  ]);
+  const { data: projects } = await supabase
+    .from("projects")
+    .select("id, name, status, description, created_at, due_date, phase")
+    .eq("customer_id", customer.id)
+    .order("created_at", { ascending: false });
+
+  const projectIds = (projects ?? []).map((p) => p.id);
+  const { data: milestones } =
+    projectIds.length > 0
+      ? await supabase
+          .from("milestones")
+          .select("id, project_id, name, due_date, completed_at, order_index")
+          .in("project_id", projectIds)
+          .order("order_index", { ascending: true })
+      : { data: [] };
 
   const rows = projects ?? [];
   const allMilestones = milestones ?? [];

@@ -28,8 +28,9 @@ export async function GET() {
   const dbMs = Date.now() - start;
 
   if (error) {
+    console.error("[health] db check failed", error.message);
     return NextResponse.json(
-      { status: "error", reason: "supabase_query_failed", message: error.message, dbMs },
+      { status: "error", reason: "supabase_query_failed", dbMs },
       { status: 503 },
     );
   }
