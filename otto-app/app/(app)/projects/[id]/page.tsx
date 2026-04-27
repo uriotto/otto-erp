@@ -244,7 +244,11 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       <MilestonesSection projectId={id} milestones={milestones ?? []} />
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">
-        <PaymentScheduleSection projectId={id} installments={installments ?? []} />
+        <PaymentScheduleSection
+          projectId={id}
+          installments={installments ?? []}
+          customerId={project.customer_id ?? undefined}
+        />
         <ProjectQuotesSection
           projectId={id}
           quotes={quotes ?? []}

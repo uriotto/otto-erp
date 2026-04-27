@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { createInvoice } from "@/app/(app)/invoices/actions";
 
 async function getTenant() {
   const supabase = await createClient();
@@ -152,6 +153,46 @@ export async function markInstallmentPaid(
   if (error) return { error: error.message };
   revalidatePath(`/projects/${projectId}`);
   return {};
+}
+
+export async function createInvoiceFromInstallment(
+  projectId: string,
+  installmentId: string,
+  customerId: string,
+): Promise<{ error?: string; invoiceId?: string }> {
+  const ctx = await getTenant();
+  if (!ctx) return { error: "לא מחובר" };
+
+  const { data: installment } = await ctx.supabase
+    .from("project_payment_schedule")
+    .select("*")
+    .eq("id", installmentId)
+    .eq("tenant_id", ctx.tenant_id)
+    .single();
+
+  if (!installment) return { error: "פעימה לא נמצאה" };
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const result = await createInvoice({
+    customer_id: customerId,
+    project_id: projectId,
+    type: "project",
+    issue_date: today,
+    due_date: installment.due_date ?? null,
+    tax_rate: 18,
+    items: [
+      {
+        description: installment.description,
+        quantity: 1,
+        unit_price: Number(installment.amount),
+      },
+    ],
+  });
+
+  if (!result.ok) return { error: result.error };
+  revalidatePath(`/projects/${projectId}`);
+  return { invoiceId: result.id };
 }
 
 export async function markInstallmentPending(
