@@ -43,19 +43,16 @@ export async function addPaymentInstallment(
     description: formData.get("description") as string,
     amount: formData.get("amount") as string,
     due_date: (formData.get("due_date") as string) || "",
-    notes: formData.get("notes") as string,
+    notes: (formData.get("notes") as string) || undefined,
   };
 
   const parsed = InstallmentSchema.safeParse(raw);
   if (!parsed.success) {
-    const errs = parsed.error.flatten();
-    return {
-      error: `validation: ${JSON.stringify(errs.fieldErrors)} | raw: ${JSON.stringify(raw)}`,
-    };
+    return { fieldErrors: parsed.error.flatten().fieldErrors };
   }
 
   const ctx = await getTenant();
-  if (!ctx) return { error: `לא מחובר | raw: ${JSON.stringify(raw)}` };
+  if (!ctx) return { error: "לא מחובר" };
 
   const { data: existing } = await ctx.supabase
     .from("project_payment_schedule")
@@ -77,11 +74,6 @@ export async function addPaymentInstallment(
     tenant_id: ctx.tenant_id,
   });
 
-  console.log("[payment-schedule] insert result", {
-    error: error?.message,
-    projectId,
-    tenant_id: ctx.tenant_id,
-  });
   if (error) return { error: error.message };
   revalidatePath(`/projects/${projectId}`);
   return { success: true };
@@ -97,7 +89,7 @@ export async function updateInstallment(
     description: formData.get("description") as string,
     amount: formData.get("amount") as string,
     due_date: (formData.get("due_date") as string) || "",
-    notes: formData.get("notes") as string,
+    notes: (formData.get("notes") as string) || undefined,
   };
 
   const parsed = InstallmentSchema.safeParse(raw);
