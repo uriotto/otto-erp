@@ -41,3 +41,20 @@ export async function signInWithEmail(
 
   return { ok: true, message: "שלחנו לך קישור התחברות. בדוק את המייל." };
 }
+
+export async function signInWithGoogle(): Promise<{ url?: string; error?: string }> {
+  const supabase = await createClient();
+  const headerList = await headers();
+  const origin =
+    headerList.get("origin") ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: `${origin}/auth/callback?next=/dashboard`,
+    },
+  });
+
+  if (error) return { error: error.message };
+  return { url: data.url };
+}
