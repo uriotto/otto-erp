@@ -37,10 +37,32 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/login") ||
     pathname.startsWith("/auth/callback") ||
     pathname.startsWith("/auth/signout");
-  const isPublicApi = pathname.startsWith("/api/health") || pathname === "/manifest.webmanifest";
+  const isPortalAuthRoute =
+    pathname.startsWith("/portal/login") || pathname.startsWith("/portal/auth/");
+  const isPortalRoute = pathname.startsWith("/portal");
+  const isPublicApi =
+    pathname.startsWith("/api/health") ||
+    pathname.startsWith("/api/finbot") ||
+    pathname === "/manifest.webmanifest";
   const isPublicRoot = pathname === "/";
 
-  if (!user && !isAuthRoute && !isPublicApi && !isPublicRoot) {
+  // Portal route protection
+  if (isPortalRoute && !isPortalAuthRoute && !user) {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/portal/login";
+    loginUrl.searchParams.set("next", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Admin route protection
+  if (
+    !user &&
+    !isAuthRoute &&
+    !isPortalAuthRoute &&
+    !isPortalRoute &&
+    !isPublicApi &&
+    !isPublicRoot
+  ) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.searchParams.set("next", pathname);

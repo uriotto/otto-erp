@@ -97,6 +97,8 @@ export type Database = {
           name: string;
           notes: string | null;
           phone: string | null;
+          portal_enabled: boolean;
+          portal_last_login: string | null;
           retainer_monthly_amount: number | null;
           status: string;
           tags: string[];
@@ -115,6 +117,8 @@ export type Database = {
           name: string;
           notes?: string | null;
           phone?: string | null;
+          portal_enabled?: boolean;
+          portal_last_login?: string | null;
           retainer_monthly_amount?: number | null;
           status?: string;
           tags?: string[];
@@ -133,6 +137,8 @@ export type Database = {
           name?: string;
           notes?: string | null;
           phone?: string | null;
+          portal_enabled?: boolean;
+          portal_last_login?: string | null;
           retainer_monthly_amount?: number | null;
           status?: string;
           tags?: string[];
@@ -1460,6 +1466,7 @@ export type Database = {
       current_customer_id: { Args: never; Returns: string };
       current_tenant_id: { Args: never; Returns: string };
       current_user_role: { Args: never; Returns: string };
+      portal_customer_id: { Args: never; Returns: string };
       process_expired_hour_banks: { Args: never; Returns: undefined };
       recalculate_bank: { Args: { p_bank_id: string }; Returns: undefined };
     };

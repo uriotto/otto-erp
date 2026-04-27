@@ -112,6 +112,8 @@ export async function updateCustomer(
 
   const status = (formData.get("status") as string) || undefined;
 
+  const portalEnabled = formData.get("portal_enabled") === "true";
+
   const { error } = await supabase
     .from("customers")
     .update({
@@ -125,6 +127,7 @@ export async function updateCustomer(
       billing_model_default: parsed.data.billing_model_default ?? null,
       hourly_rate_override: parsed.data.hourly_rate_override ?? null,
       retainer_monthly_amount: parsed.data.retainer_monthly_amount ?? null,
+      portal_enabled: portalEnabled,
       ...(status ? { status } : {}),
     })
     .eq("id", id)

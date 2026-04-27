@@ -126,6 +126,33 @@ export function EditCustomerDialog({
             </select>
           </div>
 
+          <div>
+            <label className="text-micro text-ink-soft mb-1 block uppercase">פורטל לקוחות</label>
+            <div className="border-ink-line flex items-center gap-3 rounded-lg border bg-white px-3 py-2.5">
+              <input
+                type="checkbox"
+                name="portal_enabled"
+                id="portal_enabled"
+                defaultChecked={customer.portal_enabled ?? false}
+                value="true"
+                className="accent-navy h-4 w-4"
+              />
+              <label htmlFor="portal_enabled" className="text-ink-soft cursor-pointer text-sm">
+                אפשר גישה לפורטל לקוחות
+                {customer.email && (
+                  <span className="text-ink-faded ms-1 text-xs" dir="ltr">
+                    ({customer.email})
+                  </span>
+                )}
+              </label>
+            </div>
+            {customer.portal_last_login && (
+              <p className="text-ink-faded mt-1 text-xs">
+                כניסה אחרונה: {new Date(customer.portal_last_login).toLocaleDateString("he-IL")}
+              </p>
+            )}
+          </div>
+
           <Field label="הערות" name="notes" as="textarea" defaultValue={customer.notes ?? ""} />
 
           {state.error && <p className="text-sm text-red-600">{state.error}</p>}
