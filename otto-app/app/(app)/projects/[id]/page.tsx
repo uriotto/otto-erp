@@ -16,6 +16,7 @@ import { ProjectActionsBar } from "./project-actions-bar";
 import { MilestonesSection } from "./milestones-section";
 import { PaymentScheduleSection } from "./payment-schedule-section";
 import { ProjectQuotesSection } from "./project-quotes-section";
+import { ProjectStatusBadge, ProjectHealthBadge } from "./project-quick-badges";
 
 export const metadata = { title: "פרויקט — OTTO" };
 
@@ -169,13 +170,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
               </Link>
             )}
           </div>
-          <span
-            className={`shrink-0 rounded-full border px-3 py-1 text-sm font-medium ${
-              STATUS_STYLES[project.status] ?? ""
-            }`}
-          >
-            {STATUS_LABELS[project.status] ?? project.status}
-          </span>
+          <ProjectStatusBadge projectId={id} status={project.status} />
         </div>
 
         {project.description && (
@@ -226,14 +221,13 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
               className={isOverdue ? "text-rose-600" : ""}
             />
           )}
-          {project.health !== "on_track" && (
-            <Stat
-              icon={<AlertTriangle size={14} />}
-              label="בריאות"
-              value={HEALTH_LABELS[project.health]}
-              className={project.health === "off_track" ? "text-rose-600" : "text-yellow-600"}
-            />
-          )}
+          <div className="flex items-center gap-1.5">
+            <AlertTriangle size={14} className="text-ink-faded shrink-0" />
+            <div>
+              <p className="text-ink-faded text-[10px] leading-none uppercase">בריאות</p>
+              <ProjectHealthBadge projectId={id} health={project.health} />
+            </div>
+          </div>
         </div>
 
         <ProjectActionsBar

@@ -230,6 +230,44 @@ export async function deleteProject(id: string): Promise<{ error?: string }> {
   return {};
 }
 
+export async function quickUpdateProjectStatus(
+  id: string,
+  status: "planning" | "active" | "on_hold" | "completed" | "cancelled",
+): Promise<{ error?: string }> {
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { error: "לא מחובר" };
+
+  const { error } = await supabase
+    .from("projects")
+    .update({ status })
+    .eq("id", id)
+    .eq("tenant_id", profile.tenant_id);
+
+  if (error) return { error: error.message };
+  revalidatePath("/projects");
+  revalidatePath(`/projects/${id}`);
+  return {};
+}
+
+export async function quickUpdateProjectHealth(
+  id: string,
+  health: "on_track" | "at_risk" | "off_track",
+): Promise<{ error?: string }> {
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { error: "לא מחובר" };
+
+  const { error } = await supabase
+    .from("projects")
+    .update({ health })
+    .eq("id", id)
+    .eq("tenant_id", profile.tenant_id);
+
+  if (error) return { error: error.message };
+  revalidatePath("/projects");
+  revalidatePath(`/projects/${id}`);
+  return {};
+}
+
 const MilestoneSchema = z.object({
   project_id: z.string().uuid(),
   name: z.string().min(1, "שם חובה"),
