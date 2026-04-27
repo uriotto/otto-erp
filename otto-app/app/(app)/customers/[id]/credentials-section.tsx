@@ -2,17 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import {
-  KeyRound,
-  Plus,
-  Eye,
-  EyeOff,
-  Copy,
-  Pencil,
-  Trash2,
-  Check,
-  EyeOff as Hide,
-} from "lucide-react";
+import { KeyRound, Plus, Eye, EyeOff, Copy, Pencil, Trash2, Check } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import {
   type CredentialField,
@@ -248,7 +238,7 @@ function CredentialForm({
   );
 }
 
-function RevealedFields({ id }: { id: string }) {
+function RevealedFields({ id, customerId }: { id: string; customerId: string }) {
   const [fields, setFields] = useState<CredentialField[] | null>(null);
   const [shown, setShown] = useState<Record<number, boolean>>({});
   const [copied, setCopied] = useState<number | null>(null);
@@ -262,7 +252,7 @@ function RevealedFields({ id }: { id: string }) {
       return;
     }
     startTransition(async () => {
-      const res = await revealFields(id);
+      const res = await revealFields(id, customerId);
       if (res.error) {
         toast.error(res.error);
         return;
@@ -324,7 +314,7 @@ function RevealedFields({ id }: { id: string }) {
         onClick={handleLoad}
         className="text-ink-faded hover:text-navy flex items-center gap-1 pt-1 text-[11px] transition-colors"
       >
-        <Hide size={11} />
+        <EyeOff size={11} />
         הסתר
       </button>
     </div>
@@ -347,15 +337,17 @@ export function CustomerCredentialsSection({
   const router = useRouter();
   const toast = useToast();
 
-  async function handleEdit(cred: Credential) {
+  function handleEdit(cred: Credential) {
     setLoadingEdit(cred.id);
-    const res = await revealFields(cred.id);
-    setLoadingEdit(null);
-    if (res.error) {
-      toast.error(res.error);
-      return;
-    }
-    setEditing({ cred, fields: res.fields ?? [] });
+    startTransition(async () => {
+      const res = await revealFields(cred.id, customerId);
+      setLoadingEdit(null);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      setEditing({ cred, fields: res.fields ?? [] });
+    });
   }
 
   function handleDelete(id: string) {
@@ -459,7 +451,7 @@ export function CustomerCredentialsSection({
                       </button>
                     </div>
                   </div>
-                  <RevealedFields id={cred.id} />
+                  <RevealedFields id={cred.id} customerId={customerId} />
                 </div>
               )}
             </li>
