@@ -74,6 +74,11 @@ export async function addPaymentInstallment(
     tenant_id: ctx.tenant_id,
   });
 
+  console.log("[payment-schedule] insert result", {
+    error: error?.message,
+    projectId,
+    tenant_id: ctx.tenant_id,
+  });
   if (error) return { error: error.message };
   revalidatePath(`/projects/${projectId}`);
   return { success: true };
