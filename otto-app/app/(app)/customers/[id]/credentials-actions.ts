@@ -11,7 +11,7 @@ function getKey(): Buffer {
   return Buffer.from(hex, "hex");
 }
 
-export function encryptSecret(plaintext: string): string {
+function encryptSecret(plaintext: string): string {
   const key = getKey();
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", key, iv);
@@ -21,7 +21,7 @@ export function encryptSecret(plaintext: string): string {
   return iv.toString("hex") + tag.toString("hex") + encrypted.toString("hex");
 }
 
-export function decryptSecret(encoded: string): string {
+function decryptSecret(encoded: string): string {
   const key = getKey();
   const iv = Buffer.from(encoded.slice(0, 24), "hex");
   const tag = Buffer.from(encoded.slice(24, 56), "hex");
