@@ -36,7 +36,17 @@ export async function GET(request: NextRequest) {
     .maybeSingle();
 
   if (!customer) {
-    await supabase.auth.signOut();
+    // Don't sign out admin users — only sign out if this is a non-admin email
+    const { data: adminUser } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (!adminUser) {
+      await supabase.auth.signOut();
+    }
+
     return NextResponse.redirect(
       `${origin}/portal/login?error=${encodeURIComponent("אימייל זה אינו מורשה לגישה לפורטל")}`,
     );

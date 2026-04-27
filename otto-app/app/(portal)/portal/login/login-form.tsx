@@ -22,7 +22,7 @@ export function PortalLoginForm() {
       email,
       options: {
         emailRedirectTo: `${origin}/portal/auth/callback`,
-        shouldCreateUser: false,
+        shouldCreateUser: true,
       },
     });
 
