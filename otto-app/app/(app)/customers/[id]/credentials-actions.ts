@@ -4,24 +4,28 @@ import { revalidatePath } from "next/cache";
 import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 
-// AES-256-GCM encryption – key must be 32 bytes (64 hex chars) in env
+export type CredentialField = {
+  key: string;
+  value: string;
+  hidden: boolean;
+};
+
 function getKey(): Buffer {
   const hex = process.env.CREDENTIALS_ENCRYPTION_KEY?.trim();
   if (!hex || hex.length !== 64) throw new Error("CREDENTIALS_ENCRYPTION_KEY חסר או לא תקין");
   return Buffer.from(hex, "hex");
 }
 
-function encryptSecret(plaintext: string): string {
+function encrypt(plaintext: string): string {
   const key = getKey();
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", key, iv);
   const encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
   const tag = cipher.getAuthTag();
-  // format: iv(24 hex) + tag(32 hex) + ciphertext(hex)
   return iv.toString("hex") + tag.toString("hex") + encrypted.toString("hex");
 }
 
-function decryptSecret(encoded: string): string {
+function decrypt(encoded: string): string {
   const key = getKey();
   const iv = Buffer.from(encoded.slice(0, 24), "hex");
   const tag = Buffer.from(encoded.slice(24, 56), "hex");
@@ -52,8 +56,9 @@ export async function addCredential(
   const { supabase, profile } = await getTenant();
   if (!profile) return { error: "לא מחובר" };
 
-  const secret = formData.get("secret") as string;
-  const secret_encrypted = secret ? encryptSecret(secret) : null;
+  const fieldsJson = formData.get("fields") as string;
+  const fields: CredentialField[] = fieldsJson ? JSON.parse(fieldsJson) : [];
+  const secret_encrypted = fields.length > 0 ? encrypt(JSON.stringify(fields)) : null;
 
   const { error } = await supabase.from("customer_credentials").insert({
     tenant_id: profile.tenant_id,
@@ -79,14 +84,16 @@ export async function updateCredential(
   const { supabase, profile } = await getTenant();
   if (!profile) return { error: "לא מחובר" };
 
-  const secret = formData.get("secret") as string;
+  const fieldsJson = formData.get("fields") as string;
+  const fields: CredentialField[] = fieldsJson ? JSON.parse(fieldsJson) : [];
+
   const updateData = {
     label: formData.get("label") as string,
     credential_type: (formData.get("credential_type") as string) || "password",
     username: (formData.get("username") as string) || null,
     url: (formData.get("url") as string) || null,
     notes: (formData.get("notes") as string) || null,
-    ...(secret ? { secret_encrypted: encryptSecret(secret) } : {}),
+    ...(fields.length > 0 ? { secret_encrypted: encrypt(JSON.stringify(fields)) } : {}),
   };
 
   const { error } = await supabase
@@ -118,7 +125,9 @@ export async function deleteCredential(
   return {};
 }
 
-export async function revealSecret(id: string): Promise<{ secret?: string; error?: string }> {
+export async function revealFields(
+  id: string,
+): Promise<{ fields?: CredentialField[]; error?: string }> {
   const { supabase, profile } = await getTenant();
   if (!profile) return { error: "לא מחובר" };
 
@@ -129,9 +138,14 @@ export async function revealSecret(id: string): Promise<{ secret?: string; error
     .eq("tenant_id", profile.tenant_id)
     .maybeSingle();
 
-  if (!data?.secret_encrypted) return { secret: "" };
+  if (!data?.secret_encrypted) return { fields: [] };
   try {
-    return { secret: decryptSecret(data.secret_encrypted) };
+    const raw = decrypt(data.secret_encrypted);
+    const parsed = JSON.parse(raw);
+    // Support old single-secret format
+    if (typeof parsed === "string")
+      return { fields: [{ key: "secret", value: parsed, hidden: true }] };
+    return { fields: parsed as CredentialField[] };
   } catch {
     return { error: "שגיאת פענוח" };
   }

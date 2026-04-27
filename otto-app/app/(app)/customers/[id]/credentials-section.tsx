@@ -2,13 +2,24 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { KeyRound, Plus, Eye, EyeOff, Copy, Pencil, Trash2, Check } from "lucide-react";
+import {
+  KeyRound,
+  Plus,
+  Eye,
+  EyeOff,
+  Copy,
+  Pencil,
+  Trash2,
+  Check,
+  EyeOff as Hide,
+} from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import {
+  type CredentialField,
   addCredential,
   updateCredential,
   deleteCredential,
-  revealSecret,
+  revealFields,
 } from "./credentials-actions";
 
 type Credential = {
@@ -36,28 +47,122 @@ const TYPE_STYLES: Record<string, string> = {
   other: "bg-gray-50 text-gray-600 border-gray-200",
 };
 
+const TYPE_DEFAULTS: Record<string, CredentialField[]> = {
+  password: [{ key: "password", value: "", hidden: true }],
+  api_key: [{ key: "api_key", value: "", hidden: true }],
+  oauth: [
+    { key: "client_id", value: "", hidden: false },
+    { key: "client_secret", value: "", hidden: true },
+    { key: "access_token", value: "", hidden: true },
+    { key: "refresh_token", value: "", hidden: true },
+  ],
+  ssh: [
+    { key: "host", value: "", hidden: false },
+    { key: "username", value: "", hidden: false },
+    { key: "private_key", value: "", hidden: true },
+  ],
+  other: [{ key: "value", value: "", hidden: true }],
+};
+
+function FieldEditor({
+  fields,
+  onChange,
+}: {
+  fields: CredentialField[];
+  onChange: (fields: CredentialField[]) => void;
+}) {
+  function updateField(i: number, patch: Partial<CredentialField>) {
+    onChange(fields.map((f, idx) => (idx === i ? { ...f, ...patch } : f)));
+  }
+  function removeField(i: number) {
+    onChange(fields.filter((_, idx) => idx !== i));
+  }
+  function addField() {
+    onChange([...fields, { key: "", value: "", hidden: false }]);
+  }
+
+  return (
+    <div className="space-y-2">
+      {fields.map((f, i) => (
+        <div key={i} className="flex items-center gap-1.5">
+          <input
+            value={f.key}
+            onChange={(e) => updateField(i, { key: e.target.value })}
+            placeholder="שם שדה"
+            className="border-ink-line bg-cream-paper text-navy w-28 shrink-0 rounded-lg border px-2 py-1.5 font-mono text-xs"
+            dir="ltr"
+          />
+          <input
+            value={f.value}
+            onChange={(e) => updateField(i, { value: e.target.value })}
+            type={f.hidden ? "password" : "text"}
+            placeholder="ערך"
+            autoComplete="new-password"
+            className="border-ink-line bg-cream-paper text-navy min-w-0 flex-1 rounded-lg border px-2 py-1.5 font-mono text-xs"
+            dir="ltr"
+          />
+          <button
+            type="button"
+            onClick={() => updateField(i, { hidden: !f.hidden })}
+            title={f.hidden ? "הצג" : "הסתר"}
+            className="text-ink-faded hover:text-navy shrink-0 rounded p-1 transition-colors"
+          >
+            {f.hidden ? <EyeOff size={13} /> : <Eye size={13} />}
+          </button>
+          <button
+            type="button"
+            onClick={() => removeField(i)}
+            className="text-ink-faded shrink-0 rounded p-1 transition-colors hover:text-rose-600"
+          >
+            <Trash2 size={13} />
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={addField}
+        className="text-ink-faded hover:text-navy flex items-center gap-1 text-xs transition-colors"
+      >
+        <Plus size={12} />
+        הוסף שדה
+      </button>
+    </div>
+  );
+}
+
 function CredentialForm({
   customerId,
   initial,
+  initialFields,
   onDone,
 }: {
   customerId: string;
   initial?: Credential;
+  initialFields?: CredentialField[];
   onDone: () => void;
 }) {
+  const [type, setType] = useState(initial?.credential_type ?? "password");
+  const [fields, setFields] = useState<CredentialField[]>(
+    initialFields ?? TYPE_DEFAULTS[initial?.credential_type ?? "password"] ?? [],
+  );
   const [pending, startTransition] = useTransition();
   const toast = useToast();
+
+  function handleTypeChange(newType: string) {
+    setType(newType);
+    if (!initial) setFields(TYPE_DEFAULTS[newType] ?? [{ key: "value", value: "", hidden: true }]);
+  }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
+    fd.set("fields", JSON.stringify(fields));
     startTransition(async () => {
       const res = initial
         ? await updateCredential(initial.id, customerId, fd)
         : await addCredential(customerId, fd);
-      if (res.error) {
-        toast.error(res.error);
-      } else {
+      if (res.error) toast.error(res.error);
+      else {
         toast.success(initial ? "עודכן" : "נוסף");
         onDone();
       }
@@ -76,7 +181,7 @@ function CredentialForm({
             name="label"
             required
             defaultValue={initial?.label}
-            placeholder='למשל "WordPress Admin"'
+            placeholder='למשל "Google OAuth"'
             className="border-ink-line text-navy bg-cream-paper w-full rounded-lg border px-3 py-1.5 text-sm"
           />
         </div>
@@ -84,7 +189,8 @@ function CredentialForm({
           <label className="text-ink-faded mb-1 block text-[11px] uppercase">סוג</label>
           <select
             name="credential_type"
-            defaultValue={initial?.credential_type ?? "password"}
+            value={type}
+            onChange={(e) => handleTypeChange(e.target.value)}
             className="border-ink-line text-navy bg-cream-paper w-full rounded-lg border px-3 py-1.5 text-sm"
           >
             {Object.entries(TYPE_LABELS).map(([v, l]) => (
@@ -96,26 +202,9 @@ function CredentialForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <label className="text-ink-faded mb-1 block text-[11px] uppercase">שם משתמש / מזהה</label>
-          <input
-            name="username"
-            defaultValue={initial?.username ?? ""}
-            className="border-ink-line text-navy bg-cream-paper w-full rounded-lg border px-3 py-1.5 text-sm"
-          />
-        </div>
-        <div>
-          <label className="text-ink-faded mb-1 block text-[11px] uppercase">
-            {initial ? "סיסמה / מפתח (השאר ריק לשמור הישן)" : "סיסמה / מפתח"}
-          </label>
-          <input
-            name="secret"
-            type="password"
-            autoComplete="new-password"
-            className="border-ink-line text-navy bg-cream-paper w-full rounded-lg border px-3 py-1.5 text-sm"
-          />
-        </div>
+      <div>
+        <label className="text-ink-faded mb-1.5 block text-[11px] uppercase">שדות</label>
+        <FieldEditor fields={fields} onChange={setFields} />
       </div>
 
       <div>
@@ -159,63 +248,85 @@ function CredentialForm({
   );
 }
 
-function RevealButton({ id }: { id: string }) {
-  const [secret, setSecret] = useState<string | null>(null);
-  const [shown, setShown] = useState(false);
-  const [copied, setCopied] = useState(false);
+function RevealedFields({ id }: { id: string }) {
+  const [fields, setFields] = useState<CredentialField[] | null>(null);
+  const [shown, setShown] = useState<Record<number, boolean>>({});
+  const [copied, setCopied] = useState<number | null>(null);
   const [pending, startTransition] = useTransition();
   const toast = useToast();
 
-  function handleReveal() {
-    if (secret !== null) {
-      setShown((s) => !s);
+  function handleLoad() {
+    if (fields !== null) {
+      setFields(null);
+      setShown({});
       return;
     }
     startTransition(async () => {
-      const res = await revealSecret(id);
+      const res = await revealFields(id);
       if (res.error) {
         toast.error(res.error);
         return;
       }
-      setSecret(res.secret ?? "");
-      setShown(true);
+      setFields(res.fields ?? []);
     });
   }
 
-  async function handleCopy() {
-    const val = secret ?? "";
-    if (!val) return;
-    await navigator.clipboard.writeText(val);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+  async function handleCopy(value: string, i: number) {
+    await navigator.clipboard.writeText(value);
+    setCopied(i);
+    setTimeout(() => setCopied(null), 1500);
+  }
+
+  if (fields === null) {
+    return (
+      <button
+        type="button"
+        onClick={handleLoad}
+        disabled={pending}
+        className="text-ink-faded hover:text-navy flex items-center gap-1 text-xs transition-colors disabled:opacity-40"
+      >
+        <Eye size={13} />
+        {pending ? "טוען…" : "הצג שדות"}
+      </button>
+    );
   }
 
   return (
-    <div className="flex items-center gap-1">
-      {shown && secret !== null && (
-        <span className="text-navy font-mono text-xs" dir="ltr">
-          {secret}
-        </span>
-      )}
+    <div className="mt-2 space-y-1">
+      {fields.map((f, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <span className="text-ink-faded w-28 shrink-0 font-mono text-[11px]" dir="ltr">
+            {f.key}
+          </span>
+          <span className="text-navy min-w-0 flex-1 truncate font-mono text-xs" dir="ltr">
+            {shown[i] || !f.hidden ? f.value : "●".repeat(Math.min(f.value.length, 20))}
+          </span>
+          {f.hidden && (
+            <button
+              type="button"
+              onClick={() => setShown((s) => ({ ...s, [i]: !s[i] }))}
+              className="text-ink-faded hover:text-navy shrink-0 rounded p-0.5 transition-colors"
+            >
+              {shown[i] ? <EyeOff size={12} /> : <Eye size={12} />}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => handleCopy(f.value, i)}
+            className="text-ink-faded hover:text-navy shrink-0 rounded p-0.5 transition-colors"
+          >
+            {copied === i ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+          </button>
+        </div>
+      ))}
       <button
         type="button"
-        onClick={handleReveal}
-        disabled={pending}
-        title={shown ? "הסתר" : "הצג"}
-        className="text-ink-faded hover:text-navy rounded p-0.5 transition-colors disabled:opacity-40"
+        onClick={handleLoad}
+        className="text-ink-faded hover:text-navy flex items-center gap-1 pt-1 text-[11px] transition-colors"
       >
-        {shown ? <EyeOff size={13} /> : <Eye size={13} />}
+        <Hide size={11} />
+        הסתר
       </button>
-      {secret !== null && (
-        <button
-          type="button"
-          onClick={handleCopy}
-          title="העתק"
-          className="text-ink-faded hover:text-navy rounded p-0.5 transition-colors"
-        >
-          {copied ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
-        </button>
-      )}
     </div>
   );
 }
@@ -228,10 +339,24 @@ export function CustomerCredentialsSection({
   credentials: Credential[];
 }) {
   const [showAdd, setShowAdd] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<{ cred: Credential; fields: CredentialField[] } | null>(
+    null,
+  );
+  const [loadingEdit, setLoadingEdit] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
   const toast = useToast();
+
+  async function handleEdit(cred: Credential) {
+    setLoadingEdit(cred.id);
+    const res = await revealFields(cred.id);
+    setLoadingEdit(null);
+    if (res.error) {
+      toast.error(res.error);
+      return;
+    }
+    setEditing({ cred, fields: res.fields ?? [] });
+  }
 
   function handleDelete(id: string) {
     if (!confirm("למחוק את הפרטים האלה?")) return;
@@ -253,7 +378,7 @@ export function CustomerCredentialsSection({
           type="button"
           onClick={() => {
             setShowAdd(true);
-            setEditingId(null);
+            setEditing(null);
           }}
           className="text-ink-faded hover:text-navy flex items-center gap-1 text-xs transition-colors"
         >
@@ -280,64 +405,61 @@ export function CustomerCredentialsSection({
         <ul className="divide-ink-line/60 divide-y">
           {credentials.map((cred) => (
             <li key={cred.id} className="group py-3">
-              {editingId === cred.id ? (
+              {editing?.cred.id === cred.id ? (
                 <CredentialForm
                   customerId={customerId}
-                  initial={cred}
+                  initial={editing.cred}
+                  initialFields={editing.fields}
                   onDone={() => {
-                    setEditingId(null);
+                    setEditing(null);
                     router.refresh();
                   }}
                 />
               ) : (
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-navy text-sm font-medium">{cred.label}</span>
-                      <span
-                        className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${TYPE_STYLES[cred.credential_type] ?? TYPE_STYLES.other}`}
-                      >
-                        {TYPE_LABELS[cred.credential_type] ?? cred.credential_type}
-                      </span>
+                <div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-navy text-sm font-medium">{cred.label}</span>
+                        <span
+                          className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${TYPE_STYLES[cred.credential_type] ?? TYPE_STYLES.other}`}
+                        >
+                          {TYPE_LABELS[cred.credential_type] ?? cred.credential_type}
+                        </span>
+                      </div>
+                      {cred.url && (
+                        <a
+                          href={cred.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-ink-faded hover:text-navy mt-0.5 block truncate text-xs"
+                          dir="ltr"
+                        >
+                          {cred.url}
+                        </a>
+                      )}
+                      {cred.notes && <p className="text-ink-faded mt-0.5 text-xs">{cred.notes}</p>}
                     </div>
-                    {cred.username && (
-                      <p className="text-ink-soft mt-0.5 font-mono text-xs" dir="ltr">
-                        {cred.username}
-                      </p>
-                    )}
-                    {cred.url && (
-                      <a
-                        href={cred.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-ink-faded hover:text-navy mt-0.5 block truncate text-xs"
-                        dir="ltr"
+                    <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                      <button
+                        type="button"
+                        onClick={() => handleEdit(cred)}
+                        disabled={loadingEdit === cred.id}
+                        className="text-ink-faded hover:text-navy rounded p-1 transition-colors disabled:opacity-40"
                       >
-                        {cred.url}
-                      </a>
-                    )}
-                    {cred.notes && <p className="text-ink-faded mt-0.5 text-xs">{cred.notes}</p>}
-                    <div className="mt-1">
-                      <RevealButton id={cred.id} />
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(cred.id)}
+                        disabled={pending}
+                        className="text-ink-faded rounded p-1 transition-colors hover:text-rose-600"
+                      >
+                        <Trash2 size={13} />
+                      </button>
                     </div>
                   </div>
-                  <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                    <button
-                      type="button"
-                      onClick={() => setEditingId(cred.id)}
-                      className="text-ink-faded hover:text-navy rounded p-1 transition-colors"
-                    >
-                      <Pencil size={13} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(cred.id)}
-                      disabled={pending}
-                      className="text-ink-faded rounded p-1 transition-colors hover:text-rose-600"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
+                  <RevealedFields id={cred.id} />
                 </div>
               )}
             </li>
