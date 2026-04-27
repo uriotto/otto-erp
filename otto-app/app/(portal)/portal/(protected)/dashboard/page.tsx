@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getPortalCustomer } from "@/lib/portal";
 import Link from "next/link";
 import { Receipt, LayoutGrid, FolderKanban, Clock } from "lucide-react";
 
@@ -9,15 +9,13 @@ function formatILS(n: number) {
 }
 
 export default async function PortalDashboardPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, customer } = await getPortalCustomer();
 
   const [invoicesRes, hourBanksRes, projectsRes] = await Promise.all([
     supabase
       .from("invoices")
       .select("id, number, status, total_amount, due_date, issue_date")
+      .eq("customer_id", customer.id)
       .order("issue_date", { ascending: false })
       .limit(5),
     supabase
@@ -25,11 +23,13 @@ export default async function PortalDashboardPage() {
       .select(
         "id, purchased_hours, consumed_hours, available_hours, hourly_rate, status, expiry_date",
       )
+      .eq("customer_id", customer.id)
       .eq("status", "active")
       .order("created_at", { ascending: false }),
     supabase
       .from("projects")
       .select("id, name, status")
+      .eq("customer_id", customer.id)
       .order("created_at", { ascending: false })
       .limit(5),
   ]);
@@ -67,8 +67,8 @@ export default async function PortalDashboardPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-display-md text-navy">שלום 👋</h1>
-        <p className="text-ink-soft mt-1 text-sm">{user?.email}</p>
+        <h1 className="text-display-md text-navy">שלום, {customer.name} 👋</h1>
+        <p className="text-ink-soft mt-1 text-sm">{customer.email}</p>
       </div>
 
       {/* KPI summary */}

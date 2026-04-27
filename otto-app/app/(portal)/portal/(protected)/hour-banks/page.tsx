@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getPortalCustomer } from "@/lib/portal";
 import { Clock, AlertTriangle } from "lucide-react";
 
 export const metadata = { title: "בנקי שעות — פורטל לקוחות" };
@@ -15,13 +15,14 @@ const BANK_STATUS_LABELS: Record<string, string> = {
 };
 
 export default async function PortalHourBanksPage() {
-  const supabase = await createClient();
+  const { supabase, customer } = await getPortalCustomer();
 
   const { data: banks } = await supabase
     .from("hour_banks_summary")
     .select(
       "id, purchased_hours, consumed_hours, available_hours, hourly_rate, status, created_at, expiry_date, notes",
     )
+    .eq("customer_id", customer.id)
     .order("created_at", { ascending: false });
 
   const rows = banks ?? [];

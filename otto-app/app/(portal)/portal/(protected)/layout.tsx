@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { PortalSignOutButton } from "./sign-out-button";
 
 type PortalCustomer = {
   id: string;
@@ -49,12 +50,13 @@ function PortalHeader({ customer }: { customer: PortalCustomer }) {
           <span className="text-ink-line">|</span>
           <span className="text-ink-soft text-sm">{customer.company ?? customer.name}</span>
         </div>
-        <nav className="flex items-center gap-1">
+        <div className="flex items-center gap-1">
           <NavLink href="/portal/dashboard">בית</NavLink>
           <NavLink href="/portal/invoices">חשבוניות</NavLink>
           <NavLink href="/portal/hour-banks">בנקי שעות</NavLink>
           <NavLink href="/portal/projects">פרויקטים</NavLink>
-        </nav>
+          <PortalSignOutButton />
+        </div>
       </div>
     </header>
   );

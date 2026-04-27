@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getPortalCustomer } from "@/lib/portal";
 import { FolderKanban, CheckCircle2, Circle, Calendar } from "lucide-react";
 
 export const metadata = { title: "פרויקטים — פורטל לקוחות" };
@@ -25,12 +25,13 @@ function formatDate(iso: string | null) {
 }
 
 export default async function PortalProjectsPage() {
-  const supabase = await createClient();
+  const { supabase, customer } = await getPortalCustomer();
 
   const [{ data: projects }, { data: milestones }] = await Promise.all([
     supabase
       .from("projects")
       .select("id, name, status, description, created_at, due_date, phase")
+      .eq("customer_id", customer.id)
       .order("created_at", { ascending: false }),
     supabase
       .from("milestones")

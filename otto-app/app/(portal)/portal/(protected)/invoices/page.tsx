@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getPortalCustomer } from "@/lib/portal";
 
 export const metadata = { title: "חשבוניות — פורטל לקוחות" };
 
@@ -31,11 +31,12 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 export default async function PortalInvoicesPage() {
-  const supabase = await createClient();
+  const { supabase, customer } = await getPortalCustomer();
 
   const { data: invoices } = await supabase
     .from("invoices")
     .select("id, number, status, type, total_amount, issue_date, due_date, paid_at, notes")
+    .eq("customer_id", customer.id)
     .order("issue_date", { ascending: false });
 
   const rows = invoices ?? [];
