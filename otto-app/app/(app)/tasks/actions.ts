@@ -19,6 +19,7 @@ const TaskSchema = z.object({
   assigned_to: z.string().uuid().optional().or(z.literal("")),
   due_date: z.string().optional(),
   due_at: z.string().optional(),
+  recurring_config: z.string().optional(),
 });
 
 export type TaskFormState = {
@@ -75,6 +76,7 @@ export async function createTask(_prev: TaskFormState, formData: FormData): Prom
       due_at: dateOrNull(data.due_at),
       due_date: dateOrNull(data.due_date) ?? (data.due_at ? data.due_at.slice(0, 10) : null),
       completed_at: data.status === "done" ? new Date().toISOString() : null,
+      recurring_config: data.recurring_config ? JSON.parse(data.recurring_config) : null,
     })
     .select()
     .single();
@@ -118,6 +120,7 @@ export async function updateTask(_prev: TaskFormState, formData: FormData): Prom
       due_at: dateOrNull(data.due_at),
       due_date: dateOrNull(data.due_date) ?? (data.due_at ? data.due_at.slice(0, 10) : null),
       completed_at: data.status === "done" ? new Date().toISOString() : null,
+      recurring_config: data.recurring_config ? JSON.parse(data.recurring_config) : null,
     })
     .eq("id", id)
     .eq("tenant_id", profile.tenant_id);

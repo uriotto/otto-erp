@@ -9,12 +9,15 @@ import {
   Search,
   SearchX,
   Calendar,
+  CalendarDays,
   FolderKanban,
   KanbanSquare,
   List,
+  Star,
   AlertTriangle,
   Trash2,
 } from "lucide-react";
+import { CalendarView, toDateKey } from "./calendar-view";
 import type { Tables } from "@/lib/supabase/types";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
@@ -83,7 +86,7 @@ export type LeadOption = { id: string; name: string };
 
 const SEARCH_DEBOUNCE_MS = 200;
 
-type ViewMode = "list" | "kanban";
+type ViewMode = "list" | "kanban" | "calendar" | "today";
 
 export function TasksList({
   tasks,
@@ -117,9 +120,11 @@ export function TasksList({
   const [assigneeFilter, setAssigneeFilter] = useState<string>(
     () => searchParams.get("assignee") ?? "all",
   );
-  const [view, setView] = useState<ViewMode>(() =>
-    searchParams.get("view") === "kanban" ? "kanban" : "list",
-  );
+  const [view, setView] = useState<ViewMode>(() => {
+    const v = searchParams.get("view");
+    const modes = ["kanban", "calendar", "today"] as const;
+    return modes.includes(v as (typeof modes)[number]) ? (v as ViewMode) : "list";
+  });
 
   const updateUrl = useCallback(
     (params: Record<string, string | undefined>) => {
@@ -175,7 +180,7 @@ export function TasksList({
 
   const setViewMode = (v: ViewMode) => {
     setView(v);
-    updateUrl({ view: v === "kanban" ? "kanban" : undefined });
+    updateUrl({ view: v !== "list" ? v : undefined });
   };
 
   const handleQuickCapture = async (title: string, dueDate: string | null) => {
@@ -302,6 +307,10 @@ export function TasksList({
         <NoResults query={query} onClear={clearAll} />
       ) : view === "kanban" ? (
         <KanbanView tasks={filtered} />
+      ) : view === "calendar" ? (
+        <CalendarView tasks={filtered} />
+      ) : view === "today" ? (
+        <TodayView tasks={filtered} />
       ) : (
         <ListView tasks={filtered} />
       )}
@@ -320,31 +329,30 @@ export function TasksList({
   );
 }
 
+const VIEW_TABS: { mode: ViewMode; icon: React.ReactNode; label: string }[] = [
+  { mode: "today", icon: <Star size={14} />, label: "היום" },
+  { mode: "list", icon: <List size={14} />, label: "רשימה" },
+  { mode: "kanban", icon: <KanbanSquare size={14} />, label: "קנבן" },
+  { mode: "calendar", icon: <CalendarDays size={14} />, label: "יומן" },
+];
+
 function ViewToggle({ view, onChange }: { view: ViewMode; onChange: (v: ViewMode) => void }) {
   return (
     <div className="border-ink-line bg-cream-paper inline-flex items-center rounded-lg border p-0.5">
-      <button
-        type="button"
-        onClick={() => onChange("list")}
-        className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
-          view === "list" ? "bg-navy text-cream-paper" : "text-ink-soft hover:text-navy"
-        }`}
-        aria-pressed={view === "list"}
-      >
-        <List size={14} />
-        רשימה
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange("kanban")}
-        className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
-          view === "kanban" ? "bg-navy text-cream-paper" : "text-ink-soft hover:text-navy"
-        }`}
-        aria-pressed={view === "kanban"}
-      >
-        <KanbanSquare size={14} />
-        קנבן
-      </button>
+      {VIEW_TABS.map(({ mode, icon, label }) => (
+        <button
+          key={mode}
+          type="button"
+          onClick={() => onChange(mode)}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+            view === mode ? "bg-navy text-cream-paper" : "text-ink-soft hover:text-navy"
+          }`}
+          aria-pressed={view === mode}
+        >
+          {icon}
+          {label}
+        </button>
+      ))}
     </div>
   );
 }
@@ -789,6 +797,92 @@ function NoResults({ query, onClear }: { query: string; onClear: () => void }) {
       >
         נקה חיפוש וסינון
       </button>
+    </div>
+  );
+}
+
+function TodayView({ tasks }: { tasks: TaskListItem[] }) {
+  const todayKey = toDateKey(new Date());
+
+  const overdue = tasks.filter(
+    (t) =>
+      t.due_date &&
+      t.due_date.slice(0, 10) < todayKey &&
+      t.status !== "done" &&
+      t.status !== "cancelled",
+  );
+  const dueToday = tasks.filter((t) => t.due_date?.slice(0, 10) === todayKey);
+  const urgentNoDate = tasks.filter(
+    (t) =>
+      !t.due_date &&
+      t.status !== "done" &&
+      t.status !== "cancelled" &&
+      (t.priority === "urgent" || t.priority === "high"),
+  );
+
+  if (overdue.length === 0 && dueToday.length === 0 && urgentNoDate.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="bg-cream-deep mb-4 flex h-20 w-20 items-center justify-center rounded-full">
+          <CheckSquare size={40} className="text-emerald-500" />
+        </div>
+        <h2 className="text-display-sm text-navy mb-1">הכל מסודר להיום!</h2>
+        <p className="text-ink-soft text-sm">אין משימות דחופות או בפיגור</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {overdue.length > 0 && (
+        <TodaySection
+          title={`בפיגור — ${overdue.length} משימות`}
+          tasks={overdue}
+          headerClass="text-rose-700 border-rose-200"
+          bgClass="bg-rose-50/60"
+        />
+      )}
+      {dueToday.length > 0 && (
+        <TodaySection
+          title={`להיום — ${dueToday.length} משימות`}
+          tasks={dueToday}
+          headerClass="text-navy border-navy/20"
+          bgClass="bg-cream-paper"
+        />
+      )}
+      {urgentNoDate.length > 0 && (
+        <TodaySection
+          title={`דחוף ללא תאריך — ${urgentNoDate.length} משימות`}
+          tasks={urgentNoDate}
+          headerClass="text-amber-700 border-amber-200"
+          bgClass="bg-amber-50/40"
+        />
+      )}
+    </div>
+  );
+}
+
+function TodaySection({
+  title,
+  tasks,
+  headerClass,
+  bgClass,
+}: {
+  title: string;
+  tasks: TaskListItem[];
+  headerClass: string;
+  bgClass: string;
+}) {
+  return (
+    <div className={`border-ink-line overflow-hidden rounded-2xl border ${bgClass}`}>
+      <div className={`border-b px-4 py-2.5 text-xs font-semibold uppercase ${headerClass}`}>
+        {title}
+      </div>
+      <ul className="divide-ink-line/60 divide-y">
+        {tasks.map((t) => (
+          <TaskRow key={t.id} task={t} />
+        ))}
+      </ul>
     </div>
   );
 }
