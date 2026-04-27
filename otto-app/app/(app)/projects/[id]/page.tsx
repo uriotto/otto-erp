@@ -21,6 +21,7 @@ import { MilestonesSection } from "./milestones-section";
 import { PaymentScheduleSection } from "./payment-schedule-section";
 import { ProjectQuotesSection } from "./project-quotes-section";
 import { ProjectStatusBadge, ProjectHealthBadge } from "./project-quick-badges";
+import { ProjectAddTask } from "./project-add-task";
 
 export const metadata = { title: "פרויקט — OTTO" };
 
@@ -354,13 +355,16 @@ function ProjectTasksSection({
             </span>
           )}
         </div>
-        <Link
-          href={`/tasks?project=${projectId}`}
-          className="text-ink-soft hover:text-navy flex items-center gap-1 text-xs transition-colors"
-        >
-          כל המשימות
-          <ExternalLink size={11} />
-        </Link>
+        <div className="flex items-center gap-3">
+          <ProjectAddTask projectId={projectId} />
+          <Link
+            href={`/tasks?project=${projectId}`}
+            className="text-ink-soft hover:text-navy flex items-center gap-1 text-xs transition-colors"
+          >
+            כל המשימות
+            <ExternalLink size={11} />
+          </Link>
+        </div>
       </div>
 
       {tasks.length === 0 ? (
