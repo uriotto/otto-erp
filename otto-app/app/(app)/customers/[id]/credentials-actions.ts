@@ -10,6 +10,8 @@ export type CredentialField = {
   hidden: boolean;
 };
 
+const ALLOWED_CREDENTIAL_TYPES = ["password", "api_key", "oauth", "ssh", "other"] as const;
+
 function getKey(): Buffer {
   const hex = process.env.CREDENTIALS_ENCRYPTION_KEY?.trim();
   if (!hex || hex.length !== 64) throw new Error("CREDENTIALS_ENCRYPTION_KEY חסר או לא תקין");
@@ -32,7 +34,19 @@ function decrypt(encoded: string): string {
   const ciphertext = Buffer.from(encoded.slice(56), "hex");
   const decipher = createDecipheriv("aes-256-gcm", key, iv);
   decipher.setAuthTag(tag);
-  return decipher.update(ciphertext) + decipher.final("utf8");
+  // L-2 fix: explicit utf8 encoding to avoid Buffer+string concat ambiguity
+  return decipher.update(ciphertext, undefined, "utf8") + decipher.final("utf8");
+}
+
+function sanitizeUrl(raw: string | null): string | null {
+  if (!raw) return null;
+  try {
+    const u = new URL(raw);
+    if (!["http:", "https:"].includes(u.protocol)) return null;
+    return raw;
+  } catch {
+    return null;
+  }
 }
 
 async function getTenant() {
@@ -56,17 +70,39 @@ export async function addCredential(
   const { supabase, profile } = await getTenant();
   if (!profile) return { error: "לא מחובר" };
 
-  const fieldsJson = formData.get("fields") as string;
-  const fields: CredentialField[] = fieldsJson ? JSON.parse(fieldsJson) : [];
+  // H-1: verify the customer belongs to this tenant
+  const { data: customerCheck } = await supabase
+    .from("customers")
+    .select("id")
+    .eq("id", customerId)
+    .eq("tenant_id", profile.tenant_id)
+    .maybeSingle();
+  if (!customerCheck) return { error: "לקוח לא נמצא" };
+
+  // H-2: safe JSON.parse
+  let fields: CredentialField[] = [];
+  try {
+    const fieldsJson = formData.get("fields") as string;
+    fields = fieldsJson ? JSON.parse(fieldsJson) : [];
+  } catch {
+    return { error: "נתונים לא תקינים" };
+  }
+
+  // M-2: validate credential_type against allowed enum
+  const rawType = formData.get("credential_type") as string;
+  const credential_type = (ALLOWED_CREDENTIAL_TYPES as readonly string[]).includes(rawType)
+    ? rawType
+    : "other";
+
   const secret_encrypted = fields.length > 0 ? encrypt(JSON.stringify(fields)) : null;
 
   const { error } = await supabase.from("customer_credentials").insert({
     tenant_id: profile.tenant_id,
     customer_id: customerId,
     label: formData.get("label") as string,
-    credential_type: (formData.get("credential_type") as string) || "password",
+    credential_type,
     username: (formData.get("username") as string) || null,
-    url: (formData.get("url") as string) || null,
+    url: sanitizeUrl(formData.get("url") as string | null), // H-3
     secret_encrypted,
     notes: (formData.get("notes") as string) || null,
   });
@@ -84,14 +120,26 @@ export async function updateCredential(
   const { supabase, profile } = await getTenant();
   if (!profile) return { error: "לא מחובר" };
 
-  const fieldsJson = formData.get("fields") as string;
-  const fields: CredentialField[] = fieldsJson ? JSON.parse(fieldsJson) : [];
+  // H-2: safe JSON.parse
+  let fields: CredentialField[] = [];
+  try {
+    const fieldsJson = formData.get("fields") as string;
+    fields = fieldsJson ? JSON.parse(fieldsJson) : [];
+  } catch {
+    return { error: "נתונים לא תקינים" };
+  }
+
+  // M-2: validate credential_type
+  const rawType = formData.get("credential_type") as string;
+  const credential_type = (ALLOWED_CREDENTIAL_TYPES as readonly string[]).includes(rawType)
+    ? rawType
+    : "other";
 
   const updateData = {
     label: formData.get("label") as string,
-    credential_type: (formData.get("credential_type") as string) || "password",
+    credential_type,
     username: (formData.get("username") as string) || null,
-    url: (formData.get("url") as string) || null,
+    url: sanitizeUrl(formData.get("url") as string | null), // H-3
     notes: (formData.get("notes") as string) || null,
     ...(fields.length > 0 ? { secret_encrypted: encrypt(JSON.stringify(fields)) } : {}),
   };
@@ -142,7 +190,7 @@ export async function revealFields(
   try {
     const raw = decrypt(data.secret_encrypted);
     const parsed = JSON.parse(raw);
-    // Support old single-secret format
+    // backward compat: old single-secret format
     if (typeof parsed === "string")
       return { fields: [{ key: "secret", value: parsed, hidden: true }] };
     return { fields: parsed as CredentialField[] };
