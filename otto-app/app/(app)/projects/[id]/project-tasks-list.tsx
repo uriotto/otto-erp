@@ -8,7 +8,6 @@ import {
   X,
   CheckSquare,
   ExternalLink,
-  Pencil,
   Trash2,
   ChevronDown,
   ChevronUp,
@@ -147,12 +146,7 @@ export function ProjectTasksList({
                 onDeleted={handleDeleted}
               />
             ) : (
-              <TaskRow
-                key={t.id}
-                task={t}
-                onEdit={() => setEditingId(t.id)}
-                onDelete={handleDeleted}
-              />
+              <TaskRow key={t.id} task={t} onEdit={() => setEditingId(t.id)} />
             ),
           )}
           {done.length > 0 && open.length > 0 && (
@@ -167,32 +161,12 @@ export function ProjectTasksList({
   );
 }
 
-function TaskRow({
-  task,
-  onEdit,
-  onDelete,
-}: {
-  task: Task;
-  onEdit: () => void;
-  onDelete: (id: string) => void;
-}) {
-  const [deleting, startDelete] = useTransition();
-  const toast = useToast();
-
-  function handleDelete() {
-    if (!confirm("למחוק את המשימה?")) return;
-    startDelete(async () => {
-      const res = await deleteTask(task.id);
-      if (res.error) {
-        toast.error(res.error);
-        return;
-      }
-      onDelete(task.id);
-    });
-  }
-
+function TaskRow({ task, onEdit }: { task: Task; onEdit: () => void }) {
   return (
-    <div className="border-ink-line group flex items-center gap-2 rounded-lg border bg-white px-3 py-2">
+    <div
+      className="border-ink-line hover:border-navy/30 flex cursor-pointer items-center gap-2 rounded-lg border bg-white px-3 py-2 transition-colors"
+      onClick={onEdit}
+    >
       <span
         className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${PRIORITY_COLORS[task.priority] ?? ""}`}
       >
@@ -216,25 +190,6 @@ function TaskRow({
       >
         {STATUS_LABELS[task.status]}
       </span>
-      <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-        <button
-          type="button"
-          onClick={onEdit}
-          className="text-ink-faded hover:text-navy rounded p-0.5"
-          aria-label="ערוך"
-        >
-          <Pencil size={12} />
-        </button>
-        <button
-          type="button"
-          onClick={handleDelete}
-          disabled={deleting}
-          className="text-ink-faded rounded p-0.5 hover:text-rose-600"
-          aria-label="מחק"
-        >
-          <Trash2 size={12} />
-        </button>
-      </div>
     </div>
   );
 }

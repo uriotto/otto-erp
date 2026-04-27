@@ -16,13 +16,20 @@ import {
   Star,
   AlertTriangle,
   Trash2,
+  Check,
 } from "lucide-react";
 import { CalendarView, toDateKey } from "./calendar-view";
 import type { Tables } from "@/lib/supabase/types";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
 import { NewTaskDialog } from "./new-task-dialog";
-import { deleteTask, quickCreateTask, toggleTaskComplete, updateTaskStatus } from "./actions";
+import {
+  deleteTask,
+  quickCreateTask,
+  toggleTaskComplete,
+  updateTask,
+  updateTaskStatus,
+} from "./actions";
 
 const STATUS_LABELS: Record<string, string> = {
   todo: "לעשות",
@@ -456,10 +463,135 @@ function ListView({ tasks }: { tasks: TaskListItem[] }) {
   );
 }
 
+function EditableTaskRow({ task, onDone }: { task: TaskListItem; onDone: () => void }) {
+  const [title, setTitle] = useState(task.title);
+  const [description, setDescription] = useState(task.description ?? "");
+  const [dueDate, setDueDate] = useState(task.due_date?.slice(0, 10) ?? "");
+  const [status, setStatus] = useState<string>(task.status);
+  const [priority, setPriority] = useState<string>(task.priority);
+  const [pending, startTransition] = useTransition();
+  const [deleting, startDelete] = useTransition();
+  const router = useRouter();
+  const toast = useToast();
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!title.trim()) return;
+    const fd = new FormData();
+    fd.set("id", task.id);
+    fd.set("title", title.trim());
+    fd.set("description", description);
+    fd.set("due_date", dueDate);
+    fd.set("status", status);
+    fd.set("priority", priority);
+    startTransition(async () => {
+      const res = await updateTask(undefined as never, fd);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      onDone();
+      router.refresh();
+    });
+  }
+
+  function handleDelete() {
+    if (!confirm(`למחוק את "${task.title}"?`)) return;
+    startDelete(async () => {
+      const res = await deleteTask(task.id);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      onDone();
+      router.refresh();
+    });
+  }
+
+  const inputCls =
+    "border-ink-line focus:border-navy rounded-lg border bg-white px-2 py-1.5 text-sm outline-none";
+
+  return (
+    <li className="px-4 py-3">
+      <form onSubmit={handleSubmit} className="space-y-2">
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="כותרת"
+          autoFocus
+          className={`${inputCls} w-full`}
+        />
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="תיאור (אופציונלי)"
+          rows={2}
+          className={`${inputCls} w-full resize-none`}
+        />
+        <div className="grid grid-cols-2 gap-2">
+          <input
+            type="date"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+            className={inputCls}
+          />
+          <select value={status} onChange={(e) => setStatus(e.target.value)} className={inputCls}>
+            {Object.entries(STATUS_LABELS).map(([v, l]) => (
+              <option key={v} value={v}>
+                {l}
+              </option>
+            ))}
+          </select>
+          <select
+            value={priority}
+            onChange={(e) => setPriority(e.target.value)}
+            className={inputCls}
+          >
+            {Object.entries(PRIORITY_LABELS).map(([v, l]) => (
+              <option key={v} value={v}>
+                {l}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleting}
+            className="flex items-center gap-1 text-xs text-rose-500 hover:text-rose-700"
+          >
+            <Trash2 size={12} />
+            מחק
+          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onDone}
+              className="text-ink-soft hover:text-navy rounded-lg px-3 py-1.5 text-xs"
+            >
+              ביטול
+            </button>
+            <button
+              type="submit"
+              disabled={pending || !title.trim()}
+              className="bg-navy text-cream-paper flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-40"
+            >
+              <Check size={12} />
+              שמור
+            </button>
+          </div>
+        </div>
+      </form>
+    </li>
+  );
+}
+
 function TaskRow({ task }: { task: TaskListItem }) {
   const toast = useToast();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [editing, setEditing] = useState(false);
 
   const isDone = task.status === "done";
   const due = task.due_date ? new Date(task.due_date) : null;
@@ -474,23 +606,21 @@ function TaskRow({ task }: { task: TaskListItem }) {
     });
   };
 
-  const remove = () => {
-    if (!confirm(`למחוק את "${task.title}"?`)) return;
-    startTransition(async () => {
-      const res = await deleteTask(task.id);
-      if (res.error) toast.error(res.error);
-      else {
-        toast.success("המשימה נמחקה");
-        router.refresh();
-      }
-    });
-  };
+  if (editing) {
+    return <EditableTaskRow task={task} onDone={() => setEditing(false)} />;
+  }
 
   return (
-    <li className="hover:bg-cream-deep/40 flex items-center gap-3 px-4 py-3 transition-colors">
+    <li
+      className="hover:bg-cream-deep/40 flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors"
+      onClick={() => setEditing(true)}
+    >
       <button
         type="button"
-        onClick={toggle}
+        onClick={(e) => {
+          e.stopPropagation();
+          toggle();
+        }}
         disabled={isPending}
         aria-label={isDone ? "בטל סימון כהושלם" : "סמן כהושלם"}
         className="text-ink-soft hover:text-navy shrink-0 transition-colors disabled:opacity-50"
@@ -525,17 +655,13 @@ function TaskRow({ task }: { task: TaskListItem }) {
       </div>
 
       <PriorityPill priority={task.priority} />
-      <StatusSelect taskId={task.id} status={task.status} />
-
-      <button
-        type="button"
-        onClick={remove}
-        disabled={isPending}
-        aria-label="מחק"
-        className="text-ink-faded shrink-0 rounded-md p-1 transition-colors hover:text-rose-600 disabled:opacity-50"
+      <span
+        className={`shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium ${
+          STATUS_STYLES[task.status] ?? "border-ink-line bg-cream text-ink-soft"
+        }`}
       >
-        <Trash2 size={14} />
-      </button>
+        {STATUS_LABELS[task.status] ?? task.status}
+      </span>
     </li>
   );
 }

@@ -1,14 +1,13 @@
 "use client";
 
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Plus, Clock, Trash2, Building2, FolderKanban, ListChecks, Edit2 } from "lucide-react";
+import { Plus, Clock, Trash2, Building2, FolderKanban, ListChecks, Check } from "lucide-react";
 import type { Tables } from "@/lib/supabase/types";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
-import { assignCustomerToEntry, deleteTimeEntry } from "./actions";
+import { assignCustomerToEntry, deleteTimeEntry, updateTimeEntry } from "./actions";
 import { NewTimeEntryDialog } from "./new-time-entry-dialog";
-import { EditTimeEntryDialog } from "./edit-time-entry-dialog";
 
 export type TimeEntryItem = Pick<
   Tables<"time_entries">,
@@ -85,10 +84,9 @@ export function TimeList({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const toast = useToast();
 
   const [showNew, setShowNew] = useState(false);
-  const [editEntry, setEditEntry] = useState<TimeEntryItem | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [view, setView] = useState<View>(() => (searchParams.get("view") as View) || "daily");
   const [customerFilter, setCustomerFilter] = useState<string>(
     () => searchParams.get("customer") ?? "all",
@@ -160,13 +158,6 @@ export function TimeList({
     }
     return Array.from(groups.values()).sort((a, b) => b.date.getTime() - a.date.getTime());
   }, [filtered, view]);
-
-  const handleDelete = async (id: string) => {
-    if (!confirm("למחוק את הרשומה?")) return;
-    const res = await deleteTimeEntry(id);
-    if (res.error) toast.error(res.error);
-    else toast.success("נמחק");
-  };
 
   return (
     <div>
@@ -273,8 +264,10 @@ export function TimeList({
                     key={e.id}
                     entry={e}
                     customers={customers}
-                    onDelete={handleDelete}
-                    onEdit={() => setEditEntry(e)}
+                    projects={projects}
+                    tasks={tasks}
+                    editing={editingId === e.id}
+                    onToggleEdit={() => setEditingId((id) => (id === e.id ? null : e.id))}
                   />
                 ))}
               </div>
@@ -289,16 +282,6 @@ export function TimeList({
           projects={projects}
           tasks={tasks}
           onClose={() => setShowNew(false)}
-        />
-      )}
-
-      {editEntry && (
-        <EditTimeEntryDialog
-          entry={editEntry}
-          customers={customers}
-          projects={projects}
-          tasks={tasks}
-          onClose={() => setEditEntry(null)}
         />
       )}
     </div>
@@ -339,16 +322,53 @@ function SummaryCard({
   );
 }
 
+// ── helper functions for time manipulation ──────────────────────────────────
+
+function dateStr(iso: string | null): string {
+  const d = iso ? new Date(iso) : new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function timeStr(iso: string | null): string {
+  if (!iso) return "09:00";
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function buildIso(date: string, time: string): string {
+  if (!date || !time) return "";
+  return new Date(`${date}T${time}`).toISOString();
+}
+
+function diffMinutes(date: string, startT: string, endT: string): number {
+  const s = new Date(`${date}T${startT}`).getTime();
+  const e = new Date(`${date}T${endT}`).getTime();
+  if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) return 0;
+  return Math.ceil((e - s) / 60000);
+}
+
+function addMinutesToTime(time: string, min: number): string {
+  const [h, m] = time.split(":").map(Number);
+  const total = Math.max(0, Math.min(60 * 24 - 1, (h ?? 0) * 60 + (m ?? 0) + min));
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
+// ── EntryRow ─────────────────────────────────────────────────────────────────
+
 function EntryRow({
   entry,
   customers,
-  onDelete,
-  onEdit,
+  projects,
+  tasks,
+  editing,
+  onToggleEdit,
 }: {
   entry: TimeEntryItem;
   customers: CustomerOpt[];
-  onDelete: (id: string) => void;
-  onEdit: () => void;
+  projects: ProjectOpt[];
+  tasks: TaskOpt[];
+  editing: boolean;
+  onToggleEdit: () => void;
 }) {
   const [assigning, setAssigning] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -373,13 +393,26 @@ function EntryRow({
     });
   };
 
+  if (editing) {
+    return (
+      <EditEntryRow
+        entry={entry}
+        customers={customers}
+        projects={projects}
+        tasks={tasks}
+        onClose={onToggleEdit}
+      />
+    );
+  }
+
   return (
     <div
-      className={`group flex items-start gap-3 rounded-xl border p-3 transition-colors ${
+      className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors ${
         noCustomer
           ? "border-amber-300 bg-amber-50 hover:border-amber-400"
-          : "bg-cream-paper border-ink-line hover:border-ink-soft"
+          : "bg-cream-paper border-ink-line hover:border-navy/30"
       }`}
+      onClick={onToggleEdit}
     >
       <div
         className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
@@ -430,7 +463,7 @@ function EntryRow({
         {entry.notes && <div className="text-ink-soft mt-1 text-xs">{entry.notes}</div>}
 
         {noCustomer && (
-          <div className="mt-2">
+          <div className="mt-2" onClick={(e) => e.stopPropagation()}>
             {assigning ? (
               <div className="flex items-center gap-2">
                 <select
@@ -469,24 +502,277 @@ function EntryRow({
           </div>
         )}
       </div>
-      <div className="flex shrink-0 flex-col items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
-        <button
-          type="button"
-          onClick={onEdit}
-          className="text-ink-faded hover:text-navy"
-          aria-label="ערוך רשומה"
-        >
-          <Edit2 size={15} />
-        </button>
-        <button
-          type="button"
-          onClick={() => onDelete(entry.id)}
-          className="text-ink-faded hover:text-rose-600"
-          aria-label="מחק רשומה"
-        >
-          <Trash2 size={16} />
-        </button>
-      </div>
+    </div>
+  );
+}
+
+// ── EditEntryRow ──────────────────────────────────────────────────────────────
+
+function EditEntryRow({
+  entry,
+  customers,
+  projects,
+  tasks,
+  onClose,
+}: {
+  entry: TimeEntryItem;
+  customers: CustomerOpt[];
+  projects: ProjectOpt[];
+  tasks: TaskOpt[];
+  onClose: () => void;
+}) {
+  const [date, setDate] = useState(dateStr(entry.start_time));
+  const [startT, setStartT] = useState(timeStr(entry.start_time));
+  const [endT, setEndT] = useState(timeStr(entry.end_time));
+  const [duration, setDuration] = useState<number>(entry.duration_minutes ?? 60);
+  const [customerId, setCustomerId] = useState(entry.customer_id ?? "");
+  const [projectId, setProjectId] = useState(entry.project_id ?? "");
+  const [taskId, setTaskId] = useState(entry.task_id ?? "");
+  const [notes, setNotes] = useState(entry.notes ?? "");
+  const [billable, setBillable] = useState<boolean>(entry.billable);
+  const [pending, startTransition] = useTransition();
+  const [deleting, startDelete] = useTransition();
+  const router = useRouter();
+  const toast = useToast();
+
+  const editing = useRef<"start" | "end" | "duration" | null>(null);
+
+  useEffect(() => {
+    if (editing.current !== "start") return;
+    setEndT(addMinutesToTime(startT, duration));
+    editing.current = null;
+  }, [startT, duration]);
+
+  useEffect(() => {
+    if (editing.current !== "end") return;
+    const d = diffMinutes(date, startT, endT);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (d > 0) setDuration(d);
+    editing.current = null;
+  }, [endT, date, startT]);
+
+  useEffect(() => {
+    if (editing.current !== "duration") return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (duration > 0) setEndT(addMinutesToTime(startT, duration));
+    editing.current = null;
+  }, [duration, startT]);
+
+  const filteredProjects = useMemo(
+    () => (customerId ? projects.filter((p) => p.customer_id === customerId) : projects),
+    [projects, customerId],
+  );
+  const filteredTasks = useMemo(
+    () => (projectId ? tasks.filter((t) => t.project_id === projectId) : []),
+    [tasks, projectId],
+  );
+
+  const startISO = buildIso(date, startT);
+  const endISO = buildIso(date, endT);
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const fd = new FormData();
+    fd.set("id", entry.id);
+    fd.set("start_time", startISO);
+    fd.set("end_time", endISO);
+    fd.set("customer_id", customerId);
+    fd.set("project_id", projectId);
+    fd.set("task_id", taskId);
+    fd.set("notes", notes);
+    if (billable) fd.set("billable", "on");
+    startTransition(async () => {
+      const res = await updateTimeEntry({}, fd);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success("הרשומה עודכנה");
+      onClose();
+      router.refresh();
+    });
+  }
+
+  function handleDelete() {
+    if (!confirm("למחוק את הרשומה?")) return;
+    startDelete(async () => {
+      const res = await deleteTimeEntry(entry.id);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success("נמחק");
+      onClose();
+      router.refresh();
+    });
+  }
+
+  const inputCls =
+    "border-ink-line focus:border-navy w-full rounded-lg border bg-white px-2 py-1.5 text-sm outline-none";
+
+  return (
+    <div className="border-navy/30 space-y-3 rounded-xl border bg-white p-4">
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <input type="hidden" name="start_time" value={startISO} />
+        <input type="hidden" name="end_time" value={endISO} />
+
+        <div>
+          <label className="text-ink-soft mb-1 block text-xs uppercase">תאריך</label>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className={inputCls}
+          />
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          <div>
+            <label className="text-ink-soft mb-1 block text-xs uppercase">התחלה</label>
+            <input
+              type="time"
+              value={startT}
+              onChange={(e) => {
+                editing.current = "start";
+                setStartT(e.target.value);
+              }}
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className="text-ink-soft mb-1 block text-xs uppercase">סיום</label>
+            <input
+              type="time"
+              value={endT}
+              onChange={(e) => {
+                editing.current = "end";
+                setEndT(e.target.value);
+              }}
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className="text-ink-soft mb-1 block text-xs uppercase">משך (דקות)</label>
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={duration || ""}
+              onChange={(e) => {
+                editing.current = "duration";
+                setDuration(parseInt(e.target.value || "0", 10));
+              }}
+              className={inputCls}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="text-ink-soft mb-1 block text-xs uppercase">לקוח</label>
+          <select
+            value={customerId}
+            onChange={(e) => {
+              setCustomerId(e.target.value);
+              setProjectId("");
+              setTaskId("");
+            }}
+            className={inputCls}
+          >
+            <option value="">— ללא —</option>
+            {customers.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-ink-soft mb-1 block text-xs uppercase">פרויקט</label>
+            <select
+              value={projectId}
+              onChange={(e) => {
+                setProjectId(e.target.value);
+                setTaskId("");
+              }}
+              disabled={!customerId}
+              className={`${inputCls} disabled:opacity-50`}
+            >
+              <option value="">— ללא —</option>
+              {filteredProjects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-ink-soft mb-1 block text-xs uppercase">משימה</label>
+            <select
+              value={taskId}
+              onChange={(e) => setTaskId(e.target.value)}
+              disabled={!projectId}
+              className={`${inputCls} disabled:opacity-50`}
+            >
+              <option value="">— ללא —</option>
+              {filteredTasks.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.title}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label className="text-ink-soft mb-1 block text-xs uppercase">הערות</label>
+          <textarea
+            rows={2}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className={`${inputCls} resize-none`}
+          />
+        </div>
+
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={billable}
+            onChange={(e) => setBillable(e.target.checked)}
+          />
+          לחיוב
+        </label>
+
+        <div className="flex items-center justify-between pt-1">
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleting}
+            className="flex items-center gap-1 text-xs text-rose-500 hover:text-rose-700"
+          >
+            <Trash2 size={12} />
+            מחק
+          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-ink-soft hover:text-navy rounded-lg px-3 py-1.5 text-xs"
+            >
+              ביטול
+            </button>
+            <button
+              type="submit"
+              disabled={pending}
+              className="bg-navy text-cream-paper flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-40"
+            >
+              <Check size={12} />
+              שמור
+            </button>
+          </div>
+        </div>
+      </form>
     </div>
   );
 }
