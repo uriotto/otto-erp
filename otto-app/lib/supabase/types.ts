@@ -87,6 +87,7 @@ export type Database = {
       };
       customers: {
         Row: {
+          active: boolean;
           address: string | null;
           billing_model_default: string | null;
           company: string | null;
@@ -107,6 +108,7 @@ export type Database = {
           website: string | null;
         };
         Insert: {
+          active?: boolean;
           address?: string | null;
           billing_model_default?: string | null;
           company?: string | null;
@@ -127,6 +129,7 @@ export type Database = {
           website?: string | null;
         };
         Update: {
+          active?: boolean;
           address?: string | null;
           billing_model_default?: string | null;
           company?: string | null;
@@ -839,6 +842,63 @@ export type Database = {
           },
         ];
       };
+      project_payment_schedule: {
+        Row: {
+          amount: number;
+          created_at: string;
+          description: string;
+          due_date: string | null;
+          id: string;
+          notes: string | null;
+          paid_at: string | null;
+          project_id: string;
+          sort_order: number;
+          status: string;
+          tenant_id: string;
+        };
+        Insert: {
+          amount: number;
+          created_at?: string;
+          description: string;
+          due_date?: string | null;
+          id?: string;
+          notes?: string | null;
+          paid_at?: string | null;
+          project_id: string;
+          sort_order?: number;
+          status?: string;
+          tenant_id: string;
+        };
+        Update: {
+          amount?: number;
+          created_at?: string;
+          description?: string;
+          due_date?: string | null;
+          id?: string;
+          notes?: string | null;
+          paid_at?: string | null;
+          project_id?: string;
+          sort_order?: number;
+          status?: string;
+          tenant_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "project_payment_schedule_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "project_payment_schedule_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       project_templates: {
         Row: {
           created_at: string;
@@ -994,12 +1054,80 @@ export type Database = {
           },
         ];
       };
+      quotes: {
+        Row: {
+          amount: number | null;
+          created_at: string;
+          customer_id: string;
+          document_url: string | null;
+          id: string;
+          notes: string | null;
+          project_id: string | null;
+          signed_at: string | null;
+          status: string;
+          tenant_id: string;
+          title: string;
+          valid_until: string | null;
+        };
+        Insert: {
+          amount?: number | null;
+          created_at?: string;
+          customer_id: string;
+          document_url?: string | null;
+          id?: string;
+          notes?: string | null;
+          project_id?: string | null;
+          signed_at?: string | null;
+          status?: string;
+          tenant_id: string;
+          title: string;
+          valid_until?: string | null;
+        };
+        Update: {
+          amount?: number | null;
+          created_at?: string;
+          customer_id?: string;
+          document_url?: string | null;
+          id?: string;
+          notes?: string | null;
+          project_id?: string | null;
+          signed_at?: string | null;
+          status?: string;
+          tenant_id?: string;
+          title?: string;
+          valid_until?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "quotes_customer_id_fkey";
+            columns: ["customer_id"];
+            isOneToOne: false;
+            referencedRelation: "customers";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "quotes_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "quotes_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       tasks: {
         Row: {
           assigned_to: string | null;
           completed_at: string | null;
           created_at: string;
           created_by: string | null;
+          created_via_portal: boolean;
           customer_id: string | null;
           description: string | null;
           due_at: string | null;
@@ -1008,6 +1136,7 @@ export type Database = {
           lead_id: string | null;
           order_index: number;
           parent_task_id: string | null;
+          portal_hidden: boolean;
           priority: Database["public"]["Enums"]["task_priority"];
           project_id: string | null;
           recurring_config: Json | null;
@@ -1022,6 +1151,7 @@ export type Database = {
           completed_at?: string | null;
           created_at?: string;
           created_by?: string | null;
+          created_via_portal?: boolean;
           customer_id?: string | null;
           description?: string | null;
           due_at?: string | null;
@@ -1030,6 +1160,7 @@ export type Database = {
           lead_id?: string | null;
           order_index?: number;
           parent_task_id?: string | null;
+          portal_hidden?: boolean;
           priority?: Database["public"]["Enums"]["task_priority"];
           project_id?: string | null;
           recurring_config?: Json | null;
@@ -1044,6 +1175,7 @@ export type Database = {
           completed_at?: string | null;
           created_at?: string;
           created_by?: string | null;
+          created_via_portal?: boolean;
           customer_id?: string | null;
           description?: string | null;
           due_at?: string | null;
@@ -1052,6 +1184,7 @@ export type Database = {
           lead_id?: string | null;
           order_index?: number;
           parent_task_id?: string | null;
+          portal_hidden?: boolean;
           priority?: Database["public"]["Enums"]["task_priority"];
           project_id?: string | null;
           recurring_config?: Json | null;
@@ -1296,6 +1429,51 @@ export type Database = {
             columns: ["user_id"];
             isOneToOne: false;
             referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      user_invites: {
+        Row: {
+          created_at: string;
+          email: string;
+          id: string;
+          invited_by: string | null;
+          role: string;
+          tenant_id: string;
+          used_at: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          email: string;
+          id?: string;
+          invited_by?: string | null;
+          role?: string;
+          tenant_id: string;
+          used_at?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          email?: string;
+          id?: string;
+          invited_by?: string | null;
+          role?: string;
+          tenant_id?: string;
+          used_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "user_invites_invited_by_fkey";
+            columns: ["invited_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "user_invites_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
             referencedColumns: ["id"];
           },
         ];

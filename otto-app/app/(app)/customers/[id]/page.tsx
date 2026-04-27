@@ -6,6 +6,11 @@ import { ActivityFeed } from "@/components/activities/activity-feed";
 import { TasksSection, type TasksSectionItem } from "@/components/tasks/tasks-section";
 import { CustomerActionsBar } from "./customer-actions-bar";
 import { CustomerTagsEditor } from "./customer-tags-editor";
+import {
+  CustomerProjectsSection,
+  CustomerHourBanksSection,
+  CustomerQuotesSection,
+} from "./customer-related-sections";
 import { RecentTracker } from "@/components/search/recent-tracker";
 import { BreadcrumbLabel } from "@/components/layout/breadcrumb-label";
 
@@ -31,6 +36,41 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
     .order("due_date", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: false });
   const tasks = (tasksData ?? []) as TasksSectionItem[];
+
+  const [
+    { data: projects },
+    { data: hourBanks },
+    { data: allCustomers },
+    { data: tenantSettings },
+    { data: quotes },
+  ] = await Promise.all([
+    supabase
+      .from("projects")
+      .select("id, name, status")
+      .eq("customer_id", id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("hour_banks_summary")
+      .select("id, status, purchased_hours, available_hours, purchase_date, notes")
+      .eq("customer_id", id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("customers")
+      .select("id, name, hourly_rate_override")
+      .eq("active", true)
+      .order("name"),
+    supabase
+      .from("tenant_settings")
+      .select(
+        "default_hourly_rate, default_hour_bank_expiry_months, default_alert_threshold_pct, default_alert_threshold_hours",
+      )
+      .single(),
+    supabase
+      .from("quotes")
+      .select("id, title, amount, status, document_url, signed_at, valid_until")
+      .eq("customer_id", id)
+      .order("created_at", { ascending: false }),
+  ]);
 
   const initials = customer.name
     .split(" ")
@@ -131,6 +171,43 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           </p>
           <CustomerActionsBar customer={customer} />
         </div>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <CustomerProjectsSection
+          customerId={customer.id}
+          customerName={customer.name}
+          projects={projects ?? []}
+          allCustomers={
+            (allCustomers ?? []) as {
+              id: string;
+              name: string;
+              hourly_rate_override: number | null;
+            }[]
+          }
+          templates={[]}
+          parentProjects={[]}
+        />
+        <CustomerHourBanksSection
+          customerId={customer.id}
+          hourBanks={hourBanks ?? []}
+          allCustomers={
+            (allCustomers ?? []) as {
+              id: string;
+              name: string;
+              hourly_rate_override: number | null;
+            }[]
+          }
+          defaultHourlyRate={tenantSettings?.default_hourly_rate ?? 0}
+          defaultExpiryMonths={tenantSettings?.default_hour_bank_expiry_months ?? 12}
+          defaultAlertPct={tenantSettings?.default_alert_threshold_pct ?? 20}
+          defaultAlertHours={tenantSettings?.default_alert_threshold_hours ?? 5}
+        />
+        <CustomerQuotesSection
+          customerId={customer.id}
+          customerName={customer.name}
+          quotes={quotes ?? []}
+        />
       </div>
 
       <div className="mt-6">

@@ -12,7 +12,7 @@ import {
   X,
   Users,
   SearchX,
-  Trash2,
+  UserX,
   Check,
 } from "lucide-react";
 import type { Tables } from "@/lib/supabase/types";
@@ -20,7 +20,8 @@ import { NewCustomerDialog } from "./new-customer-dialog";
 import { ExportCsvButton } from "@/components/ui/export-csv-button";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
-import { bulkDeleteCustomers, exportCustomersCsv } from "./actions";
+import { bulkDeactivateCustomers, exportCustomersCsv } from "./actions";
+import { Eye, EyeOff } from "lucide-react";
 
 type Customer = Tables<"customers">;
 type StatusFilter = "all" | "active" | "inactive";
@@ -46,7 +47,13 @@ function parseTags(value: string | null): string[] {
     .filter((t) => t.length > 0);
 }
 
-export function CustomersList({ customers }: { customers: Customer[] }) {
+export function CustomersList({
+  customers,
+  showInactive = false,
+}: {
+  customers: Customer[];
+  showInactive?: boolean;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -139,17 +146,17 @@ export function CustomersList({ customers }: { customers: Customer[] }) {
 
   const clearSelection = () => setSelectedIds(new Set());
 
-  const handleBulkDelete = () => {
+  const handleBulkDeactivate = () => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
-    if (!confirm(`למחוק ${ids.length} לקוחות?`)) return;
+    if (!confirm(`להשבית ${ids.length} לקוחות?`)) return;
     startDeleteTransition(async () => {
-      const result = await bulkDeleteCustomers(ids);
+      const result = await bulkDeactivateCustomers(ids);
       if (result?.error) {
         toast.error(result.error);
         return;
       }
-      toast.success(`נמחקו ${result.deleted ?? ids.length} לקוחות`);
+      toast.success(`הושבתו ${result.updated ?? ids.length} לקוחות`);
       setSelectedIds(new Set());
       router.refresh();
     });
@@ -174,6 +181,14 @@ export function CustomersList({ customers }: { customers: Customer[] }) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Link
+            href={showInactive ? "/customers" : "/customers?inactive=1"}
+            className="text-ink-soft hover:text-navy flex items-center gap-1.5 rounded-xl border border-transparent px-3 py-2.5 text-xs font-medium transition-colors hover:border-current"
+            title={showInactive ? "הצג פעילים בלבד" : "הצג מושבתים"}
+          >
+            {showInactive ? <EyeOff size={14} /> : <Eye size={14} />}
+            {showInactive ? "הסתר מושבתים" : "מושבתים"}
+          </Link>
           <ExportCsvButton label="ייצא CSV" action={exportCustomersCsv} />
           <button
             onClick={() => setShowNew(true)}
@@ -290,13 +305,13 @@ export function CustomersList({ customers }: { customers: Customer[] }) {
           <span className="text-sm font-medium">{selectedIds.size} נבחרו</span>
           <button
             type="button"
-            onClick={handleBulkDelete}
+            onClick={handleBulkDeactivate}
             disabled={pendingDelete}
             aria-busy={pendingDelete}
-            className="flex items-center gap-1.5 rounded-xl bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex items-center gap-1.5 rounded-xl bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {pendingDelete ? <Spinner size={13} /> : <Trash2 size={13} />}
-            {pendingDelete ? "מוחק" : "מחק"}
+            {pendingDelete ? <Spinner size={13} /> : <UserX size={13} />}
+            {pendingDelete ? "מעדכן" : "השבת"}
           </button>
           <button
             type="button"
@@ -365,7 +380,14 @@ function CustomerCard({
             {initials}
           </div>
           <div className="min-w-0">
-            <div className="text-navy truncate font-semibold">{c.name}</div>
+            <div className="flex items-center gap-2">
+              <div className="text-navy truncate font-semibold">{c.name}</div>
+              {c.active === false && (
+                <span className="shrink-0 rounded-full border border-gray-200 bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
+                  מושבת
+                </span>
+              )}
+            </div>
             {c.company && (
               <div className="text-ink-soft flex items-center gap-1 text-xs">
                 <Building2 size={11} />

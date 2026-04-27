@@ -14,17 +14,19 @@ export function NewProjectDialog({
   customers,
   templates,
   parentProjects,
+  defaultCustomerId,
   onClose,
 }: {
   customers: CustomerOption[];
   templates: TemplateOption[];
   parentProjects: ProjectListItem[];
+  defaultCustomerId?: string;
   onClose: () => void;
 }) {
   const [state, action, pending] = useActionState(createProject, init);
   const toast = useToast();
   const router = useRouter();
-  const [selectedCustomer, setSelectedCustomer] = useState<string>("");
+  const [selectedCustomer, setSelectedCustomer] = useState<string>(defaultCustomerId ?? "");
 
   const filteredParents = useMemo(() => {
     if (!selectedCustomer) return parentProjects;
@@ -58,22 +60,34 @@ export function NewProjectDialog({
           <Field label="שם הפרויקט *" name="name" error={state.fieldErrors?.name?.[0]} />
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-micro text-ink-soft mb-1 block uppercase">לקוח</label>
-              <select
-                name="customer_id"
-                value={selectedCustomer}
-                onChange={(e) => setSelectedCustomer(e.target.value)}
-                className="border-ink-line focus:border-navy w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none"
-              >
-                <option value="">— ללא —</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {defaultCustomerId ? (
+              <>
+                <input type="hidden" name="customer_id" value={defaultCustomerId} />
+                <div className="col-span-1">
+                  <label className="text-micro text-ink-soft mb-1 block uppercase">לקוח</label>
+                  <div className="border-ink-line rounded-lg border bg-gray-50 px-3 py-2 text-sm text-gray-500">
+                    {customers.find((c) => c.id === defaultCustomerId)?.name ?? "—"}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div>
+                <label className="text-micro text-ink-soft mb-1 block uppercase">לקוח</label>
+                <select
+                  name="customer_id"
+                  value={selectedCustomer}
+                  onChange={(e) => setSelectedCustomer(e.target.value)}
+                  className="border-ink-line focus:border-navy w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none"
+                >
+                  <option value="">— ללא —</option>
+                  {customers.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <Select label="פרויקט אב" name="parent_project_id" options={filteredParents}>
               <option value="">— ראשי —</option>
             </Select>

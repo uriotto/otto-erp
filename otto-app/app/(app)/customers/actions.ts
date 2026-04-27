@@ -206,14 +206,22 @@ export async function exportCustomersCsv(): Promise<
   return { csv, filename };
 }
 
-export async function deleteCustomer(id: string): Promise<{ error?: string }> {
+export async function deactivateCustomer(id: string): Promise<{ error?: string }> {
   const supabase = await createClient();
-  const { data: profile } = await supabase.from("users").select("tenant_id").single();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "לא מחובר" };
+  const { data: profile } = await supabase
+    .from("users")
+    .select("tenant_id")
+    .eq("id", user.id)
+    .single();
   if (!profile) return { error: "לא מחובר" };
 
   const { error } = await supabase
     .from("customers")
-    .delete()
+    .update({ active: false })
     .eq("id", id)
     .eq("tenant_id", profile.tenant_id);
   if (error) return { error: error.message };
@@ -221,31 +229,61 @@ export async function deleteCustomer(id: string): Promise<{ error?: string }> {
   return {};
 }
 
-export async function bulkDeleteCustomers(
+export async function reactivateCustomer(id: string): Promise<{ error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "לא מחובר" };
+  const { data: profile } = await supabase
+    .from("users")
+    .select("tenant_id")
+    .eq("id", user.id)
+    .single();
+  if (!profile) return { error: "לא מחובר" };
+
+  const { error } = await supabase
+    .from("customers")
+    .update({ active: true })
+    .eq("id", id)
+    .eq("tenant_id", profile.tenant_id);
+  if (error) return { error: error.message };
+  revalidatePath("/customers");
+  return {};
+}
+
+export async function bulkDeactivateCustomers(
   ids: string[],
-): Promise<{ error?: string; deleted?: number }> {
+): Promise<{ error?: string; updated?: number }> {
   if (!Array.isArray(ids) || ids.length === 0) {
     return { error: "לא נבחרו לקוחות" };
   }
 
-  // Validate that every id looks like a non-empty string (UUIDs)
   const cleanIds = ids.filter((id): id is string => typeof id === "string" && id.length > 0);
   if (cleanIds.length === 0) {
     return { error: "מזהים לא תקינים" };
   }
 
   const supabase = await createClient();
-  const { data: profile } = await supabase.from("users").select("tenant_id").single();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "לא מחובר" };
+  const { data: profile } = await supabase
+    .from("users")
+    .select("tenant_id")
+    .eq("id", user.id)
+    .single();
   if (!profile) return { error: "לא מחובר" };
 
   const { error } = await supabase
     .from("customers")
-    .delete()
+    .update({ active: false })
     .in("id", cleanIds)
     .eq("tenant_id", profile.tenant_id);
 
   if (error) return { error: error.message };
 
   revalidatePath("/customers");
-  return { deleted: cleanIds.length };
+  return { updated: cleanIds.length };
 }

@@ -5,7 +5,7 @@ import { Pencil } from "lucide-react";
 import type { Tables } from "@/lib/supabase/types";
 import { WhatsAppButton } from "@/components/contact/whatsapp-button";
 import { EditCustomerDialog } from "./edit-customer-dialog";
-import { DeleteCustomerButton } from "./delete-customer-button";
+import { DeactivateCustomerButton } from "./delete-customer-button";
 
 export function CustomerActionsBar({ customer }: { customer: Tables<"customers"> }) {
   const [showEdit, setShowEdit] = useState(false);
@@ -20,7 +20,7 @@ export function CustomerActionsBar({ customer }: { customer: Tables<"customers">
         <Pencil size={13} />
         ערוך
       </button>
-      <DeleteCustomerButton id={customer.id} />
+      <DeactivateCustomerButton id={customer.id} active={customer.active ?? true} />
       {showEdit && <EditCustomerDialog customer={customer} onClose={() => setShowEdit(false)} />}
     </div>
   );

@@ -37,6 +37,7 @@ export function NewHourBankDialog({
   defaultExpiryMonths,
   defaultAlertPct,
   defaultAlertHours,
+  defaultCustomerId,
   onClose,
 }: {
   customers: CustomerOption[];
@@ -44,13 +45,14 @@ export function NewHourBankDialog({
   defaultExpiryMonths: number;
   defaultAlertPct: number;
   defaultAlertHours: number;
+  defaultCustomerId?: string;
   onClose: () => void;
 }) {
   const [state, action, pending] = useActionState(createHourBank, init);
   const toast = useToast();
   const router = useRouter();
 
-  const [customerId, setCustomerId] = useState("");
+  const [customerId, setCustomerId] = useState(defaultCustomerId ?? "");
   const [confirmDuplicate, setConfirmDuplicate] = useState(false);
   const [overage, setOverage] = useState<OverageInfo | null>(null);
 
@@ -128,29 +130,41 @@ export function NewHourBankDialog({
         </div>
 
         <form action={action} className="space-y-4">
-          <div>
-            <label className="text-micro text-ink-soft mb-1 block uppercase">לקוח *</label>
-            <select
-              name="customer_id"
-              required
-              value={customerId}
-              onChange={(e) => {
-                setCustomerId(e.target.value);
-                setConfirmDuplicate(false);
-              }}
-              className="border-ink-line focus:border-navy w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none"
-            >
-              <option value="">— בחר לקוח —</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            {state.fieldErrors?.customer_id?.[0] && (
-              <p className="mt-1 text-xs text-red-600">{state.fieldErrors.customer_id[0]}</p>
-            )}
-          </div>
+          {defaultCustomerId ? (
+            <>
+              <input type="hidden" name="customer_id" value={defaultCustomerId} />
+              <div>
+                <label className="text-micro text-ink-soft mb-1 block uppercase">לקוח</label>
+                <div className="border-ink-line rounded-lg border bg-gray-50 px-3 py-2 text-sm text-gray-500">
+                  {customers.find((c) => c.id === defaultCustomerId)?.name ?? "—"}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div>
+              <label className="text-micro text-ink-soft mb-1 block uppercase">לקוח *</label>
+              <select
+                name="customer_id"
+                required
+                value={customerId}
+                onChange={(e) => {
+                  setCustomerId(e.target.value);
+                  setConfirmDuplicate(false);
+                }}
+                className="border-ink-line focus:border-navy w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none"
+              >
+                <option value="">— בחר לקוח —</option>
+                {customers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              {state.fieldErrors?.customer_id?.[0] && (
+                <p className="mt-1 text-xs text-red-600">{state.fieldErrors.customer_id[0]}</p>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <Field

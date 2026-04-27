@@ -14,6 +14,8 @@ import { createClient } from "@/lib/supabase/server";
 import { BreadcrumbLabel } from "@/components/layout/breadcrumb-label";
 import { ProjectActionsBar } from "./project-actions-bar";
 import { MilestonesSection } from "./milestones-section";
+import { PaymentScheduleSection } from "./payment-schedule-section";
+import { ProjectQuotesSection } from "./project-quotes-section";
 
 export const metadata = { title: "פרויקט — OTTO" };
 
@@ -64,34 +66,50 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 
   if (!project) notFound();
 
-  const [{ data: customer }, { data: milestones }, { data: parent }, { data: children }] =
-    await Promise.all([
-      project.customer_id
-        ? supabase
-            .from("customers")
-            .select("id, name, company")
-            .eq("id", project.customer_id)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
-      supabase
-        .from("milestones")
-        .select("*")
-        .eq("project_id", id)
-        .order("order_index", { ascending: true }),
-      project.parent_project_id
-        ? supabase
-            .from("projects")
-            .select("id, name")
-            .eq("id", project.parent_project_id)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
-      supabase
-        .from("projects")
-        .select("id, name, status")
-        .eq("parent_project_id", id)
-        .is("deleted_at", null)
-        .order("created_at"),
-    ]);
+  const [
+    { data: customer },
+    { data: milestones },
+    { data: parent },
+    { data: children },
+    { data: installments },
+    { data: quotes },
+  ] = await Promise.all([
+    project.customer_id
+      ? supabase
+          .from("customers")
+          .select("id, name, company")
+          .eq("id", project.customer_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase
+      .from("milestones")
+      .select("*")
+      .eq("project_id", id)
+      .order("order_index", { ascending: true }),
+    project.parent_project_id
+      ? supabase
+          .from("projects")
+          .select("id, name")
+          .eq("id", project.parent_project_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase
+      .from("projects")
+      .select("id, name, status")
+      .eq("parent_project_id", id)
+      .is("deleted_at", null)
+      .order("created_at"),
+    supabase
+      .from("project_payment_schedule")
+      .select("*")
+      .eq("project_id", id)
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("quotes")
+      .select("id, title, amount, status, document_url, signed_at, valid_until")
+      .eq("project_id", id)
+      .order("created_at", { ascending: false }),
+  ]);
 
   const { data: customerOptions } = await supabase
     .from("customers")
@@ -224,6 +242,16 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       </div>
 
       <MilestonesSection projectId={id} milestones={milestones ?? []} />
+
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <PaymentScheduleSection projectId={id} installments={installments ?? []} />
+        <ProjectQuotesSection
+          projectId={id}
+          quotes={quotes ?? []}
+          customerId={customer?.id}
+          customerName={customer?.name}
+        />
+      </div>
 
       {children && children.length > 0 && (
         <div className="bg-cream-paper border-ink-line mt-4 rounded-2xl border p-6">
