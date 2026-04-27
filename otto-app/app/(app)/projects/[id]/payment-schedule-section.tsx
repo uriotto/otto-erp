@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useActionState } from "react";
+import { useState, useTransition, useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, CheckCircle2, Circle, Trash2, X } from "lucide-react";
 import {
@@ -99,11 +99,13 @@ function AddInstallmentForm({ projectId, onClose }: { projectId: string; onClose
   const boundAction = addPaymentInstallment.bind(null, projectId);
   const [state, action, pending] = useActionState<InstallmentFormState, FormData>(boundAction, {});
 
-  if (state.success) {
-    router.refresh();
-    onClose();
-  }
-  if (state.error) toast.error(state.error);
+  useEffect(() => {
+    if (state.success) {
+      router.refresh();
+      onClose();
+    }
+    if (state.error) toast.error(state.error);
+  }, [state]);
 
   const fe = state.fieldErrors ?? {};
 
