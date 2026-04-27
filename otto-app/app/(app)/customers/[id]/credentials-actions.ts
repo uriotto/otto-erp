@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 
 // AES-256-GCM encryption – key must be 32 bytes (64 hex chars) in env
 function getKey(): Buffer {
-  const hex = process.env.CREDENTIALS_ENCRYPTION_KEY;
+  const hex = process.env.CREDENTIALS_ENCRYPTION_KEY?.trim();
   if (!hex || hex.length !== 64) throw new Error("CREDENTIALS_ENCRYPTION_KEY חסר או לא תקין");
   return Buffer.from(hex, "hex");
 }
