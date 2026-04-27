@@ -14,7 +14,7 @@ export default async function QuotesPage() {
     supabase.from("customers").select("id, name, company").eq("active", true).order("name"),
     supabase
       .from("projects")
-      .select("id, name")
+      .select("id, name, customer_id")
       .is("deleted_at", null)
       .order("created_at", { ascending: false }),
   ]);

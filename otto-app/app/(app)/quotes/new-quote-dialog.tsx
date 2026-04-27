@@ -16,7 +16,7 @@ const STATUSES = [
 ];
 
 type CustomerOption = { id: string; name: string; company: string | null };
-type ProjectOption = { id: string; name: string };
+type ProjectOption = { id: string; name: string; customer_id?: string | null };
 
 function useFileUpload() {
   const [uploading, startUpload] = useTransition();
@@ -86,8 +86,13 @@ export function NewQuoteDialog({
   const formRef = useRef<HTMLFormElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [docMode, setDocMode] = useState<"url" | "upload">("url");
+  const [selectedCustomerId, setSelectedCustomerId] = useState(defaultCustomerId ?? "");
   const { upload, uploading, uploadedUrl, uploadedName, setUploadedUrl, setUploadedName } =
     useFileUpload();
+
+  const filteredProjects = selectedCustomerId
+    ? projects.filter((p) => !p.customer_id || p.customer_id === selectedCustomerId)
+    : projects;
 
   useEffect(() => {
     if (state.success) {
@@ -143,6 +148,8 @@ export function NewQuoteDialog({
                 <select
                   name="customer_id"
                   required
+                  value={selectedCustomerId}
+                  onChange={(e) => setSelectedCustomerId(e.target.value)}
                   className="border-ink-line focus:border-navy w-full rounded-xl border bg-white px-3 py-2.5 text-sm outline-none"
                 >
                   <option value="">בחר לקוח</option>
@@ -172,7 +179,7 @@ export function NewQuoteDialog({
                   className="border-ink-line focus:border-navy w-full rounded-xl border bg-white px-3 py-2.5 text-sm outline-none"
                 >
                   <option value="">ללא פרויקט</option>
-                  {projects.map((p) => (
+                  {filteredProjects.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}
                     </option>
