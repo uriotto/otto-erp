@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 
+const BILLING_MODELS = ["hourly", "hour_bank", "fixed_price", "retainer"] as const;
+
 const CustomerSchema = z.object({
   name: z.string().min(1, "שם חובה"),
   email: z.string().email("אימייל לא תקין").optional().or(z.literal("")),
@@ -12,6 +14,15 @@ const CustomerSchema = z.object({
   website: z.string().url("כתובת אתר לא תקינה").optional().or(z.literal("")),
   address: z.string().optional(),
   notes: z.string().optional(),
+  billing_model_default: z.enum(BILLING_MODELS).optional().nullable(),
+  hourly_rate_override: z.preprocess(
+    (v) => (v === "" || v == null ? null : Number(v)),
+    z.number().positive().optional().nullable(),
+  ),
+  retainer_monthly_amount: z.preprocess(
+    (v) => (v === "" || v == null ? null : Number(v)),
+    z.number().positive().optional().nullable(),
+  ),
 });
 
 export type CustomerFormState = {
@@ -32,6 +43,9 @@ export async function createCustomer(
     website: formData.get("website") as string,
     address: formData.get("address") as string,
     notes: formData.get("notes") as string,
+    billing_model_default: (formData.get("billing_model_default") as string) || null,
+    hourly_rate_override: formData.get("hourly_rate_override") as string,
+    retainer_monthly_amount: formData.get("retainer_monthly_amount") as string,
   };
 
   const parsed = CustomerSchema.safeParse(raw);
@@ -44,9 +58,16 @@ export async function createCustomer(
   if (!profile) return { error: "לא מחובר" };
 
   const { error } = await supabase.from("customers").insert({
-    ...parsed.data,
+    name: parsed.data.name,
     email: parsed.data.email || null,
+    phone: parsed.data.phone || null,
+    company: parsed.data.company || null,
     website: parsed.data.website || null,
+    address: parsed.data.address || null,
+    notes: parsed.data.notes || null,
+    billing_model_default: parsed.data.billing_model_default ?? null,
+    hourly_rate_override: parsed.data.hourly_rate_override ?? null,
+    retainer_monthly_amount: parsed.data.retainer_monthly_amount ?? null,
     tenant_id: profile.tenant_id,
   });
 
@@ -75,6 +96,9 @@ export async function updateCustomer(
     website: formData.get("website") as string,
     address: formData.get("address") as string,
     notes: formData.get("notes") as string,
+    billing_model_default: (formData.get("billing_model_default") as string) || null,
+    hourly_rate_override: formData.get("hourly_rate_override") as string,
+    retainer_monthly_amount: formData.get("retainer_monthly_amount") as string,
   };
 
   const parsed = CustomerSchema.safeParse(raw);
@@ -91,9 +115,16 @@ export async function updateCustomer(
   const { error } = await supabase
     .from("customers")
     .update({
-      ...parsed.data,
+      name: parsed.data.name,
       email: parsed.data.email || null,
+      phone: parsed.data.phone || null,
+      company: parsed.data.company || null,
       website: parsed.data.website || null,
+      address: parsed.data.address || null,
+      notes: parsed.data.notes || null,
+      billing_model_default: parsed.data.billing_model_default ?? null,
+      hourly_rate_override: parsed.data.hourly_rate_override ?? null,
+      retainer_monthly_amount: parsed.data.retainer_monthly_amount ?? null,
       ...(status ? { status } : {}),
     })
     .eq("id", id)

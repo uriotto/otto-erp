@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { createCustomer, type CustomerFormState } from "./actions";
 import { useToast } from "@/components/ui/toast";
@@ -8,9 +8,17 @@ import { Spinner } from "@/components/ui/spinner";
 
 const init: CustomerFormState = {};
 
+const BILLING_LABELS: Record<string, string> = {
+  hourly: "שעתי",
+  hour_bank: "בנק שעות",
+  fixed_price: "מחיר קבוע",
+  retainer: "ריטיינר חודשי",
+};
+
 export function NewCustomerDialog({ onClose }: { onClose: () => void }) {
   const [state, action, pending] = useActionState(createCustomer, init);
   const toast = useToast();
+  const [billingModel, setBillingModel] = useState("");
 
   useEffect(() => {
     if (state.success) {
@@ -45,6 +53,31 @@ export function NewCustomerDialog({ onClose }: { onClose: () => void }) {
             <Field label="אתר" name="website" type="url" error={state.fieldErrors?.website?.[0]} />
           </div>
           <Field label="כתובת" name="address" />
+
+          <div>
+            <label className="text-micro text-ink-soft mb-1 block uppercase">מודל חיוב</label>
+            <select
+              name="billing_model_default"
+              value={billingModel}
+              onChange={(e) => setBillingModel(e.target.value)}
+              className="border-ink-line focus:border-navy w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none"
+            >
+              <option value="">— ללא —</option>
+              {Object.entries(BILLING_LABELS).map(([v, l]) => (
+                <option key={v} value={v}>
+                  {l}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {billingModel === "hourly" && (
+            <Field label="תעריף שעתי (₪)" name="hourly_rate_override" type="number" />
+          )}
+          {billingModel === "retainer" && (
+            <Field label="סכום ריטיינר חודשי (₪)" name="retainer_monthly_amount" type="number" />
+          )}
+
           <Field label="הערות" name="notes" as="textarea" />
 
           {state.error && <p className="text-sm text-red-600">{state.error}</p>}

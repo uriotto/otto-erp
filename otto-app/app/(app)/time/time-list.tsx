@@ -135,7 +135,7 @@ export function TimeList({
       const dur = e.duration_minutes ?? 0;
       if (t >= wkStart) weekMin += dur;
       if (t >= moStart) monthMin += dur;
-      if (e.billable && (e.billing_status === "unbilled" || !e.billing_status)) unbilledMin += dur;
+      if (e.billable && (e.billing_status === "pending" || !e.billing_status)) unbilledMin += dur;
     }
     return { weekMin, monthMin, unbilledMin };
   }, [entries]);
