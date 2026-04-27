@@ -46,7 +46,15 @@ export async function createActivity(
   }
 
   const supabase = await createClient();
-  const { data: profile } = await supabase.from("users").select("tenant_id, id").single();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "לא מחובר" };
+  const { data: profile } = await supabase
+    .from("users")
+    .select("tenant_id, id")
+    .eq("id", user.id)
+    .single();
   if (!profile) return { error: "לא מחובר" };
 
   const occurredAt = toIsoOrNull(parsed.data.occurred_at) ?? new Date().toISOString();
@@ -93,7 +101,15 @@ export async function updateActivity(
   }
 
   const supabase = await createClient();
-  const { data: profile } = await supabase.from("users").select("tenant_id").single();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "לא מחובר" };
+  const { data: profile } = await supabase
+    .from("users")
+    .select("tenant_id")
+    .eq("id", user.id)
+    .single();
   if (!profile) return { error: "לא מחובר" };
 
   const occurredAt = toIsoOrNull(parsed.data.occurred_at) ?? new Date().toISOString();
@@ -124,7 +140,15 @@ export async function toggleActivityComplete(
   parentPath: string,
 ): Promise<{ error?: string }> {
   const supabase = await createClient();
-  const { data: profile } = await supabase.from("users").select("tenant_id").single();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "לא מחובר" };
+  const { data: profile } = await supabase
+    .from("users")
+    .select("tenant_id")
+    .eq("id", user.id)
+    .single();
   if (!profile) return { error: "לא מחובר" };
 
   const { error } = await supabase
@@ -139,7 +163,15 @@ export async function toggleActivityComplete(
 
 export async function deleteActivity(id: string, parentPath: string): Promise<{ error?: string }> {
   const supabase = await createClient();
-  const { data: profile } = await supabase.from("users").select("tenant_id").single();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "לא מחובר" };
+  const { data: profile } = await supabase
+    .from("users")
+    .select("tenant_id")
+    .eq("id", user.id)
+    .single();
   if (!profile) return { error: "לא מחובר" };
 
   const { error } = await supabase

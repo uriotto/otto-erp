@@ -53,7 +53,15 @@ export async function createContent(
   }
 
   const supabase = await createClient();
-  const { data: profile } = await supabase.from("users").select("tenant_id, id").single();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "לא מחובר" };
+  const { data: profile } = await supabase
+    .from("users")
+    .select("tenant_id, id")
+    .eq("id", user.id)
+    .single();
   if (!profile) return { error: "לא מחובר" };
 
   const tags = parsed.data.tags
@@ -86,7 +94,15 @@ export async function updateContentStatus(
   status: (typeof STATUSES)[number],
 ): Promise<{ error?: string }> {
   const supabase = await createClient();
-  const { data: profile } = await supabase.from("users").select("tenant_id").single();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "לא מחובר" };
+  const { data: profile } = await supabase
+    .from("users")
+    .select("tenant_id")
+    .eq("id", user.id)
+    .single();
   if (!profile) return { error: "לא מחובר" };
 
   const extra: Record<string, string> = {};
@@ -106,7 +122,15 @@ export async function updateContentStatus(
 
 export async function deleteContent(id: string): Promise<{ error?: string }> {
   const supabase = await createClient();
-  const { data: profile } = await supabase.from("users").select("tenant_id").single();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "לא מחובר" };
+  const { data: profile } = await supabase
+    .from("users")
+    .select("tenant_id")
+    .eq("id", user.id)
+    .single();
   if (!profile) return { error: "לא מחובר" };
 
   const { error } = await supabase

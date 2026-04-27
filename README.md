@@ -22,6 +22,7 @@ npm run dev
 ## סטטוס
 
 **Phase 1.1** — Repo + Next.js Init ✅
+
 - Next.js 16 (App Router, TypeScript Strict)
 - Tailwind v4 + Design System (cream/navy palette)
 - RTL מההתחלה (`lang="he"`, `dir="rtl"`)

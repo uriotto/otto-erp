@@ -37,7 +37,15 @@ export async function createLead(_prev: LeadFormState, formData: FormData): Prom
   }
 
   const supabase = await createClient();
-  const { data: profile } = await supabase.from("users").select("tenant_id").single();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "לא מחובר" };
+  const { data: profile } = await supabase
+    .from("users")
+    .select("tenant_id")
+    .eq("id", user.id)
+    .single();
   if (!profile) return { error: "לא מחובר" };
 
   const valueNum = parsed.data.value ? parseFloat(parsed.data.value) : null;
@@ -79,7 +87,15 @@ export async function updateLead(_prev: LeadFormState, formData: FormData): Prom
   }
 
   const supabase = await createClient();
-  const { data: profile } = await supabase.from("users").select("tenant_id").single();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "לא מחובר" };
+  const { data: profile } = await supabase
+    .from("users")
+    .select("tenant_id")
+    .eq("id", user.id)
+    .single();
   if (!profile) return { error: "לא מחובר" };
 
   const valueNum = parsed.data.value ? parseFloat(parsed.data.value) : null;
@@ -109,7 +125,15 @@ export async function updateLead(_prev: LeadFormState, formData: FormData): Prom
 
 export async function updateLeadStatus(id: string, status: string): Promise<{ error?: string }> {
   const supabase = await createClient();
-  const { data: profile } = await supabase.from("users").select("tenant_id").single();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "לא מחובר" };
+  const { data: profile } = await supabase
+    .from("users")
+    .select("tenant_id")
+    .eq("id", user.id)
+    .single();
   if (!profile) return { error: "לא מחובר" };
 
   const { error } = await supabase
@@ -164,7 +188,15 @@ export async function exportLeadsCsv(): Promise<
   { csv: string; filename: string } | { error: string }
 > {
   const supabase = await createClient();
-  const { data: profile } = await supabase.from("users").select("tenant_id").single();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "לא מחובר" };
+  const { data: profile } = await supabase
+    .from("users")
+    .select("tenant_id")
+    .eq("id", user.id)
+    .single();
   if (!profile) return { error: "לא מחובר" };
 
   const { data: leads, error } = await supabase
@@ -202,7 +234,15 @@ export async function bulkDeleteLeads(ids: string[]): Promise<{ error?: string; 
   if (!Array.isArray(ids) || ids.length === 0) return { error: "לא נבחרו לידים" };
 
   const supabase = await createClient();
-  const { data: profile } = await supabase.from("users").select("tenant_id").single();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "לא מחובר" };
+  const { data: profile } = await supabase
+    .from("users")
+    .select("tenant_id")
+    .eq("id", user.id)
+    .single();
   if (!profile) return { error: "לא מחובר" };
 
   const { error, count } = await supabase
@@ -225,7 +265,15 @@ export async function bulkUpdateLeadsStatus(
   if (!allowed.includes(status)) return { error: "סטטוס לא תקין" };
 
   const supabase = await createClient();
-  const { data: profile } = await supabase.from("users").select("tenant_id").single();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "לא מחובר" };
+  const { data: profile } = await supabase
+    .from("users")
+    .select("tenant_id")
+    .eq("id", user.id)
+    .single();
   if (!profile) return { error: "לא מחובר" };
 
   const { error, count } = await supabase
@@ -241,7 +289,15 @@ export async function bulkUpdateLeadsStatus(
 
 export async function deleteLead(id: string): Promise<{ error?: string }> {
   const supabase = await createClient();
-  const { data: profile } = await supabase.from("users").select("tenant_id").single();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "לא מחובר" };
+  const { data: profile } = await supabase
+    .from("users")
+    .select("tenant_id")
+    .eq("id", user.id)
+    .single();
   if (!profile) return { error: "לא מחובר" };
 
   const { error } = await supabase

@@ -52,7 +52,15 @@ export type InvoiceActionResult =
 
 async function getTenant() {
   const supabase = await createClient();
-  const { data: profile } = await supabase.from("users").select("tenant_id, id, role").single();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { supabase, profile: null };
+  const { data: profile } = await supabase
+    .from("users")
+    .select("tenant_id, id, role")
+    .eq("id", user.id)
+    .single();
   return { supabase, profile };
 }
 

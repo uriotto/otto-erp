@@ -6,7 +6,15 @@ import { createClient } from "@/lib/supabase/server";
 
 export async function markNotificationRead(id: string): Promise<{ error?: string }> {
   const supabase = await createClient();
-  const { data: profile } = await supabase.from("users").select("tenant_id").single();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "לא מחובר" };
+  const { data: profile } = await supabase
+    .from("users")
+    .select("tenant_id")
+    .eq("id", user.id)
+    .single();
   if (!profile) return { error: "לא מחובר" };
 
   const { error } = await supabase
@@ -23,7 +31,15 @@ export async function markNotificationRead(id: string): Promise<{ error?: string
 
 export async function markAllNotificationsRead(): Promise<{ error?: string }> {
   const supabase = await createClient();
-  const { data: profile } = await supabase.from("users").select("tenant_id").single();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "לא מחובר" };
+  const { data: profile } = await supabase
+    .from("users")
+    .select("tenant_id")
+    .eq("id", user.id)
+    .single();
   if (!profile) return { error: "לא מחובר" };
 
   const { error } = await supabase
