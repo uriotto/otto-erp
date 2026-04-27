@@ -250,14 +250,18 @@ const QUOTE_STATUS_STYLES: Record<string, string> = {
   expired: "bg-gray-100 text-gray-400 border-gray-200",
 };
 
+type ProjectOption = { id: string; name: string; customer_id?: string | null };
+
 export function CustomerQuotesSection({
   customerId,
   customerName,
   quotes,
+  projects,
 }: {
   customerId: string;
   customerName: string;
   quotes: QuoteItem[];
+  projects: ProjectOption[];
 }) {
   const [showNew, setShowNew] = useState(false);
   const router = useRouter();
@@ -322,7 +326,7 @@ export function CustomerQuotesSection({
       {showNew && (
         <NewQuoteDialog
           customers={[{ id: customerId, name: customerName, company: null }]}
-          projects={[]}
+          projects={projects}
           defaultCustomerId={customerId}
           onClose={() => {
             setShowNew(false);

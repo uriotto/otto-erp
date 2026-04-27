@@ -46,7 +46,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   ] = await Promise.all([
     supabase
       .from("projects")
-      .select("id, name, status")
+      .select("id, name, status, customer_id")
       .eq("customer_id", id)
       .order("created_at", { ascending: false }),
     supabase
@@ -207,6 +207,11 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           customerId={customer.id}
           customerName={customer.name}
           quotes={quotes ?? []}
+          projects={(projects ?? []).map((p) => ({
+            id: p.id,
+            name: p.name,
+            customer_id: p.customer_id,
+          }))}
         />
       </div>
 
