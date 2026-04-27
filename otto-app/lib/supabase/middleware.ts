@@ -76,5 +76,22 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(dashUrl);
   }
 
+  // Block authenticated admin-area users who have no users row (not invited)
+  const isAccessPending = pathname === "/access-pending";
+  if (user && !isAuthRoute && !isPortalRoute && !isPublicApi && !isPublicRoot && !isAccessPending) {
+    const { data: profile } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (!profile) {
+      const pendingUrl = request.nextUrl.clone();
+      pendingUrl.pathname = "/access-pending";
+      pendingUrl.search = "";
+      return NextResponse.redirect(pendingUrl);
+    }
+  }
+
   return response;
 }
