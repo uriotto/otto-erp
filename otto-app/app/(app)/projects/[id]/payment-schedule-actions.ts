@@ -46,12 +46,15 @@ export async function addPaymentInstallment(
     notes: formData.get("notes") as string,
   };
 
+  console.log("[payment-schedule] raw input", raw);
   const parsed = InstallmentSchema.safeParse(raw);
   if (!parsed.success) {
+    console.log("[payment-schedule] validation failed", parsed.error.flatten());
     return { fieldErrors: parsed.error.flatten().fieldErrors };
   }
 
   const ctx = await getTenant();
+  console.log("[payment-schedule] tenant ctx", { hasCtx: !!ctx, projectId });
   if (!ctx) return { error: "לא מחובר" };
 
   const { data: existing } = await ctx.supabase
