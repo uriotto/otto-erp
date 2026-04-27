@@ -106,7 +106,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       .order("sort_order", { ascending: true }),
     supabase
       .from("quotes")
-      .select("id, title, amount, status, document_url, signed_at, valid_until")
+      .select(
+        "id, title, amount, status, document_url, signed_at, valid_until, notes, customer_id, project_id",
+      )
       .eq("project_id", id)
       .order("created_at", { ascending: false }),
   ]);

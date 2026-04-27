@@ -1,12 +1,13 @@
 "use client";
 
 import { useActionState, useEffect, useState, useTransition } from "react";
-import { Check, CircleDashed, Plus, Trash2, X, Calendar } from "lucide-react";
+import { Check, CircleDashed, Plus, Trash2, X, Calendar, Pencil } from "lucide-react";
 import type { Tables } from "@/lib/supabase/types";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
 import {
   createMilestone,
+  updateMilestone,
   deleteMilestone,
   toggleMilestoneComplete,
   type MilestoneFormState,
@@ -78,6 +79,75 @@ export function MilestonesSection({
   );
 }
 
+function EditMilestoneForm({
+  milestone,
+  projectId,
+  onClose,
+}: {
+  milestone: Tables<"milestones">;
+  projectId: string;
+  onClose: () => void;
+}) {
+  const toast = useToast();
+  const boundAction = updateMilestone.bind(null, milestone.id, projectId);
+  const [state, action, pending] = useActionState<MilestoneFormState, FormData>(boundAction, {});
+
+  useEffect(() => {
+    if (state.success) onClose();
+    if (state.error) toast.error(state.error);
+  }, [state]);
+
+  return (
+    <form
+      action={action}
+      className="border-ink-line space-y-2 rounded-lg border bg-white px-3 py-2.5"
+    >
+      <div>
+        <input
+          name="name"
+          required
+          defaultValue={milestone.name}
+          placeholder="שם"
+          className="border-ink-line focus:border-navy w-full rounded-lg border bg-white px-2.5 py-1.5 text-sm outline-none"
+        />
+        {state.fieldErrors?.name?.[0] && (
+          <p className="mt-0.5 text-xs text-red-600">{state.fieldErrors.name[0]}</p>
+        )}
+      </div>
+      <input
+        name="description"
+        defaultValue={milestone.description ?? ""}
+        placeholder="תיאור (אופציונלי)"
+        className="border-ink-line focus:border-navy w-full rounded-lg border bg-white px-2.5 py-1.5 text-xs outline-none"
+      />
+      <input
+        name="due_date"
+        type="date"
+        defaultValue={milestone.due_date ?? ""}
+        dir="ltr"
+        className="border-ink-line focus:border-navy w-full rounded-lg border bg-white px-2.5 py-1.5 text-xs outline-none"
+      />
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-ink-soft hover:text-navy rounded-lg px-3 py-1.5 text-xs"
+        >
+          ביטול
+        </button>
+        <button
+          type="submit"
+          disabled={pending}
+          className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
+        >
+          {pending && <Spinner size={12} />}
+          שמור
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function MilestoneRow({
   milestone,
   projectId,
@@ -87,6 +157,7 @@ function MilestoneRow({
 }) {
   const [pending, startTransition] = useTransition();
   const [deleting, startDelete] = useTransition();
+  const [editing, setEditing] = useState(false);
   const toast = useToast();
 
   const isDone = !!milestone.completed_at;
@@ -110,6 +181,18 @@ function MilestoneRow({
   const due = milestone.due_date ? new Date(milestone.due_date) : null;
   // eslint-disable-next-line react-hooks/purity
   const isOverdue = !isDone && due && due.getTime() < Date.now();
+
+  if (editing) {
+    return (
+      <li>
+        <EditMilestoneForm
+          milestone={milestone}
+          projectId={projectId}
+          onClose={() => setEditing(false)}
+        />
+      </li>
+    );
+  }
 
   return (
     <li className="border-ink-line group flex items-start gap-3 rounded-lg border bg-white px-3 py-2.5">
@@ -150,15 +233,25 @@ function MilestoneRow({
           </div>
         )}
       </div>
-      <button
-        type="button"
-        onClick={handleDelete}
-        disabled={deleting}
-        className="text-ink-faded opacity-0 transition-opacity group-hover:opacity-100 hover:text-rose-600 disabled:cursor-not-allowed"
-        aria-label="מחק"
-      >
-        {deleting ? <Spinner size={14} /> : <Trash2 size={14} />}
-      </button>
+      <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="text-ink-faded hover:text-navy rounded p-0.5"
+          aria-label="ערוך"
+        >
+          <Pencil size={13} />
+        </button>
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={deleting}
+          className="text-ink-faded rounded p-0.5 hover:text-rose-600 disabled:cursor-not-allowed"
+          aria-label="מחק"
+        >
+          {deleting ? <Spinner size={13} /> : <Trash2 size={13} />}
+        </button>
+      </div>
     </li>
   );
 }

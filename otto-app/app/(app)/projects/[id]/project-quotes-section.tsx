@@ -1,20 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, FileText, ExternalLink, CheckCircle2 } from "lucide-react";
+import { Plus, FileText, ExternalLink, Pencil } from "lucide-react";
 import { NewQuoteDialog } from "@/app/(app)/quotes/new-quote-dialog";
-import { useToast } from "@/components/ui/toast";
+import { EditQuoteDialog } from "@/app/(app)/quotes/edit-quote-dialog";
 import { useRouter } from "next/navigation";
+import type { Tables } from "@/lib/supabase/types";
 
-type QuoteItem = {
-  id: string;
-  title: string;
-  amount: number | null;
-  status: string;
-  document_url: string | null;
-  signed_at: string | null;
-  valid_until: string | null;
-};
+type QuoteItem = Pick<
+  Tables<"quotes">,
+  | "id"
+  | "title"
+  | "amount"
+  | "status"
+  | "document_url"
+  | "signed_at"
+  | "valid_until"
+  | "notes"
+  | "customer_id"
+  | "project_id"
+>;
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "טיוטה",
@@ -48,6 +53,7 @@ export function ProjectQuotesSection({
   customerName?: string;
 }) {
   const [showNew, setShowNew] = useState(false);
+  const [editingQuote, setEditingQuote] = useState<QuoteItem | null>(null);
   const router = useRouter();
 
   const customers =
@@ -104,6 +110,13 @@ export function ProjectQuotesSection({
                     <ExternalLink size={12} />
                   </a>
                 )}
+                <button
+                  onClick={() => setEditingQuote(q)}
+                  className="text-ink-faded hover:text-navy transition-colors"
+                  title="ערוך"
+                >
+                  <Pencil size={12} />
+                </button>
               </div>
             </li>
           ))}
@@ -118,6 +131,18 @@ export function ProjectQuotesSection({
           defaultProjectId={projectId}
           onClose={() => {
             setShowNew(false);
+            router.refresh();
+          }}
+        />
+      )}
+
+      {editingQuote && (
+        <EditQuoteDialog
+          quote={editingQuote}
+          customers={customers}
+          projects={[{ id: projectId, name: "הפרויקט הנוכחי" }]}
+          onClose={() => {
+            setEditingQuote(null);
             router.refresh();
           }}
         />

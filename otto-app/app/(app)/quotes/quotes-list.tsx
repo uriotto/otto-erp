@@ -3,9 +3,10 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, FileText, ExternalLink, Trash2, Building2 } from "lucide-react";
+import { Plus, FileText, ExternalLink, Trash2, Building2, Pencil } from "lucide-react";
 import { deleteQuote } from "./actions";
 import { NewQuoteDialog } from "./new-quote-dialog";
+import { EditQuoteDialog } from "./edit-quote-dialog";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
 import type { Tables } from "@/lib/supabase/types";
@@ -79,6 +80,7 @@ export function QuotesList({
   projects: ProjectOption[];
 }) {
   const [showNew, setShowNew] = useState(false);
+  const [editingQuote, setEditingQuote] = useState<Quote | null>(null);
   const router = useRouter();
 
   return (
@@ -175,6 +177,13 @@ export function QuotesList({
                           <ExternalLink size={12} />
                         </a>
                       )}
+                      <button
+                        onClick={() => setEditingQuote(q)}
+                        className="text-ink-faded hover:text-navy rounded p-1 transition-colors"
+                        title="ערוך"
+                      >
+                        <Pencil size={12} />
+                      </button>
                       <DeleteButton id={q.id} />
                     </div>
                   </td>
@@ -191,6 +200,18 @@ export function QuotesList({
           projects={projects}
           onClose={() => {
             setShowNew(false);
+            router.refresh();
+          }}
+        />
+      )}
+
+      {editingQuote && (
+        <EditQuoteDialog
+          quote={editingQuote}
+          customers={customers}
+          projects={projects}
+          onClose={() => {
+            setEditingQuote(null);
             router.refresh();
           }}
         />

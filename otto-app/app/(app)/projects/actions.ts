@@ -291,6 +291,42 @@ export async function toggleMilestoneComplete(
   return {};
 }
 
+export async function updateMilestone(
+  id: string,
+  projectId: string,
+  _prev: MilestoneFormState,
+  formData: FormData,
+): Promise<MilestoneFormState> {
+  const raw = {
+    project_id: projectId,
+    name: formData.get("name") as string,
+    description: (formData.get("description") as string) || undefined,
+    due_date: (formData.get("due_date") as string) || undefined,
+    order_index: 0,
+  };
+  const parsed = MilestoneSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { fieldErrors: parsed.error.flatten().fieldErrors };
+  }
+
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { error: "לא מחובר" };
+
+  const { error } = await supabase
+    .from("milestones")
+    .update({
+      name: parsed.data.name,
+      description: parsed.data.description || null,
+      due_date: dateOrNull(parsed.data.due_date),
+    })
+    .eq("id", id)
+    .eq("tenant_id", profile.tenant_id);
+
+  if (error) return { error: error.message };
+  revalidatePath(`/projects/${projectId}`);
+  return { success: true };
+}
+
 export async function deleteMilestone(id: string, projectId: string): Promise<{ error?: string }> {
   const { supabase, profile } = await getTenant();
   if (!profile) return { error: "לא מחובר" };
