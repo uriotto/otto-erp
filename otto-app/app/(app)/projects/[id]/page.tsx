@@ -10,7 +10,6 @@ import {
   AlertTriangle,
   ListTree,
   ShieldCheck,
-  CheckSquare,
   Clock,
   ExternalLink,
 } from "lucide-react";
@@ -21,7 +20,7 @@ import { MilestonesSection } from "./milestones-section";
 import { PaymentScheduleSection } from "./payment-schedule-section";
 import { ProjectQuotesSection } from "./project-quotes-section";
 import { ProjectStatusBadge, ProjectHealthBadge } from "./project-quick-badges";
-import { ProjectAddTask } from "./project-add-task";
+import { ProjectTasksList } from "./project-tasks-list";
 
 export const metadata = { title: "פרויקט — OTTO" };
 
@@ -116,7 +115,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       .order("created_at", { ascending: false }),
     supabase
       .from("tasks")
-      .select("id, title, status, priority, due_date")
+      .select("id, title, status, priority, due_date, description")
       .eq("project_id", id)
       .is("parent_task_id", null)
       .order("created_at", { ascending: false })
@@ -305,119 +304,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         </div>
       )}
 
-      <ProjectTasksSection projectId={id} tasks={tasks ?? []} />
+      <ProjectTasksList projectId={id} initialTasks={tasks ?? []} />
 
       <ProjectHoursSection projectId={id} entries={timeEntries ?? []} />
-    </div>
-  );
-}
-
-const STATUS_TASK_COLORS: Record<string, string> = {
-  todo: "bg-gray-100 text-gray-600",
-  in_progress: "bg-blue-50 text-blue-700",
-  review: "bg-purple-50 text-purple-700",
-  done: "bg-emerald-50 text-emerald-700",
-  cancelled: "bg-gray-100 text-gray-400",
-};
-const STATUS_TASK_LABELS: Record<string, string> = {
-  todo: "לעשות",
-  in_progress: "בעבודה",
-  review: "ביקורת",
-  done: "הושלם",
-  cancelled: "בוטל",
-};
-const PRIORITY_COLORS: Record<string, string> = {
-  urgent: "bg-rose-50 text-rose-700",
-  high: "bg-amber-50 text-amber-700",
-  medium: "bg-sky-50 text-sky-700",
-  low: "bg-gray-50 text-gray-500",
-};
-
-function ProjectTasksSection({
-  projectId,
-  tasks,
-}: {
-  projectId: string;
-  tasks: { id: string; title: string; status: string; priority: string; due_date: string | null }[];
-}) {
-  const open = tasks.filter((t) => t.status !== "done" && t.status !== "cancelled");
-  const done = tasks.filter((t) => t.status === "done" || t.status === "cancelled");
-
-  return (
-    <div className="bg-cream-paper border-ink-line mt-4 rounded-2xl border p-6">
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <CheckSquare size={16} className="text-navy" />
-          <h2 className="text-display-sm text-navy">משימות</h2>
-          {tasks.length > 0 && (
-            <span className="bg-navy/10 text-navy rounded-full px-2 py-0.5 text-xs font-semibold">
-              {open.length} פתוחות
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-3">
-          <ProjectAddTask projectId={projectId} />
-          <Link
-            href={`/tasks?project=${projectId}`}
-            className="text-ink-soft hover:text-navy flex items-center gap-1 text-xs transition-colors"
-          >
-            כל המשימות
-            <ExternalLink size={11} />
-          </Link>
-        </div>
-      </div>
-
-      {tasks.length === 0 ? (
-        <p className="text-ink-faded text-sm">אין משימות לפרויקט זה</p>
-      ) : (
-        <div className="space-y-1.5">
-          {open.slice(0, 5).map((t) => (
-            <div
-              key={t.id}
-              className="border-ink-line flex items-center gap-2 rounded-lg border bg-white px-3 py-2"
-            >
-              <span
-                className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${PRIORITY_COLORS[t.priority] ?? ""}`}
-              >
-                {t.priority === "urgent"
-                  ? "דחוף"
-                  : t.priority === "high"
-                    ? "גבוה"
-                    : t.priority === "medium"
-                      ? "בינוני"
-                      : "נמוך"}
-              </span>
-              <span className="text-navy min-w-0 flex-1 truncate text-sm">{t.title}</span>
-              <span
-                className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${STATUS_TASK_COLORS[t.status] ?? ""}`}
-              >
-                {STATUS_TASK_LABELS[t.status]}
-              </span>
-              {t.due_date && (
-                <span
-                  className={`text-[10px] ${new Date(t.due_date) < new Date() ? "text-rose-600" : "text-ink-faded"}`}
-                >
-                  {new Date(t.due_date).toLocaleDateString("he-IL", {
-                    day: "numeric",
-                    month: "numeric",
-                  })}
-                </span>
-              )}
-            </div>
-          ))}
-          {open.length > 5 && (
-            <Link
-              href={`/tasks?project=${projectId}`}
-              className="text-ink-faded hover:text-navy block pt-1 text-center text-xs"
-            >
-              + עוד {open.length - 5} משימות פתוחות
-            </Link>
-          )}
-          {done.length > 0 && open.length === 0 && (
-            <p className="text-ink-soft text-sm">כל {done.length} המשימות הושלמו</p>
-          )}
-        </div>
-      )}
     </div>
   );
 }
