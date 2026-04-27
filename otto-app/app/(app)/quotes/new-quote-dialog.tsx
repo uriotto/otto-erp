@@ -1,10 +1,11 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
-import { X } from "lucide-react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { X, Upload, Link2, Loader2, FileCheck } from "lucide-react";
 import { createQuote, type QuoteFormState } from "./actions";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
+import { createClient } from "@/lib/supabase/client";
 
 const STATUSES = [
   { value: "draft", label: "טיוטה" },
@@ -16,6 +17,56 @@ const STATUSES = [
 
 type CustomerOption = { id: string; name: string; company: string | null };
 type ProjectOption = { id: string; name: string };
+
+function useFileUpload() {
+  const [uploading, startUpload] = useTransition();
+  const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
+  const [uploadedName, setUploadedName] = useState<string | null>(null);
+  const toast = useToast();
+
+  async function upload(file: File) {
+    startUpload(async () => {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("לא מחובר");
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from("users")
+        .select("tenant_id")
+        .eq("id", user.id)
+        .single();
+      if (!profile) {
+        toast.error("שגיאה בטעינת פרופיל");
+        return;
+      }
+
+      const ext = file.name.split(".").pop();
+      const path = `${profile.tenant_id}/quotes/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+      const { error } = await supabase.storage.from("documents").upload(path, file);
+      if (error) {
+        toast.error(`שגיאה בהעלאה: ${error.message}`);
+        return;
+      }
+
+      const { data: signed } = await supabase.storage
+        .from("documents")
+        .createSignedUrl(path, 60 * 60 * 24 * 365 * 5);
+
+      if (signed?.signedUrl) {
+        setUploadedUrl(signed.signedUrl);
+        setUploadedName(file.name);
+      }
+    });
+  }
+
+  return { upload, uploading, uploadedUrl, uploadedName, setUploadedUrl, setUploadedName };
+}
 
 export function NewQuoteDialog({
   customers,
@@ -33,6 +84,10 @@ export function NewQuoteDialog({
   const toast = useToast();
   const [state, action, pending] = useActionState<QuoteFormState, FormData>(createQuote, {});
   const formRef = useRef<HTMLFormElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [docMode, setDocMode] = useState<"url" | "upload">("url");
+  const { upload, uploading, uploadedUrl, uploadedName, setUploadedUrl, setUploadedName } =
+    useFileUpload();
 
   useEffect(() => {
     if (state.success) {
@@ -43,6 +98,12 @@ export function NewQuoteDialog({
   }, [state]);
 
   const fe = state.fieldErrors ?? {};
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    upload(file);
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -152,17 +213,108 @@ export function NewQuoteDialog({
             </div>
           </div>
 
+          {/* Document section */}
           <div>
-            <label className="text-navy mb-1 block text-sm font-medium">קישור למסמך</label>
-            <input
-              name="document_url"
-              type="url"
-              className="border-ink-line focus:border-navy w-full rounded-xl border bg-white px-3 py-2.5 text-sm outline-none"
-              placeholder="https://drive.google.com/..."
-              dir="ltr"
-            />
-            {fe.document_url && <p className="mt-1 text-xs text-red-500">{fe.document_url[0]}</p>}
-            <p className="text-ink-faded mt-1 text-xs">Google Drive, Dropbox, או כל URL</p>
+            <div className="mb-1.5 flex items-center justify-between">
+              <label className="text-navy text-sm font-medium">מסמך</label>
+              <div className="flex overflow-hidden rounded-lg border border-gray-200 text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDocMode("url");
+                    setUploadedUrl(null);
+                    setUploadedName(null);
+                  }}
+                  className={`flex items-center gap-1 px-2.5 py-1 transition-colors ${
+                    docMode === "url"
+                      ? "bg-navy text-cream-paper"
+                      : "text-ink-soft hover:text-navy bg-white"
+                  }`}
+                >
+                  <Link2 size={11} />
+                  קישור
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDocMode("upload")}
+                  className={`flex items-center gap-1 px-2.5 py-1 transition-colors ${
+                    docMode === "upload"
+                      ? "bg-navy text-cream-paper"
+                      : "text-ink-soft hover:text-navy bg-white"
+                  }`}
+                >
+                  <Upload size={11} />
+                  העלאה
+                </button>
+              </div>
+            </div>
+
+            {docMode === "url" ? (
+              <>
+                <input
+                  name="document_url"
+                  type="url"
+                  className="border-ink-line focus:border-navy w-full rounded-xl border bg-white px-3 py-2.5 text-sm outline-none"
+                  placeholder="https://drive.google.com/..."
+                  dir="ltr"
+                />
+                <p className="text-ink-faded mt-1 text-xs">Google Drive, Dropbox, או כל URL</p>
+              </>
+            ) : (
+              <>
+                {/* Hidden field for uploaded URL */}
+                <input type="hidden" name="document_url" value={uploadedUrl ?? ""} />
+
+                {uploadedUrl ? (
+                  <div className="border-ink-line flex items-center gap-2 rounded-xl border bg-green-50 px-3 py-2.5">
+                    <FileCheck size={14} className="shrink-0 text-green-600" />
+                    <span className="min-w-0 flex-1 truncate text-sm text-green-700">
+                      {uploadedName}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUploadedUrl(null);
+                        setUploadedName(null);
+                      }}
+                      className="shrink-0 text-green-600 hover:text-red-500"
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="border-ink-line hover:border-navy flex w-full items-center justify-center gap-2 rounded-xl border border-dashed bg-white px-3 py-4 text-sm transition-colors disabled:opacity-60"
+                  >
+                    {uploading ? (
+                      <>
+                        <Loader2 size={16} className="text-navy animate-spin" />
+                        <span className="text-ink-soft">מעלה...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload size={16} className="text-ink-faded" />
+                        <span className="text-ink-soft">לחץ לבחירת קובץ</span>
+                        <span className="text-ink-faded text-xs">(PDF, Word, תמונה, עד 10MB)</span>
+                      </>
+                    )}
+                  </button>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                {fe.document_url && (
+                  <p className="mt-1 text-xs text-red-500">{fe.document_url[0]}</p>
+                )}
+              </>
+            )}
           </div>
 
           <div>
@@ -194,7 +346,7 @@ export function NewQuoteDialog({
             </button>
             <button
               type="submit"
-              disabled={pending}
+              disabled={pending || uploading}
               className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold disabled:opacity-60"
             >
               {pending && <Spinner size={14} />}
