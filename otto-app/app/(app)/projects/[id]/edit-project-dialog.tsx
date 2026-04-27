@@ -148,6 +148,21 @@ export function EditProjectDialog({
             />
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <Field
+              label="תחילת אחריות"
+              name="warranty_start"
+              type="date"
+              defaultValue={project.warranty_start ?? ""}
+            />
+            <Field
+              label="סיום אחריות"
+              name="warranty_end"
+              type="date"
+              defaultValue={project.warranty_end ?? ""}
+            />
+          </div>
+
           {state.error && <p className="text-sm text-red-600">{state.error}</p>}
 
           <div className="flex justify-end gap-3 pt-2">

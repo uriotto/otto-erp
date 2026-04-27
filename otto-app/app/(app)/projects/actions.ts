@@ -19,6 +19,8 @@ const ProjectSchema = z.object({
   estimated_hours: z.string().optional(),
   start_date: z.string().optional(),
   due_date: z.string().optional(),
+  warranty_start: z.string().optional(),
+  warranty_end: z.string().optional(),
   health: z.enum(["on_track", "at_risk", "off_track"]).default("on_track"),
   template_id: z.string().uuid().optional().or(z.literal("")),
 });
@@ -203,6 +205,8 @@ export async function updateProject(
       estimated_hours: num(data.estimated_hours),
       start_date: dateOrNull(data.start_date),
       due_date: dateOrNull(data.due_date),
+      warranty_start: dateOrNull(data.warranty_start),
+      warranty_end: dateOrNull(data.warranty_end),
       health: data.health,
     })
     .eq("id", id)

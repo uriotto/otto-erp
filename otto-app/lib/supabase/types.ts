@@ -85,6 +85,60 @@ export type Database = {
           },
         ];
       };
+      customer_credentials: {
+        Row: {
+          created_at: string;
+          credential_type: string;
+          customer_id: string;
+          id: string;
+          label: string;
+          notes: string | null;
+          secret_encrypted: string | null;
+          tenant_id: string;
+          url: string | null;
+          username: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          credential_type?: string;
+          customer_id: string;
+          id?: string;
+          label: string;
+          notes?: string | null;
+          secret_encrypted?: string | null;
+          tenant_id: string;
+          url?: string | null;
+          username?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          credential_type?: string;
+          customer_id?: string;
+          id?: string;
+          label?: string;
+          notes?: string | null;
+          secret_encrypted?: string | null;
+          tenant_id?: string;
+          url?: string | null;
+          username?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "customer_credentials_customer_id_fkey";
+            columns: ["customer_id"];
+            isOneToOne: false;
+            referencedRelation: "customers";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "customer_credentials_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       customers: {
         Row: {
           active: boolean;
@@ -967,6 +1021,8 @@ export type Database = {
           template_id: string | null;
           tenant_id: string;
           updated_at: string;
+          warranty_end: string | null;
+          warranty_start: string | null;
         };
         Insert: {
           billing_model?: Database["public"]["Enums"]["project_billing_model"];
@@ -991,6 +1047,8 @@ export type Database = {
           template_id?: string | null;
           tenant_id: string;
           updated_at?: string;
+          warranty_end?: string | null;
+          warranty_start?: string | null;
         };
         Update: {
           billing_model?: Database["public"]["Enums"]["project_billing_model"];
@@ -1015,6 +1073,8 @@ export type Database = {
           template_id?: string | null;
           tenant_id?: string;
           updated_at?: string;
+          warranty_end?: string | null;
+          warranty_start?: string | null;
         };
         Relationships: [
           {

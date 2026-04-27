@@ -9,6 +9,7 @@ import {
   Hourglass,
   AlertTriangle,
   ListTree,
+  ShieldCheck,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { BreadcrumbLabel } from "@/components/layout/breadcrumb-label";
@@ -228,6 +229,20 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
               <ProjectHealthBadge projectId={id} health={project.health} />
             </div>
           </div>
+          {project.warranty_start && (
+            <Stat
+              icon={<ShieldCheck size={14} />}
+              label="אחריות"
+              value={`${new Date(project.warranty_start).toLocaleDateString("he-IL")}${project.warranty_end ? ` – ${new Date(project.warranty_end).toLocaleDateString("he-IL")}` : ""}`}
+              className={
+                project.warranty_end && new Date(project.warranty_end) < new Date()
+                  ? "text-rose-600"
+                  : project.warranty_end && new Date(project.warranty_end) > new Date()
+                    ? "text-emerald-600"
+                    : ""
+              }
+            />
+          )}
         </div>
 
         <ProjectActionsBar

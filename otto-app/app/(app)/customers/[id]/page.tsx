@@ -13,6 +13,7 @@ import {
 } from "./customer-related-sections";
 import { RecentTracker } from "@/components/search/recent-tracker";
 import { BreadcrumbLabel } from "@/components/layout/breadcrumb-label";
+import { CustomerCredentialsSection } from "./credentials-section";
 
 export const metadata = { title: "לקוח — OTTO" };
 
@@ -43,6 +44,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
     { data: allCustomers },
     { data: tenantSettings },
     { data: quotes },
+    { data: credentials },
   ] = await Promise.all([
     supabase
       .from("projects")
@@ -70,6 +72,11 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
       .select("id, title, amount, status, document_url, signed_at, valid_until")
       .eq("customer_id", id)
       .order("created_at", { ascending: false }),
+    supabase
+      .from("customer_credentials")
+      .select("id, label, credential_type, username, url, notes")
+      .eq("customer_id", id)
+      .order("created_at", { ascending: true }),
   ]);
 
   const initials = customer.name
@@ -214,6 +221,8 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           }))}
         />
       </div>
+
+      <CustomerCredentialsSection customerId={customer.id} credentials={credentials ?? []} />
 
       <div className="mt-6">
         <TasksSection tasks={tasks} />
