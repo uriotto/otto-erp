@@ -46,16 +46,16 @@ export async function addPaymentInstallment(
     notes: formData.get("notes") as string,
   };
 
-  console.log("[payment-schedule] raw input", raw);
   const parsed = InstallmentSchema.safeParse(raw);
   if (!parsed.success) {
-    console.log("[payment-schedule] validation failed", parsed.error.flatten());
-    return { fieldErrors: parsed.error.flatten().fieldErrors };
+    const errs = parsed.error.flatten();
+    return {
+      error: `validation: ${JSON.stringify(errs.fieldErrors)} | raw: ${JSON.stringify(raw)}`,
+    };
   }
 
   const ctx = await getTenant();
-  console.log("[payment-schedule] tenant ctx", { hasCtx: !!ctx, projectId });
-  if (!ctx) return { error: "לא מחובר" };
+  if (!ctx) return { error: `לא מחובר | raw: ${JSON.stringify(raw)}` };
 
   const { data: existing } = await ctx.supabase
     .from("project_payment_schedule")
