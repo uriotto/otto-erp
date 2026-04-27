@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState, useTransition } from "react";
+import { useActionState, useEffect, useOptimistic, useState, useTransition } from "react";
 import { Check, CircleDashed, Plus, Trash2, X, Calendar, Pencil } from "lucide-react";
 import type { Tables } from "@/lib/supabase/types";
 import { useToast } from "@/components/ui/toast";
@@ -155,16 +155,23 @@ function MilestoneRow({
   milestone: Tables<"milestones">;
   projectId: string;
 }) {
-  const [pending, startTransition] = useTransition();
+  const [toggling, startToggle] = useTransition();
   const [deleting, startDelete] = useTransition();
   const [editing, setEditing] = useState(false);
   const toast = useToast();
 
-  const isDone = !!milestone.completed_at;
+  const serverDone = !!milestone.completed_at;
+  const [optimisticDone, setOptimisticDone] = useOptimistic(
+    serverDone,
+    (_: boolean, next: boolean) => next,
+  );
+  const isDone = optimisticDone;
 
   function handleToggle() {
-    startTransition(async () => {
-      const res = await toggleMilestoneComplete(milestone.id, !isDone, projectId);
+    const next = !optimisticDone;
+    startToggle(async () => {
+      setOptimisticDone(next);
+      const res = await toggleMilestoneComplete(milestone.id, next, projectId);
       if (res.error) toast.error(res.error);
     });
   }
@@ -199,13 +206,11 @@ function MilestoneRow({
       <button
         type="button"
         onClick={handleToggle}
-        disabled={pending}
+        disabled={toggling}
         aria-pressed={isDone}
         className="mt-0.5 shrink-0 transition-transform motion-reduce:transition-none"
       >
-        {pending ? (
-          <Spinner size={18} />
-        ) : isDone ? (
+        {isDone ? (
           <Check size={18} className="text-emerald-600" />
         ) : (
           <CircleDashed size={18} className="text-ink-faded hover:text-navy transition-colors" />
