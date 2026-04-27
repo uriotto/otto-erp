@@ -597,6 +597,78 @@ export type Database = {
           },
         ];
       };
+      marketing_content: {
+        Row: {
+          body: string | null;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          notes: string | null;
+          platform: Database["public"]["Enums"]["content_platform"];
+          published_at: string | null;
+          scheduled_date: string | null;
+          status: Database["public"]["Enums"]["content_status"];
+          tags: string[] | null;
+          tenant_id: string;
+          title: string;
+          updated_at: string;
+          utm_campaign: string | null;
+          utm_medium: string | null;
+          utm_source: string | null;
+        };
+        Insert: {
+          body?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          notes?: string | null;
+          platform?: Database["public"]["Enums"]["content_platform"];
+          published_at?: string | null;
+          scheduled_date?: string | null;
+          status?: Database["public"]["Enums"]["content_status"];
+          tags?: string[] | null;
+          tenant_id: string;
+          title: string;
+          updated_at?: string;
+          utm_campaign?: string | null;
+          utm_medium?: string | null;
+          utm_source?: string | null;
+        };
+        Update: {
+          body?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          notes?: string | null;
+          platform?: Database["public"]["Enums"]["content_platform"];
+          published_at?: string | null;
+          scheduled_date?: string | null;
+          status?: Database["public"]["Enums"]["content_status"];
+          tags?: string[] | null;
+          tenant_id?: string;
+          title?: string;
+          updated_at?: string;
+          utm_campaign?: string | null;
+          utm_medium?: string | null;
+          utm_source?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "marketing_content_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "marketing_content_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       milestones: {
         Row: {
           completed_at: string | null;
@@ -1471,6 +1543,16 @@ export type Database = {
       recalculate_bank: { Args: { p_bank_id: string }; Returns: undefined };
     };
     Enums: {
+      content_platform:
+        | "linkedin"
+        | "instagram"
+        | "facebook"
+        | "twitter"
+        | "blog"
+        | "email"
+        | "whatsapp"
+        | "other";
+      content_status: "idea" | "planned" | "in_progress" | "published" | "cancelled";
       hour_bank_status: "draft" | "active" | "depleted" | "expired" | "cancelled";
       invoice_status:
         | "draft"
@@ -1626,6 +1708,17 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      content_platform: [
+        "linkedin",
+        "instagram",
+        "facebook",
+        "twitter",
+        "blog",
+        "email",
+        "whatsapp",
+        "other",
+      ],
+      content_status: ["idea", "planned", "in_progress", "published", "cancelled"],
       hour_bank_status: ["draft", "active", "depleted", "expired", "cancelled"],
       invoice_status: [
         "draft",
