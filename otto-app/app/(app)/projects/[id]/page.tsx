@@ -10,6 +10,9 @@ import {
   AlertTriangle,
   ListTree,
   ShieldCheck,
+  CheckSquare,
+  Clock,
+  ExternalLink,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { BreadcrumbLabel } from "@/components/layout/breadcrumb-label";
@@ -49,11 +52,6 @@ const BILLING_LABELS: Record<string, string> = {
   fixed_price: "מחיר קבוע",
   retainer: "ריטיינר",
 };
-const HEALTH_LABELS: Record<string, string> = {
-  on_track: "בקצב",
-  at_risk: "בסיכון",
-  off_track: "מחוץ למסלול",
-};
 
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -75,6 +73,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     { data: children },
     { data: installments },
     { data: quotes },
+    { data: tasks },
+    { data: timeEntries },
   ] = await Promise.all([
     project.customer_id
       ? supabase
@@ -113,6 +113,17 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       )
       .eq("project_id", id)
       .order("created_at", { ascending: false }),
+    supabase
+      .from("tasks")
+      .select("id, title, status, priority, due_date")
+      .eq("project_id", id)
+      .is("parent_task_id", null)
+      .order("created_at", { ascending: false })
+      .limit(20),
+    supabase
+      .from("time_entries")
+      .select("id, duration_minutes, billable, start_time")
+      .eq("project_id", id),
   ]);
 
   const { data: customerOptions } = await supabase
@@ -293,17 +304,177 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         </div>
       )}
 
-      <div className="bg-cream-paper border-ink-line mt-4 rounded-2xl border p-6">
-        <h2 className="text-display-sm text-navy mb-2">משימות</h2>
-        <p className="text-ink-soft text-sm">
-          המודול יתווסף ב-Phase 3.2 (משימות עם Kanban / Calendar / Gantt).
-        </p>
+      <ProjectTasksSection projectId={id} tasks={tasks ?? []} />
+
+      <ProjectHoursSection projectId={id} entries={timeEntries ?? []} />
+    </div>
+  );
+}
+
+const STATUS_TASK_COLORS: Record<string, string> = {
+  todo: "bg-gray-100 text-gray-600",
+  in_progress: "bg-blue-50 text-blue-700",
+  review: "bg-purple-50 text-purple-700",
+  done: "bg-emerald-50 text-emerald-700",
+  cancelled: "bg-gray-100 text-gray-400",
+};
+const STATUS_TASK_LABELS: Record<string, string> = {
+  todo: "לעשות",
+  in_progress: "בעבודה",
+  review: "ביקורת",
+  done: "הושלם",
+  cancelled: "בוטל",
+};
+const PRIORITY_COLORS: Record<string, string> = {
+  urgent: "bg-rose-50 text-rose-700",
+  high: "bg-amber-50 text-amber-700",
+  medium: "bg-sky-50 text-sky-700",
+  low: "bg-gray-50 text-gray-500",
+};
+
+function ProjectTasksSection({
+  projectId,
+  tasks,
+}: {
+  projectId: string;
+  tasks: { id: string; title: string; status: string; priority: string; due_date: string | null }[];
+}) {
+  const open = tasks.filter((t) => t.status !== "done" && t.status !== "cancelled");
+  const done = tasks.filter((t) => t.status === "done" || t.status === "cancelled");
+
+  return (
+    <div className="bg-cream-paper border-ink-line mt-4 rounded-2xl border p-6">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <CheckSquare size={16} className="text-navy" />
+          <h2 className="text-display-sm text-navy">משימות</h2>
+          {tasks.length > 0 && (
+            <span className="bg-navy/10 text-navy rounded-full px-2 py-0.5 text-xs font-semibold">
+              {open.length} פתוחות
+            </span>
+          )}
+        </div>
+        <Link
+          href={`/tasks?project=${projectId}`}
+          className="text-ink-soft hover:text-navy flex items-center gap-1 text-xs transition-colors"
+        >
+          כל המשימות
+          <ExternalLink size={11} />
+        </Link>
       </div>
 
-      <div className="bg-cream-paper border-ink-line mt-4 rounded-2xl border p-6">
-        <h2 className="text-display-sm text-navy mb-2">שעות</h2>
-        <p className="text-ink-soft text-sm">המודול יתווסף ב-Phase 3.4 (רישום שעות וטיימר).</p>
+      {tasks.length === 0 ? (
+        <p className="text-ink-faded text-sm">אין משימות לפרויקט זה</p>
+      ) : (
+        <div className="space-y-1.5">
+          {open.slice(0, 5).map((t) => (
+            <div
+              key={t.id}
+              className="border-ink-line flex items-center gap-2 rounded-lg border bg-white px-3 py-2"
+            >
+              <span
+                className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${PRIORITY_COLORS[t.priority] ?? ""}`}
+              >
+                {t.priority === "urgent"
+                  ? "דחוף"
+                  : t.priority === "high"
+                    ? "גבוה"
+                    : t.priority === "medium"
+                      ? "בינוני"
+                      : "נמוך"}
+              </span>
+              <span className="text-navy min-w-0 flex-1 truncate text-sm">{t.title}</span>
+              <span
+                className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${STATUS_TASK_COLORS[t.status] ?? ""}`}
+              >
+                {STATUS_TASK_LABELS[t.status]}
+              </span>
+              {t.due_date && (
+                <span
+                  className={`text-[10px] ${new Date(t.due_date) < new Date() ? "text-rose-600" : "text-ink-faded"}`}
+                >
+                  {new Date(t.due_date).toLocaleDateString("he-IL", {
+                    day: "numeric",
+                    month: "numeric",
+                  })}
+                </span>
+              )}
+            </div>
+          ))}
+          {open.length > 5 && (
+            <Link
+              href={`/tasks?project=${projectId}`}
+              className="text-ink-faded hover:text-navy block pt-1 text-center text-xs"
+            >
+              + עוד {open.length - 5} משימות פתוחות
+            </Link>
+          )}
+          {done.length > 0 && open.length === 0 && (
+            <p className="text-ink-soft text-sm">כל {done.length} המשימות הושלמו</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProjectHoursSection({
+  projectId,
+  entries,
+}: {
+  projectId: string;
+  entries: { id: string; duration_minutes: number | null; billable: boolean | null }[];
+}) {
+  const totalMin = entries.reduce((s, e) => s + (e.duration_minutes ?? 0), 0);
+  const billableMin = entries
+    .filter((e) => e.billable)
+    .reduce((s, e) => s + (e.duration_minutes ?? 0), 0);
+  const fmt = (min: number) => {
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return m > 0 ? `${h}:${String(m).padStart(2, "0")}` : `${h}`;
+  };
+
+  return (
+    <div className="bg-cream-paper border-ink-line mt-4 rounded-2xl border p-6">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Clock size={16} className="text-navy" />
+          <h2 className="text-display-sm text-navy">שעות</h2>
+        </div>
+        <Link
+          href={`/time?project=${projectId}`}
+          className="text-ink-soft hover:text-navy flex items-center gap-1 text-xs transition-colors"
+        >
+          פנקס שעות
+          <ExternalLink size={11} />
+        </Link>
       </div>
+
+      {entries.length === 0 ? (
+        <p className="text-ink-faded text-sm">אין שעות רשומות לפרויקט זה</p>
+      ) : (
+        <div className="grid grid-cols-3 gap-3 text-center">
+          <div className="border-ink-line rounded-xl border bg-white px-3 py-3">
+            <p className="text-navy text-xl font-bold tabular-nums" dir="ltr">
+              {fmt(totalMin)}h
+            </p>
+            <p className="text-ink-faded mt-0.5 text-xs">{'סה"כ'}</p>
+          </div>
+          <div className="border-ink-line rounded-xl border bg-white px-3 py-3">
+            <p className="text-navy text-xl font-bold tabular-nums" dir="ltr">
+              {fmt(billableMin)}h
+            </p>
+            <p className="text-ink-faded mt-0.5 text-xs">לחיוב</p>
+          </div>
+          <div className="border-ink-line rounded-xl border bg-white px-3 py-3">
+            <p className="text-navy text-xl font-bold tabular-nums" dir="ltr">
+              {entries.length}
+            </p>
+            <p className="text-ink-faded mt-0.5 text-xs">רשומות</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
