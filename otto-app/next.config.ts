@@ -23,6 +23,7 @@ const securityHeaders = [
       "frame-src 'none'",
       "object-src 'none'",
       "base-uri 'self'",
+      "worker-src blob:",
     ].join("; "),
   },
 ];
