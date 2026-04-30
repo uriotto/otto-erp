@@ -16,7 +16,20 @@ export type NotificationsResponse = {
 export async function GET() {
   const supabase = await createClient();
 
-  const { data: profile } = await supabase.from("users").select("tenant_id, id").single();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ unreadCount: 0, items: [] } satisfies NotificationsResponse, {
+      status: 200,
+    });
+  }
+
+  const { data: profile } = await supabase
+    .from("users")
+    .select("tenant_id, id")
+    .eq("id", user.id)
+    .single();
   if (!profile) {
     return NextResponse.json({ unreadCount: 0, items: [] } satisfies NotificationsResponse, {
       status: 200,
