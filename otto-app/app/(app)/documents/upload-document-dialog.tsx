@@ -121,10 +121,6 @@ export function UploadDocumentDialog({
 
         setUploadProgress(70);
 
-        const {
-          data: { publicUrl },
-        } = supabase.storage.from("documents").getPublicUrl(uploadData.path);
-
         const result = await uploadDocument({
           title: title.trim(),
           type: type as "contract" | "spec" | "deliverable" | "reference" | "other",
@@ -135,7 +131,7 @@ export function UploadDocumentDialog({
           notes: notes.trim() || null,
           tags,
           file_path: uploadData.path,
-          file_url: publicUrl,
+          file_url: null,
           file_size_bytes: selectedFile.size,
           mime_type: selectedFile.type || null,
         });

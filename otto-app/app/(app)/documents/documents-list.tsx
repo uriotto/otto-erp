@@ -17,9 +17,10 @@ import {
   Filter,
   X,
 } from "lucide-react";
-import { deleteDocument } from "./actions";
+import { deleteDocument, getDocumentSignedUrl } from "./actions";
 import { UploadDocumentDialog } from "./upload-document-dialog";
 import { SignatureDialog } from "./signature-dialog";
+import { DocumentPreviewDialog } from "./document-preview-dialog";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
 import { relativeTimeHebrew } from "@/lib/relative-time";
@@ -77,6 +78,33 @@ function FileMimeIcon({ mime }: { mime: string | null }) {
   return <FileText size={20} className="text-ink-faded" />;
 }
 
+function ViewButton({ doc }: { doc: DocumentItem }) {
+  const [isPending, startTransition] = useTransition();
+  const toast = useToast();
+
+  function handleView() {
+    startTransition(async () => {
+      const res = await getDocumentSignedUrl(doc.id);
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      window.open(res.url, "_blank", "noopener,noreferrer");
+    });
+  }
+
+  return (
+    <button
+      onClick={handleView}
+      disabled={isPending}
+      className="text-ink-faded hover:text-navy rounded p-1 transition-colors disabled:opacity-50"
+      title="פתח / הורד"
+    >
+      {isPending ? <Spinner size={13} /> : <Download size={13} />}
+    </button>
+  );
+}
+
 function DeleteButton({ doc }: { doc: DocumentItem }) {
   const [isPending, startTransition] = useTransition();
   const toast = useToast();
@@ -120,6 +148,7 @@ export function DocumentsList({
 }) {
   const [showUpload, setShowUpload] = useState(false);
   const [signingDoc, setSigningDoc] = useState<DocumentItem | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("");
   const [filterCustomer, setFilterCustomer] = useState("");
@@ -256,7 +285,12 @@ export function DocumentsList({
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((doc) => (
-            <DocumentCard key={doc.id} doc={doc} onSign={() => setSigningDoc(doc)} />
+            <DocumentCard
+              key={doc.id}
+              doc={doc}
+              onSign={() => setSigningDoc(doc)}
+              onPreview={() => setPreviewDoc(doc)}
+            />
           ))}
         </div>
       )}
@@ -276,13 +310,26 @@ export function DocumentsList({
           onClose={() => setSigningDoc(null)}
         />
       )}
+
+      {previewDoc && <DocumentPreviewDialog doc={previewDoc} onClose={() => setPreviewDoc(null)} />}
     </div>
   );
 }
 
-function DocumentCard({ doc, onSign }: { doc: DocumentItem; onSign: () => void }) {
+function DocumentCard({
+  doc,
+  onSign,
+  onPreview,
+}: {
+  doc: DocumentItem;
+  onSign: () => void;
+  onPreview: () => void;
+}) {
   return (
-    <div className="bg-cream-paper border-ink-line group flex flex-col gap-3 rounded-2xl border p-4 transition-shadow hover:shadow-sm">
+    <div
+      className="bg-cream-paper border-ink-line group flex cursor-pointer flex-col gap-3 rounded-2xl border p-4 transition-shadow hover:shadow-sm"
+      onClick={onPreview}
+    >
       {/* Header */}
       <div className="flex items-start gap-3">
         <div className="border-ink-line bg-cream mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border">
@@ -336,18 +383,8 @@ function DocumentCard({ doc, onSign }: { doc: DocumentItem; onSign: () => void }
       {/* Footer */}
       <div className="border-ink-line mt-auto flex items-center justify-between border-t pt-3">
         <span className="text-ink-faded text-xs">{relativeTimeHebrew(doc.created_at)}</span>
-        <div className="flex items-center gap-1">
-          {doc.file_url && (
-            <a
-              href={doc.file_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-ink-faded hover:text-navy rounded p-1 transition-colors"
-              title="הורד / צפה"
-            >
-              <Download size={13} />
-            </a>
-          )}
+        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+          <ViewButton doc={doc} />
           {doc.signature_required && !doc.signed_at && (
             <button
               onClick={onSign}

@@ -16,7 +16,7 @@ const UploadDocumentSchema = z.object({
   notes: z.string().max(2000).optional().nullable(),
   tags: z.array(z.string()).default([]),
   file_path: z.string().min(1, "קובץ חובה"),
-  file_url: z.string().url("URL לא תקין"),
+  file_url: z.string().url().optional().nullable(),
   file_size_bytes: z.number().optional().nullable(),
   mime_type: z.string().optional().nullable(),
 });
@@ -142,6 +142,31 @@ export async function deleteDocument(id: string): Promise<DocumentActionResult> 
 
   revalidatePath("/documents");
   return { ok: true, id };
+}
+
+export async function getDocumentSignedUrl(
+  id: string,
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { ok: false, error: "לא מחובר" };
+
+  const { data: doc } = await supabase
+    .from("documents")
+    .select("file_path")
+    .eq("id", id)
+    .eq("tenant_id", profile.tenant_id)
+    .maybeSingle();
+
+  if (!doc?.file_path) return { ok: false, error: "קובץ לא נמצא" };
+
+  const { data, error } = await supabase.storage
+    .from("documents")
+    .createSignedUrl(doc.file_path, 300); // 5 minutes
+
+  if (error || !data?.signedUrl)
+    return { ok: false, error: error?.message ?? "שגיאה ביצירת קישור" };
+
+  return { ok: true, url: data.signedUrl };
 }
 
 export async function updateDocumentMeta(
