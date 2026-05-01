@@ -1,21 +1,47 @@
-import { FolderOpen, Clock } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { DocumentsList, type DocumentItem } from "./documents-list";
 
 export const metadata = { title: "מסמכים — OTTO" };
 
-export default function DocumentsPage() {
+export default async function DocumentsPage() {
+  const supabase = await createClient();
+
+  const [{ data: docsRaw }, { data: customers }, { data: projects }] = await Promise.all([
+    supabase
+      .from("documents")
+      .select(
+        "id, title, type, mime_type, file_url, file_size_bytes, signature_required, signed_at, signed_by_name, visible_to_client, tags, notes, created_at, customer_id, project_id, customers(name), projects(name)",
+      )
+      .order("created_at", { ascending: false }),
+    supabase.from("customers").select("id, name, company").eq("active", true).order("name"),
+    supabase.from("projects").select("id, name, customer_id").is("deleted_at", null).order("name"),
+  ]);
+
+  const documents: DocumentItem[] = (docsRaw ?? []).map((d) => ({
+    id: d.id,
+    title: d.title,
+    type: d.type,
+    mime_type: d.mime_type,
+    file_url: d.file_url,
+    file_size_bytes: d.file_size_bytes,
+    signature_required: d.signature_required,
+    signed_at: d.signed_at,
+    signed_by_name: d.signed_by_name ?? null,
+    visible_to_client: d.visible_to_client,
+    tags: d.tags ?? [],
+    notes: d.notes,
+    created_at: d.created_at,
+    customer_id: d.customer_id,
+    customer_name: (d.customers as { name: string } | null)?.name ?? null,
+    project_id: d.project_id,
+    project_name: (d.projects as { name: string } | null)?.name ?? null,
+  }));
+
   return (
-    <div className="flex flex-col items-center justify-center py-24 text-center">
-      <div className="border-ink-line bg-cream-paper mb-6 rounded-2xl border p-6">
-        <FolderOpen size={40} className="text-navy mx-auto mb-4 opacity-40" />
-        <div className="mb-2 flex items-center justify-center gap-2">
-          <Clock size={14} className="text-ink-faded" />
-          <span className="text-ink-faded text-sm">בפיתוח — Phase 4.3</span>
-        </div>
-        <h1 className="text-display-sm text-navy mb-2">מסמכים</h1>
-        <p className="text-ink-soft max-w-sm text-sm">
-          בקרוב: ניהול מסמכים עם חיבור Google Drive, חיפוש סמנטי וחתימה דיגיטלית.
-        </p>
-      </div>
-    </div>
+    <DocumentsList
+      documents={documents}
+      customers={customers ?? []}
+      projects={(projects ?? []).map((p) => ({ ...p, customer_id: p.customer_id ?? null }))}
+    />
   );
 }

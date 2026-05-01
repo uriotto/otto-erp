@@ -213,6 +213,113 @@ export type Database = {
           },
         ];
       };
+      documents: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          customer_id: string | null;
+          extracted_text: string | null;
+          file_path: string | null;
+          file_size_bytes: number | null;
+          file_source: Database["public"]["Enums"]["file_source"];
+          file_url: string | null;
+          id: string;
+          mime_type: string | null;
+          notes: string | null;
+          project_id: string | null;
+          signature_data: string | null;
+          signature_required: boolean;
+          signed_at: string | null;
+          signed_by_email: string | null;
+          signed_by_name: string | null;
+          tags: string[];
+          tenant_id: string;
+          title: string;
+          type: Database["public"]["Enums"]["document_type"];
+          updated_at: string;
+          visible_to_client: boolean;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          customer_id?: string | null;
+          extracted_text?: string | null;
+          file_path?: string | null;
+          file_size_bytes?: number | null;
+          file_source?: Database["public"]["Enums"]["file_source"];
+          file_url?: string | null;
+          id?: string;
+          mime_type?: string | null;
+          notes?: string | null;
+          project_id?: string | null;
+          signature_data?: string | null;
+          signature_required?: boolean;
+          signed_at?: string | null;
+          signed_by_email?: string | null;
+          signed_by_name?: string | null;
+          tags?: string[];
+          tenant_id: string;
+          title: string;
+          type?: Database["public"]["Enums"]["document_type"];
+          updated_at?: string;
+          visible_to_client?: boolean;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          customer_id?: string | null;
+          extracted_text?: string | null;
+          file_path?: string | null;
+          file_size_bytes?: number | null;
+          file_source?: Database["public"]["Enums"]["file_source"];
+          file_url?: string | null;
+          id?: string;
+          mime_type?: string | null;
+          notes?: string | null;
+          project_id?: string | null;
+          signature_data?: string | null;
+          signature_required?: boolean;
+          signed_at?: string | null;
+          signed_by_email?: string | null;
+          signed_by_name?: string | null;
+          tags?: string[];
+          tenant_id?: string;
+          title?: string;
+          type?: Database["public"]["Enums"]["document_type"];
+          updated_at?: string;
+          visible_to_client?: boolean;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "documents_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "documents_customer_id_fkey";
+            columns: ["customer_id"];
+            isOneToOne: false;
+            referencedRelation: "customers";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "documents_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "documents_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       expenses: {
         Row: {
           amount: number;
@@ -1779,6 +1886,9 @@ export type Database = {
       portal_customer_id: { Args: never; Returns: string };
       process_expired_hour_banks: { Args: never; Returns: undefined };
       recalculate_bank: { Args: { p_bank_id: string }; Returns: undefined };
+      show_limit: { Args: never; Returns: number };
+      show_trgm: { Args: { "": string }; Returns: string[] };
+      unaccent: { Args: { "": string }; Returns: string };
     };
     Enums: {
       content_platform:
@@ -1791,6 +1901,8 @@ export type Database = {
         | "whatsapp"
         | "other";
       content_status: "idea" | "planned" | "in_progress" | "published" | "cancelled";
+      document_type: "contract" | "spec" | "deliverable" | "reference" | "other";
+      file_source: "storage" | "drive";
       hour_bank_status: "draft" | "active" | "depleted" | "expired" | "cancelled";
       invoice_status:
         | "draft"
@@ -1957,6 +2069,8 @@ export const Constants = {
         "other",
       ],
       content_status: ["idea", "planned", "in_progress", "published", "cancelled"],
+      document_type: ["contract", "spec", "deliverable", "reference", "other"],
+      file_source: ["storage", "drive"],
       hour_bank_status: ["draft", "active", "depleted", "expired", "cancelled"],
       invoice_status: [
         "draft",

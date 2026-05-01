@@ -2,22 +2,22 @@
 
 @theme {
   /* Colors — cream */
-  --color-cream: #f2ebdc;
-  --color-cream-deep: #e8dec8;
-  --color-cream-paper: #faf5ea;
-  --color-cream-shadow: #ddd0b5;
+  --color-cream: #ffffff;
+  --color-cream-deep: #f5f7fa;
+  --color-cream-paper: #ffffff;
+  --color-cream-shadow: #e2e8f0;
 
   /* Colors — navy */
-  --color-navy: #1b2a4e;
-  --color-navy-deep: #0f1b36;
-  --color-navy-soft: #2c3e6b;
-  --color-navy-pale: #b8c2d6;
+  --color-navy: #003f7c;
+  --color-navy-deep: #002855;
+  --color-navy-soft: #1565ab;
+  --color-navy-pale: #bcd9f2;
 
   /* Colors — ink (text + borders) */
-  --color-ink: #1b2a4e;
-  --color-ink-soft: #4a5878;
-  --color-ink-faded: #8590ab;
-  --color-ink-line: #d4cbb6;
+  --color-ink: #003f7c;
+  --color-ink-soft: #4a6b8c;
+  --color-ink-faded: #94a3b8;
+  --color-ink-line: #e2e8f0;
 
   /* Fonts */
   --font-sans: var(--font-assistant), ui-sans-serif, system-ui, sans-serif;
