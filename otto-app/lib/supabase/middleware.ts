@@ -45,6 +45,7 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/finbot") ||
     pathname === "/manifest.webmanifest";
   const isPublicRoot = pathname === "/";
+  const isPublicProposal = pathname.startsWith("/proposal/");
 
   // Portal route protection
   if (isPortalRoute && !isPortalAuthRoute && !user) {
@@ -61,7 +62,8 @@ export async function updateSession(request: NextRequest) {
     !isPortalAuthRoute &&
     !isPortalRoute &&
     !isPublicApi &&
-    !isPublicRoot
+    !isPublicRoot &&
+    !isPublicProposal
   ) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";

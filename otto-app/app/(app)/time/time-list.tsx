@@ -2,12 +2,28 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Plus, Clock, Trash2, Building2, FolderKanban, ListChecks, Check } from "lucide-react";
+import {
+  Plus,
+  Clock,
+  Trash2,
+  Building2,
+  FolderKanban,
+  ListChecks,
+  Check,
+  Table2,
+} from "lucide-react";
 import type { Tables } from "@/lib/supabase/types";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
-import { assignCustomerToEntry, deleteTimeEntry, updateTimeEntry } from "./actions";
+import {
+  assignCustomerToEntry,
+  deleteTimeEntry,
+  updateTimeEntry,
+  bulkDeleteTimeEntries,
+  bulkToggleBillable,
+} from "./actions";
 import { NewTimeEntryDialog } from "./new-time-entry-dialog";
+import { BulkActionBar } from "@/components/ui/bulk-action-bar";
 
 export type TimeEntryItem = Pick<
   Tables<"time_entries">,
@@ -31,12 +47,13 @@ export type CustomerOpt = Pick<Tables<"customers">, "id" | "name">;
 export type ProjectOpt = Pick<Tables<"projects">, "id" | "name" | "customer_id">;
 export type TaskOpt = Pick<Tables<"tasks">, "id" | "title" | "project_id">;
 
-type View = "daily" | "weekly" | "monthly";
+type View = "daily" | "weekly" | "monthly" | "table";
 
-const VIEWS: { value: View; label: string }[] = [
+const VIEWS: { value: View; label: string; icon?: React.ReactNode }[] = [
   { value: "daily", label: "יומי" },
   { value: "weekly", label: "שבועי" },
   { value: "monthly", label: "חודשי" },
+  { value: "table", label: "טבלה", icon: <Table2 size={13} /> },
 ];
 
 function formatDurationMinutes(min: number | null | undefined): string {
@@ -85,9 +102,12 @@ export function TimeList({
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  const toast = useToast();
   const [showNew, setShowNew] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [view, setView] = useState<View>(() => (searchParams.get("view") as View) || "daily");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkPending, startBulk] = useTransition();
   const [customerFilter, setCustomerFilter] = useState<string>(
     () => searchParams.get("customer") ?? "all",
   );
@@ -158,6 +178,52 @@ export function TimeList({
     }
     return Array.from(groups.values()).sort((a, b) => b.date.getTime() - a.date.getTime());
   }, [filtered, view]);
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selected.size === filtered.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(filtered.map((e) => e.id)));
+    }
+  }
+
+  function handleBulkDelete() {
+    const ids = Array.from(selected);
+    if (!confirm(`למחוק ${ids.length} רשומות שעות?`)) return;
+    startBulk(async () => {
+      const res = await bulkDeleteTimeEntries(ids);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(`נמחקו ${res.deleted} רשומות`);
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
+
+  function handleBulkBillable(billable: boolean) {
+    const ids = Array.from(selected);
+    startBulk(async () => {
+      const res = await bulkToggleBillable(ids, billable);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(`עודכנו ${res.updated} רשומות`);
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
 
   return (
     <div>
@@ -246,7 +312,89 @@ export function TimeList({
         </select>
       </div>
 
-      {grouped.length === 0 ? (
+      {filtered.length === 0 ? (
+        <EmptyState onNew={() => setShowNew(true)} />
+      ) : view === "table" ? (
+        <div className="bg-cream-paper border-ink-line overflow-hidden rounded-2xl border">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-ink-line/60 border-b">
+                <th className="w-10 px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={selected.size === filtered.length && filtered.length > 0}
+                    onChange={toggleSelectAll}
+                    className="cursor-pointer rounded"
+                  />
+                </th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">תאריך</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">לקוח</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">פרויקט</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">משימה</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">שעות</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">סוג</th>
+              </tr>
+            </thead>
+            <tbody className="divide-ink-line/40 divide-y">
+              {filtered.map((e) => (
+                <tr
+                  key={e.id}
+                  className={`transition-colors ${selected.has(e.id) ? "bg-navy/5" : "hover:bg-cream/30"}`}
+                >
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(e.id)}
+                      onChange={() => toggleSelect(e.id)}
+                      className="cursor-pointer rounded"
+                    />
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="text-ink-soft text-xs">
+                      {new Date(e.start_time).toLocaleDateString("he-IL")}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {e.customer_name ? (
+                      <span className="text-ink-soft inline-flex items-center gap-1 text-xs">
+                        <Building2 size={11} />
+                        {e.customer_name}
+                      </span>
+                    ) : (
+                      <span className="text-ink-faded text-xs">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    {e.project_name ? (
+                      <span className="text-ink-soft inline-flex items-center gap-1 text-xs">
+                        <FolderKanban size={11} />
+                        {e.project_name}
+                      </span>
+                    ) : (
+                      <span className="text-ink-faded text-xs">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="text-ink-soft text-xs">{e.task_name ?? "—"}</span>
+                  </td>
+                  <td className="px-4 py-3" dir="ltr">
+                    <span className="text-navy text-xs font-medium">
+                      {formatDurationMinutes(e.duration_minutes)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`rounded-full border px-2 py-0.5 text-xs font-medium ${e.billable ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-gray-200 bg-gray-100 text-gray-500"}`}
+                    >
+                      {e.billable ? "לחיוב" : "לא לחיוב"}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : grouped.length === 0 ? (
         <EmptyState onNew={() => setShowNew(true)} />
       ) : (
         <div className="space-y-6">
@@ -275,6 +423,32 @@ export function TimeList({
           ))}
         </div>
       )}
+
+      <BulkActionBar
+        selectedCount={selected.size}
+        onClear={() => setSelected(new Set())}
+        actions={[
+          {
+            label: "סמן לחיוב",
+            variant: "default",
+            isPending: bulkPending,
+            onClick: () => handleBulkBillable(true),
+          },
+          {
+            label: "הסר חיוב",
+            variant: "default",
+            isPending: bulkPending,
+            onClick: () => handleBulkBillable(false),
+          },
+          {
+            label: "מחק",
+            icon: Trash2,
+            variant: "danger",
+            isPending: bulkPending,
+            onClick: handleBulkDelete,
+          },
+        ]}
+      />
 
       {showNew && (
         <NewTimeEntryDialog

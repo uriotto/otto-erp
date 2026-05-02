@@ -248,3 +248,38 @@ export async function quickCreateTask(input: {
   revalidatePath("/today");
   return { taskId: data.id };
 }
+
+export async function bulkDeleteTasks(ids: string[]): Promise<{ deleted: number; error?: string }> {
+  if (ids.length === 0) return { deleted: 0 };
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { deleted: 0, error: "לא מחובר" };
+
+  const { error, count } = await supabase
+    .from("tasks")
+    .delete({ count: "exact" })
+    .in("id", ids)
+    .eq("tenant_id", profile.tenant_id);
+
+  if (error) return { deleted: 0, error: error.message };
+  revalidatePath("/tasks");
+  return { deleted: count ?? ids.length };
+}
+
+export async function bulkUpdateTaskStatus(
+  ids: string[],
+  status: string,
+): Promise<{ updated: number; error?: string }> {
+  if (ids.length === 0) return { updated: 0 };
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { updated: 0, error: "לא מחובר" };
+
+  const { error, count } = await supabase
+    .from("tasks")
+    .update({ status: status as "todo" | "in_progress" | "review" | "done" | "cancelled" })
+    .in("id", ids)
+    .eq("tenant_id", profile.tenant_id);
+
+  if (error) return { updated: 0, error: error.message };
+  revalidatePath("/tasks");
+  return { updated: count ?? ids.length };
+}

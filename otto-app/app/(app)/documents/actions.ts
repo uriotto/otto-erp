@@ -169,6 +169,44 @@ export async function getDocumentSignedUrl(
   return { ok: true, url: data.signedUrl };
 }
 
+export async function bulkDeleteDocuments(
+  ids: string[],
+): Promise<{ deleted: number; skipped: number; error?: string }> {
+  if (ids.length === 0) return { deleted: 0, skipped: 0 };
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { deleted: 0, skipped: 0, error: "לא מחובר" };
+
+  // Only unsigned documents can be deleted
+  const { data: candidates } = await supabase
+    .from("documents")
+    .select("id, file_path, signed_at")
+    .in("id", ids)
+    .eq("tenant_id", profile.tenant_id)
+    .is("signed_at", null);
+
+  const eligible = candidates ?? [];
+  const skipped = ids.length - eligible.length;
+
+  for (const doc of eligible) {
+    if (doc.file_path) {
+      await supabase.storage.from("documents").remove([doc.file_path]);
+    }
+  }
+
+  const eligibleIds = eligible.map((d) => d.id);
+  if (eligibleIds.length === 0) return { deleted: 0, skipped };
+
+  const { error, count } = await supabase
+    .from("documents")
+    .delete({ count: "exact" })
+    .in("id", eligibleIds)
+    .eq("tenant_id", profile.tenant_id);
+
+  if (error) return { deleted: 0, skipped, error: error.message };
+  revalidatePath("/documents");
+  return { deleted: count ?? eligibleIds.length, skipped };
+}
+
 export async function updateDocumentMeta(
   id: string,
   input: { title?: string; notes?: string; visible_to_client?: boolean; tags?: string[] },

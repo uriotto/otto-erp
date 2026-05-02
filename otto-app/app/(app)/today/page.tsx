@@ -101,7 +101,6 @@ export default async function TodayPage() {
   const upcoming = allTasks.filter((t) => t.due_date && t.due_date > todayDateStr);
   const noDueDate = allTasks.filter((t) => !t.due_date);
 
-  const greeting = getGreeting();
   const dateLabel = new Date().toLocaleDateString("he-IL", {
     weekday: "long",
     day: "numeric",
@@ -112,8 +111,7 @@ export default async function TodayPage() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-display-sm text-navy">{greeting}</h1>
-          <p className="text-ink-soft mt-1 text-sm">{dateLabel}</p>
+          <p className="text-navy text-base font-semibold">{dateLabel}</p>
         </div>
         <TodayNewButton parentItems={parentItems} />
       </div>
@@ -200,9 +198,9 @@ export default async function TodayPage() {
       )}
 
       {allTasks.length === 0 && allMeetings.length === 0 && (
-        <div className="border-ink-line bg-cream-paper/40 flex flex-col items-center justify-center rounded-2xl border border-dashed px-6 py-16 text-center">
+        <div className="bg-cream-paper shadow-card flex flex-col items-center justify-center rounded-2xl px-6 py-16 text-center">
           <div className="bg-cream-deep mb-5 flex h-20 w-20 items-center justify-center rounded-full">
-            <Coffee size={48} className="text-navy/60" />
+            <Coffee size={40} className="text-navy/50" />
           </div>
           <h3 className="text-display-sm text-navy mb-2">היום הזה פנוי</h3>
           <p className="text-ink-soft mx-auto mb-6 max-w-md text-sm leading-relaxed">
@@ -211,13 +209,13 @@ export default async function TodayPage() {
           <div className="flex flex-wrap justify-center gap-2">
             <Link
               href="/customers"
-              className="border-ink-line text-navy hover:border-navy bg-cream-paper flex items-center gap-1 rounded-xl border px-4 py-2 text-sm font-semibold transition-colors"
+              className="shadow-card text-navy bg-cream-paper flex items-center gap-1 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all hover:shadow-md"
             >
               לקוחות <ArrowLeft size={13} />
             </Link>
             <Link
               href="/leads"
-              className="border-ink-line text-navy hover:border-navy bg-cream-paper flex items-center gap-1 rounded-xl border px-4 py-2 text-sm font-semibold transition-colors"
+              className="shadow-card text-navy bg-cream-paper flex items-center gap-1 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all hover:shadow-md"
             >
               לידים <ArrowLeft size={13} />
             </Link>
@@ -226,15 +224,6 @@ export default async function TodayPage() {
       )}
     </div>
   );
-}
-
-function getGreeting(): string {
-  const h = new Date().getHours();
-  if (h < 6) return "לילה טוב";
-  if (h < 12) return "בוקר טוב";
-  if (h < 17) return "צהריים טובים";
-  if (h < 21) return "ערב טוב";
-  return "לילה טוב";
 }
 
 function Section({
@@ -249,13 +238,15 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section>
+    <section className="bg-cream-paper shadow-card rounded-2xl p-5">
       <div className="mb-3 flex items-center gap-2">
         {icon}
-        <h2 className="text-navy font-semibold">{title}</h2>
-        <span className="text-ink-faded text-sm">{count}</span>
+        <h2 className="text-navy text-sm font-semibold">{title}</h2>
+        <span className="bg-cream-deep text-ink-soft rounded-full px-2 py-0.5 text-xs font-medium">
+          {count}
+        </span>
       </div>
-      <div className="space-y-2">{children}</div>
+      <div className="space-y-1">{children}</div>
     </section>
   );
 }
@@ -273,20 +264,21 @@ function StatCard({
 }) {
   const styles =
     tone === "danger"
-      ? "border-red-200 bg-red-50"
+      ? "bg-red-50/60 ring-1 ring-red-200"
       : tone === "primary"
-        ? "border-navy/10 bg-navy/5"
-        : "border-ink-line bg-cream-paper";
-  const valueColor =
-    tone === "danger" ? "text-red-700" : tone === "primary" ? "text-navy" : "text-navy";
+        ? "bg-navy/5 ring-1 ring-navy/15"
+        : "bg-cream-paper";
+  const valueColor = tone === "danger" ? "text-red-700" : "text-navy";
 
   return (
-    <div className={`rounded-2xl border p-4 ${styles}`}>
-      <div className="text-ink-soft mb-1 flex items-center gap-1.5 text-xs">
+    <div className={`shadow-card rounded-2xl p-4 ${styles}`}>
+      <div className="text-ink-soft mb-2 flex items-center gap-1.5 text-xs font-medium">
         {icon}
         {label}
       </div>
-      <div className={`text-display-md font-bold ${valueColor}`}>{value}</div>
+      <div className={`text-[28px] leading-none font-bold tracking-tight ${valueColor}`}>
+        {value}
+      </div>
     </div>
   );
 }

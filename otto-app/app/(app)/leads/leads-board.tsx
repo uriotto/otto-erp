@@ -15,6 +15,8 @@ import {
   Sparkles,
   SearchX,
   Trash2,
+  Table2,
+  KanbanSquare,
 } from "lucide-react";
 import type { Tables } from "@/lib/supabase/types";
 import { NewLeadDialog } from "./new-lead-dialog";
@@ -26,6 +28,7 @@ import {
 } from "./actions";
 import { ExportCsvButton } from "@/components/ui/export-csv-button";
 import { useToast } from "@/components/ui/toast";
+import { ViewToggle, useStoredView } from "@/components/ui/view-toggle";
 
 type Lead = Tables<"leads">;
 
@@ -74,6 +77,25 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [bulkPending, startBulk] = useTransition();
   const toast = useToast();
+  const [view, setView] = useStoredView<"kanban" | "table">("leads-view", "kanban");
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverStatus, setDragOverStatus] = useState<Lead["status"] | null>(null);
+  const [, startDrag] = useTransition();
+  const [optimisticStatuses, setOptimisticStatuses] = useState<Map<string, Lead["status"]>>(
+    new Map(),
+  );
+
+  useEffect(() => {
+    if (optimisticStatuses.size === 0) return;
+    setOptimisticStatuses((prev) => {
+      const next = new Map(prev);
+      for (const [id, status] of next) {
+        const lead = leads.find((l) => l.id === id);
+        if (lead && lead.status === status) next.delete(id);
+      }
+      return next.size === prev.size ? prev : next;
+    });
+  }, [leads]);
 
   const toggleSelected = useCallback((id: string) => {
     setSelected((prev) => {
@@ -143,9 +165,17 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
     return Array.from(set).sort((a, b) => a.localeCompare(b, "he"));
   }, [leads]);
 
+  const effectiveLeads = useMemo(
+    () =>
+      leads.map((l) =>
+        optimisticStatuses.has(l.id) ? { ...l, status: optimisticStatuses.get(l.id)! } : l,
+      ),
+    [leads, optimisticStatuses],
+  );
+
   const filteredLeads = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return leads.filter((lead) => {
+    return effectiveLeads.filter((lead) => {
       if (source !== ALL_SOURCES && (lead.source ?? "") !== source) return false;
       if (statusFilter !== "all" && lead.status !== statusFilter) return false;
       if (selectedTags.length > 0) {
@@ -159,7 +189,7 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [leads, query, source, statusFilter, selectedTags]);
+  }, [effectiveLeads, query, source, statusFilter, selectedTags]);
 
   const toggleTag = (tag: string) => {
     setTags(
@@ -212,6 +242,16 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <ViewToggle
+            storageKey="leads-view"
+            views={[
+              { id: "kanban", icon: KanbanSquare, label: "קנבן" },
+              { id: "table", icon: Table2, label: "טבלה" },
+            ]}
+            defaultView="kanban"
+            current={view}
+            onChange={setView}
+          />
           <ExportCsvButton label="ייצא CSV" action={exportLeadsCsv} />
           <button
             onClick={() => setShowNew(true)}
@@ -345,14 +385,147 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
         <EmptyState onNew={() => setShowNew(true)} />
       ) : filteredLeads.length === 0 ? (
         <NoResults query={query} onClear={clearFilters} />
+      ) : view === "table" ? (
+        <div className="bg-cream-paper border-ink-line overflow-hidden rounded-2xl border">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-ink-line/60 border-b">
+                <th className="w-10 px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={selected.size === filteredLeads.length && filteredLeads.length > 0}
+                    onChange={() => {
+                      if (selected.size === filteredLeads.length) {
+                        setSelected(new Set());
+                      } else {
+                        setSelected(new Set(filteredLeads.map((l) => l.id)));
+                      }
+                    }}
+                    className="cursor-pointer rounded"
+                  />
+                </th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">שם</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">חברה</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">סטטוס</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">מקור</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">ציון</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">תגיות</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">תאריך</th>
+              </tr>
+            </thead>
+            <tbody className="divide-ink-line/40 divide-y">
+              {filteredLeads.map((lead) => {
+                const status = STATUSES.find((s) => s.key === lead.status);
+                return (
+                  <tr
+                    key={lead.id}
+                    className={`transition-colors ${selected.has(lead.id) ? "bg-navy/5" : "hover:bg-cream/30"}`}
+                  >
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(lead.id)}
+                        onChange={() => toggleSelected(lead.id)}
+                        className="cursor-pointer rounded"
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/leads/${lead.id}`}
+                        className="text-navy font-medium hover:underline"
+                      >
+                        {lead.name}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-ink-soft text-xs">{lead.company ?? "—"}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {status && (
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-xs font-medium ${status.color}`}
+                        >
+                          {status.label}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-ink-soft text-xs">{lead.source ?? "—"}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {lead.value != null ? (
+                        <span className="text-navy text-xs font-medium" dir="ltr">
+                          ₪{lead.value.toLocaleString("he-IL")}
+                        </span>
+                      ) : (
+                        <span className="text-ink-faded text-xs">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-1">
+                        {(lead.tags ?? []).slice(0, 2).map((t) => (
+                          <span
+                            key={t}
+                            className="bg-navy/5 text-ink-soft rounded-full px-1.5 py-0.5 text-[10px]"
+                          >
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-ink-soft text-xs">
+                        {new Date(lead.created_at).toLocaleDateString("he-IL")}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       ) : (
-        <div className="space-y-6">
+        <div className="flex gap-3 pb-4">
           {STATUSES.map(({ key, label, color }) => {
             const group = filteredLeads.filter((l) => l.status === key);
-            if (group.length === 0) return null;
+            const isOver = dragOverStatus === key;
             return (
-              <div key={key}>
-                <div className="mb-3 flex items-center gap-2">
+              <div
+                key={key}
+                className={`flex min-w-0 flex-1 flex-col rounded-2xl border transition-colors duration-150 ${
+                  isOver ? "border-navy/40 bg-navy/5" : "border-ink-line bg-cream-paper/60"
+                }`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  setDragOverStatus(key);
+                }}
+                onDragLeave={(e) => {
+                  const related = e.relatedTarget as Node | null;
+                  if (!related || !e.currentTarget.contains(related)) {
+                    setDragOverStatus(null);
+                  }
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const id = draggingId;
+                  setDraggingId(null);
+                  setDragOverStatus(null);
+                  if (!id) return;
+                  const lead = effectiveLeads.find((l) => l.id === id);
+                  if (!lead || lead.status === key) return;
+                  const prevStatus = lead.status;
+                  setOptimisticStatuses((prev) => new Map(prev).set(id, key));
+                  startDrag(async () => {
+                    const res = await updateLeadStatus(id, key);
+                    if (res?.error) {
+                      setOptimisticStatuses((prev) => new Map(prev).set(id, prevStatus));
+                      toast.error(res.error);
+                    }
+                  });
+                }}
+              >
+                <div className="flex items-center gap-2 px-3 pt-3 pb-2">
                   <span
                     className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${color}`}
                   >
@@ -360,15 +533,29 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
                   </span>
                   <span className="text-ink-faded text-xs">{group.length}</span>
                 </div>
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <div
+                  className="flex flex-col gap-2 overflow-y-auto p-2 pt-1"
+                  style={{ maxHeight: "calc(100vh - 300px)", minHeight: "5rem" }}
+                >
                   {group.map((lead) => (
                     <LeadCard
                       key={lead.id}
                       lead={lead}
                       isSelected={selected.has(lead.id)}
                       onToggleSelect={() => toggleSelected(lead.id)}
+                      isDragging={draggingId === lead.id}
+                      onDragStart={() => setDraggingId(lead.id)}
+                      onDragEnd={() => {
+                        setDraggingId(null);
+                        setDragOverStatus(null);
+                      }}
                     />
                   ))}
+                  {group.length === 0 && (
+                    <div className="text-ink-faded flex flex-1 items-center justify-center rounded-xl border border-dashed border-current/20 py-8 text-xs">
+                      גרור לכאן
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -448,10 +635,16 @@ function LeadCard({
   lead,
   isSelected,
   onToggleSelect,
+  isDragging,
+  onDragStart,
+  onDragEnd,
 }: {
   lead: Lead;
   isSelected: boolean;
   onToggleSelect: () => void;
+  isDragging?: boolean;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
 }) {
   const [, startTransition] = useTransition();
   const [flash, setFlash] = useState(false);
@@ -474,7 +667,15 @@ function LeadCard({
 
   return (
     <div
-      className={`bg-cream-paper rounded-2xl border p-4 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md ${
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "move";
+        onDragStart?.();
+      }}
+      onDragEnd={onDragEnd}
+      className={`bg-cream-paper cursor-grab rounded-2xl border p-4 transition-all duration-200 ease-out active:cursor-grabbing ${
+        isDragging ? "scale-95 opacity-40 shadow-lg" : "hover:-translate-y-0.5 hover:shadow-md"
+      } ${
         isSelected ? "border-navy ring-navy/20 ring-2" : "border-ink-line hover:border-ink-soft"
       } ${flash ? "bg-navy/5 scale-[0.99]" : ""}`}
     >

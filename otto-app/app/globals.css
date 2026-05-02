@@ -3,9 +3,10 @@
 @theme {
   /* Colors — cream */
   --color-cream: #ffffff;
-  --color-cream-deep: #f5f7fa;
+  --color-cream-deep: #f5f5f5;
   --color-cream-paper: #ffffff;
-  --color-cream-shadow: #e2e8f0;
+  --color-cream-shadow: #e8e8e8;
+  --color-cream-sidebar: #f7f7f7;
 
   /* Colors — navy */
   --color-navy: #003f7c;
@@ -16,8 +17,11 @@
   /* Colors — ink (text + borders) */
   --color-ink: #003f7c;
   --color-ink-soft: #4a6b8c;
-  --color-ink-faded: #94a3b8;
-  --color-ink-line: #e2e8f0;
+  --color-ink-faded: #9aa5b4;
+  --color-ink-line: #e8e8e8;
+
+  /* Colors — accent */
+  --color-accent: #e07d3c;
 
   /* Fonts */
   --font-sans: var(--font-assistant), ui-sans-serif, system-ui, sans-serif;
@@ -60,6 +64,14 @@
 
 body {
   font-family: var(--font-sans);
+  background-color: var(--color-cream);
+}
+
+/* Card shadow utility */
+.shadow-card {
+  box-shadow:
+    0 1px 4px rgba(0, 0, 0, 0.06),
+    0 0 0 1px rgba(0, 0, 0, 0.04);
 }
 
 @keyframes shimmer {

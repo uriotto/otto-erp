@@ -16,14 +16,19 @@ import {
   EyeOff,
   Filter,
   X,
+  LayoutGrid,
+  Table2,
+  Building2,
 } from "lucide-react";
-import { deleteDocument, getDocumentSignedUrl } from "./actions";
+import { deleteDocument, getDocumentSignedUrl, bulkDeleteDocuments } from "./actions";
 import { UploadDocumentDialog } from "./upload-document-dialog";
 import { SignatureDialog } from "./signature-dialog";
 import { DocumentPreviewDialog } from "./document-preview-dialog";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
 import { relativeTimeHebrew } from "@/lib/relative-time";
+import { ViewToggle, useStoredView } from "@/components/ui/view-toggle";
+import { BulkActionBar } from "@/components/ui/bulk-action-bar";
 
 export type DocumentItem = {
   id: string;
@@ -146,6 +151,9 @@ export function DocumentsList({
   customers: CustomerOption[];
   projects: ProjectOption[];
 }) {
+  const router = useRouter();
+  const toast = useToast();
+  const [view, setView] = useStoredView<"grid" | "table">("documents-view", "grid");
   const [showUpload, setShowUpload] = useState(false);
   const [signingDoc, setSigningDoc] = useState<DocumentItem | null>(null);
   const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null);
@@ -153,6 +161,8 @@ export function DocumentsList({
   const [filterType, setFilterType] = useState("");
   const [filterCustomer, setFilterCustomer] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkPending, startBulk] = useTransition();
 
   const filtered = documents.filter((d) => {
     if (filterType && d.type !== filterType) return false;
@@ -172,6 +182,42 @@ export function DocumentsList({
 
   const hasFilters = filterType || filterCustomer;
 
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selected.size === filtered.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(filtered.map((d) => d.id)));
+    }
+  }
+
+  function handleBulkDelete() {
+    const ids = Array.from(selected);
+    if (!confirm(`למחוק ${ids.length} מסמכים? מסמכים חתומים לא יימחקו.`)) return;
+    startBulk(async () => {
+      const res = await bulkDeleteDocuments(ids);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      const msg =
+        res.skipped > 0
+          ? `נמחקו ${res.deleted} מסמכים (${res.skipped} חתומים נדלגו)`
+          : `נמחקו ${res.deleted} מסמכים`;
+      toast.success(msg);
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-end justify-between gap-4">
@@ -187,13 +233,25 @@ export function DocumentsList({
             )}
           </p>
         </div>
-        <button
-          onClick={() => setShowUpload(true)}
-          className="bg-navy text-cream-paper hover:bg-navy/90 flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium"
-        >
-          <Upload size={15} />
-          העלאת מסמך
-        </button>
+        <div className="flex items-center gap-2">
+          <ViewToggle
+            storageKey="documents-view"
+            views={[
+              { id: "grid", icon: LayoutGrid, label: "גריד" },
+              { id: "table", icon: Table2, label: "טבלה" },
+            ]}
+            defaultView="grid"
+            current={view}
+            onChange={setView}
+          />
+          <button
+            onClick={() => setShowUpload(true)}
+            className="bg-navy text-cream-paper hover:bg-navy/90 flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium"
+          >
+            <Upload size={15} />
+            העלאת מסמך
+          </button>
+        </div>
       </div>
 
       {/* Search + filter bar */}
@@ -266,7 +324,7 @@ export function DocumentsList({
         </div>
       )}
 
-      {/* Documents grid */}
+      {/* Documents grid/table */}
       {filtered.length === 0 ? (
         <div className="border-ink-line rounded-2xl border py-16 text-center">
           <FileText size={32} className="text-ink-faded mx-auto mb-3 opacity-40" />
@@ -282,6 +340,106 @@ export function DocumentsList({
             </button>
           )}
         </div>
+      ) : view === "table" ? (
+        <div className="bg-cream-paper border-ink-line overflow-hidden rounded-2xl border">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-ink-line/60 border-b">
+                <th className="w-10 px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={selected.size === filtered.length && filtered.length > 0}
+                    onChange={toggleSelectAll}
+                    className="cursor-pointer rounded"
+                  />
+                </th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">כותרת</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">סוג</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">לקוח</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">פרויקט</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">חתימה</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">תאריך</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody className="divide-ink-line/40 divide-y">
+              {filtered.map((doc) => (
+                <tr
+                  key={doc.id}
+                  className={`transition-colors ${selected.has(doc.id) ? "bg-navy/5" : "hover:bg-cream/30"}`}
+                >
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(doc.id)}
+                      onChange={() => toggleSelect(doc.id)}
+                      className="cursor-pointer rounded"
+                    />
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      className="text-navy text-start font-medium hover:underline"
+                      onClick={() => setPreviewDoc(doc)}
+                    >
+                      {doc.title}
+                    </button>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`rounded-full border px-2 py-0.5 text-xs font-medium ${TYPE_STYLES[doc.type] ?? TYPE_STYLES.other}`}
+                    >
+                      {TYPE_LABELS[doc.type] ?? doc.type}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {doc.customer_name ? (
+                      <span className="text-ink-soft inline-flex items-center gap-1 text-xs">
+                        <Building2 size={11} />
+                        {doc.customer_name}
+                      </span>
+                    ) : (
+                      <span className="text-ink-faded text-xs">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="text-ink-soft text-xs">{doc.project_name ?? "—"}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {doc.signed_at ? (
+                      <span className="inline-flex items-center gap-1 text-xs text-green-700">
+                        <CheckCircle2 size={11} /> חתום
+                      </span>
+                    ) : doc.signature_required ? (
+                      <span className="text-xs text-amber-600">ממתין</span>
+                    ) : (
+                      <span className="text-ink-faded text-xs">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="text-ink-soft text-xs">
+                      {new Date(doc.created_at).toLocaleDateString("he-IL")}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end gap-1">
+                      <ViewButton doc={doc} />
+                      {doc.signature_required && !doc.signed_at && (
+                        <button
+                          onClick={() => setSigningDoc(doc)}
+                          className="rounded p-1 text-amber-600 transition-colors hover:text-amber-700"
+                          title="חתום"
+                        >
+                          <PenLine size={13} />
+                        </button>
+                      )}
+                      <DeleteButton doc={doc} />
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((doc) => (
@@ -294,6 +452,20 @@ export function DocumentsList({
           ))}
         </div>
       )}
+
+      <BulkActionBar
+        selectedCount={selected.size}
+        onClear={() => setSelected(new Set())}
+        actions={[
+          {
+            label: "מחק",
+            icon: Trash2,
+            variant: "danger",
+            isPending: bulkPending,
+            onClick: handleBulkDelete,
+          },
+        ]}
+      />
 
       {showUpload && (
         <UploadDocumentDialog

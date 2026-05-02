@@ -3,15 +3,20 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, FileText, ExternalLink, Trash2, Building2, Pencil } from "lucide-react";
-import { deleteQuote } from "./actions";
+import { Plus, FileText, ExternalLink, Trash2, Building2, Pencil, Link2 } from "lucide-react";
+import { deleteQuote, bulkDeleteQuotes } from "./actions";
 import { NewQuoteDialog } from "./new-quote-dialog";
 import { EditQuoteDialog } from "./edit-quote-dialog";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
+import { BulkActionBar } from "@/components/ui/bulk-action-bar";
 import type { Tables } from "@/lib/supabase/types";
 
-type Quote = Tables<"quotes"> & { customer_name?: string; project_name?: string };
+type Quote = Tables<"quotes"> & {
+  customer_name?: string;
+  project_name?: string;
+  public_token?: string;
+};
 type CustomerOption = { id: string; name: string; company: string | null };
 type ProjectOption = { id: string; name: string };
 
@@ -38,6 +43,33 @@ function formatAmount(n: number) {
 function formatDate(iso: string | null) {
   if (!iso) return null;
   return new Date(iso).toLocaleDateString("he-IL");
+}
+
+function CopyLinkButton({ token }: { token: string }) {
+  const [copied, setCopied] = useState(false);
+  const toast = useToast();
+
+  async function handleCopy() {
+    const url = `${window.location.origin}/proposal/${token}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      toast.success("הקישור הועתק");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("לא ניתן להעתיק");
+    }
+  }
+
+  return (
+    <button
+      onClick={handleCopy}
+      className={`rounded p-1 transition-colors ${copied ? "text-green-500" : "text-ink-faded hover:text-navy"}`}
+      title="העתק קישור להצעה"
+    >
+      <Link2 size={12} />
+    </button>
+  );
 }
 
 function DeleteButton({ id }: { id: string }) {
@@ -81,7 +113,42 @@ export function QuotesList({
 }) {
   const [showNew, setShowNew] = useState(false);
   const [editingQuote, setEditingQuote] = useState<Quote | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkPending, startBulk] = useTransition();
+  const toast = useToast();
   const router = useRouter();
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selected.size === quotes.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(quotes.map((q) => q.id)));
+    }
+  }
+
+  function handleBulkDelete() {
+    const ids = Array.from(selected);
+    if (!confirm(`למחוק ${ids.length} הצעות מחיר?`)) return;
+    startBulk(async () => {
+      const res = await bulkDeleteQuotes(ids);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(`נמחקו ${res.deleted} הצעות`);
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
 
   return (
     <>
@@ -117,6 +184,14 @@ export function QuotesList({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-ink-line/60 border-b">
+                <th className="w-10 px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={selected.size === quotes.length && quotes.length > 0}
+                    onChange={toggleSelectAll}
+                    className="cursor-pointer rounded"
+                  />
+                </th>
                 <th className="text-ink-soft px-4 py-3 text-start font-medium">כותרת</th>
                 <th className="text-ink-soft px-4 py-3 text-start font-medium">לקוח</th>
                 <th className="text-ink-soft px-4 py-3 text-start font-medium">סכום</th>
@@ -127,7 +202,18 @@ export function QuotesList({
             </thead>
             <tbody className="divide-ink-line/40 divide-y">
               {quotes.map((q) => (
-                <tr key={q.id} className="hover:bg-cream/30 transition-colors">
+                <tr
+                  key={q.id}
+                  className={`transition-colors ${selected.has(q.id) ? "bg-navy/5" : "hover:bg-cream/30"}`}
+                >
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(q.id)}
+                      onChange={() => toggleSelect(q.id)}
+                      className="cursor-pointer rounded"
+                    />
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <FileText size={13} className="text-ink-faded shrink-0" />
@@ -166,6 +252,7 @@ export function QuotesList({
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
+                      {q.public_token && <CopyLinkButton token={q.public_token} />}
                       {q.document_url && (
                         <a
                           href={q.document_url}
@@ -193,6 +280,20 @@ export function QuotesList({
           </table>
         </div>
       )}
+
+      <BulkActionBar
+        selectedCount={selected.size}
+        onClear={() => setSelected(new Set())}
+        actions={[
+          {
+            label: "מחק",
+            icon: Trash2,
+            variant: "danger",
+            isPending: bulkPending,
+            onClick: handleBulkDelete,
+          },
+        ]}
+      />
 
       {showNew && (
         <NewQuoteDialog

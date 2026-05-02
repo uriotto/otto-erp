@@ -466,3 +466,57 @@ export async function deletePayment(paymentId: string): Promise<InvoiceActionRes
 export type InvoiceStatus = Enums<"invoice_status">;
 export type InvoiceType = Enums<"invoice_type">;
 export type PaymentMethod = Enums<"payment_method">;
+
+export async function bulkDeleteInvoices(
+  ids: string[],
+): Promise<{ deleted: number; skipped: number; error?: string }> {
+  if (ids.length === 0) return { deleted: 0, skipped: 0 };
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { deleted: 0, skipped: 0, error: "לא מחובר" };
+
+  // Only delete draft/cancelled invoices with no payments
+  const { data: candidates } = await supabase
+    .from("invoices")
+    .select("id, status")
+    .in("id", ids)
+    .eq("tenant_id", profile.tenant_id)
+    .in("status", ["draft", "cancelled"]);
+
+  const eligible = (candidates ?? []).map((c) => c.id);
+  const skipped = ids.length - eligible.length;
+  if (eligible.length === 0) return { deleted: 0, skipped };
+
+  // Delete items first
+  await supabase.from("invoice_items").delete().in("invoice_id", eligible);
+
+  const { error, count } = await supabase
+    .from("invoices")
+    .delete({ count: "exact" })
+    .in("id", eligible)
+    .eq("tenant_id", profile.tenant_id);
+
+  if (error) return { deleted: 0, skipped, error: error.message };
+  revalidatePath("/invoices");
+  return { deleted: count ?? eligible.length, skipped };
+}
+
+export async function bulkUpdateInvoiceStatus(
+  ids: string[],
+  status: "sent" | "cancelled",
+): Promise<{ updated: number; error?: string }> {
+  if (ids.length === 0) return { updated: 0 };
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { updated: 0, error: "לא מחובר" };
+
+  const { error, count } = await supabase
+    .from("invoices")
+    .update({ status })
+    .in("id", ids)
+    .eq("tenant_id", profile.tenant_id)
+    .neq("status", "paid")
+    .neq("status", "cancelled");
+
+  if (error) return { updated: 0, error: error.message };
+  revalidatePath("/invoices");
+  return { updated: count ?? ids.length };
+}

@@ -14,6 +14,8 @@ import {
   Mic,
   Sparkles,
   Megaphone,
+  CalendarDays,
+  BarChart2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -44,6 +46,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "לקוחות", href: "/customers", icon: Users },
       { label: "פרויקטים", href: "/projects", icon: FolderKanban },
       { label: "משימות", href: "/tasks", icon: CheckSquare },
+      { label: "לוח שנה", href: "/calendar", icon: CalendarDays },
       { label: "שעות", href: "/time", icon: Timer },
       { label: "בנק שעות", href: "/hour-banks", icon: LayoutGrid },
     ],
@@ -55,6 +58,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "פיננסים", href: "/finance", icon: Banknote },
       { label: "הצעות מחיר", href: "/quotes", icon: FileText },
       { label: "מסמכים", href: "/documents", icon: FolderOpen },
+      { label: "דוחות", href: "/reports", icon: BarChart2 },
     ],
   },
   {

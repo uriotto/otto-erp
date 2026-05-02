@@ -621,3 +621,22 @@ async function createAdvanceInvoiceForBank(input: {
     hourly_rate: input.hourly_rate,
   });
 }
+
+export async function bulkCancelHourBanks(
+  ids: string[],
+): Promise<{ cancelled: number; error?: string }> {
+  if (ids.length === 0) return { cancelled: 0 };
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { cancelled: 0, error: "לא מחובר" };
+
+  const { error, count } = await supabase
+    .from("hour_banks")
+    .update({ status: "cancelled" })
+    .in("id", ids)
+    .eq("tenant_id", profile.tenant_id)
+    .in("status", ["active", "draft"]);
+
+  if (error) return { cancelled: 0, error: error.message };
+  revalidatePath("/hour-banks");
+  return { cancelled: count ?? ids.length };
+}

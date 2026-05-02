@@ -21,6 +21,7 @@ import { PaymentScheduleSection } from "./payment-schedule-section";
 import { ProjectQuotesSection } from "./project-quotes-section";
 import { ProjectStatusBadge, ProjectHealthBadge } from "./project-quick-badges";
 import { ProjectTasksList } from "./project-tasks-list";
+import { AgentSection } from "@/components/agents/agent-section";
 
 export const metadata = { title: "פרויקט — OTTO" };
 
@@ -307,6 +308,16 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       <ProjectTasksList projectId={id} initialTasks={tasks ?? []} />
 
       <ProjectHoursSection projectId={id} entries={timeEntries ?? []} />
+
+      <AgentSection
+        contextType="project"
+        contextId={id}
+        contextData={{
+          project_name: project.name,
+          project_id: id,
+          customer_id: project.customer_id,
+        }}
+      />
     </div>
   );
 }

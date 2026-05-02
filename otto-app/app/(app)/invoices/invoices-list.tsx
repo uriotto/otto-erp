@@ -1,10 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, Receipt, Calendar, AlertTriangle, CheckCircle2, Wallet, Clock } from "lucide-react";
+import {
+  Plus,
+  Receipt,
+  Calendar,
+  AlertTriangle,
+  CheckCircle2,
+  Wallet,
+  Clock,
+  Trash2,
+  Send,
+} from "lucide-react";
 import { NewInvoiceDialog } from "./new-invoice-dialog";
+import { bulkDeleteInvoices, bulkUpdateInvoiceStatus } from "./actions";
+import { BulkActionBar } from "@/components/ui/bulk-action-bar";
+import { useToast } from "@/components/ui/toast";
 
 export type InvoiceStatusUI =
   | "draft"
@@ -122,6 +135,66 @@ export function InvoicesList({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showNew, setShowNew] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkPending, startBulk] = useTransition();
+  const toast = useToast();
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll(visibleIds: string[]) {
+    const allSelected = visibleIds.every((id) => selected.has(id));
+    if (allSelected) {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        visibleIds.forEach((id) => next.delete(id));
+        return next;
+      });
+    } else {
+      setSelected((prev) => new Set([...prev, ...visibleIds]));
+    }
+  }
+
+  function handleBulkDelete() {
+    const ids = Array.from(selected);
+    if (!confirm(`למחוק ${ids.length} חשבוניות? (רק טיוטות ומבוטלות יימחקו)`)) return;
+    startBulk(async () => {
+      const res = await bulkDeleteInvoices(ids);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      const msg =
+        res.skipped > 0
+          ? `נמחקו ${res.deleted}, דולגו ${res.skipped} (לא ניתן למחוק)`
+          : `נמחקו ${res.deleted} חשבוניות`;
+      toast.success(msg);
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
+
+  function handleBulkStatus(status: "sent" | "cancelled") {
+    const ids = Array.from(selected);
+    const label = status === "sent" ? "נשלחה" : "מבוטל";
+    if (!confirm(`לשנות סטטוס ${ids.length} חשבוניות ל"${label}"?`)) return;
+    startBulk(async () => {
+      const res = await bulkUpdateInvoiceStatus(ids, status);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(`עודכנו ${res.updated} חשבוניות`);
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
 
   const [status, setStatus] = useState<string>(searchParams.get("status") ?? "all");
   const [customerId, setCustomerId] = useState<string>(searchParams.get("customer") ?? "all");
@@ -263,6 +336,14 @@ export function InvoicesList({
           <table className="w-full text-sm">
             <thead className="bg-cream-deep text-ink-soft text-xs">
               <tr>
+                <th className="w-10 px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={filtered.length > 0 && filtered.every((inv) => selected.has(inv.id))}
+                    onChange={() => toggleSelectAll(filtered.map((inv) => inv.id))}
+                    className="cursor-pointer rounded"
+                  />
+                </th>
                 <Th>מספר</Th>
                 <Th>לקוח</Th>
                 <Th>הוצאה</Th>
@@ -275,12 +356,42 @@ export function InvoicesList({
             </thead>
             <tbody>
               {filtered.map((inv) => (
-                <InvoiceRow key={inv.id} inv={inv} />
+                <InvoiceRow
+                  key={inv.id}
+                  inv={inv}
+                  isSelected={selected.has(inv.id)}
+                  onToggleSelect={() => toggleSelect(inv.id)}
+                />
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      <BulkActionBar
+        selectedCount={selected.size}
+        onClear={() => setSelected(new Set())}
+        actions={[
+          {
+            label: "סמן כנשלחה",
+            icon: Send,
+            isPending: bulkPending,
+            onClick: () => handleBulkStatus("sent"),
+          },
+          {
+            label: "בטל",
+            isPending: bulkPending,
+            onClick: () => handleBulkStatus("cancelled"),
+          },
+          {
+            label: "מחק",
+            icon: Trash2,
+            variant: "danger",
+            isPending: bulkPending,
+            onClick: handleBulkDelete,
+          },
+        ]}
+      />
 
       {showNew && (
         <NewInvoiceDialog
@@ -305,7 +416,15 @@ function Th({ children, align }: { children: React.ReactNode; align?: "end" }) {
   );
 }
 
-function InvoiceRow({ inv }: { inv: InvoiceListItem }) {
+function InvoiceRow({
+  inv,
+  isSelected,
+  onToggleSelect,
+}: {
+  inv: InvoiceListItem;
+  isSelected: boolean;
+  onToggleSelect: () => void;
+}) {
   const router = useRouter();
   const remaining = Math.max(inv.total_amount - inv.paid_amount, 0);
   const overdue =
@@ -314,8 +433,17 @@ function InvoiceRow({ inv }: { inv: InvoiceListItem }) {
   return (
     <tr
       onClick={() => router.push(`/invoices/${inv.id}`)}
-      className="border-ink-line hover:bg-cream-deep/40 cursor-pointer border-t transition-colors"
+      className={`border-ink-line cursor-pointer border-t transition-colors ${isSelected ? "bg-navy/5" : "hover:bg-cream-deep/40"}`}
     >
+      <td className="px-4 py-3">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={onToggleSelect}
+          onClick={(e) => e.stopPropagation()}
+          className="cursor-pointer rounded"
+        />
+      </td>
       <td className="px-4 py-3">
         <Link
           href={`/invoices/${inv.id}`}

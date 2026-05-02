@@ -14,26 +14,31 @@ export function Sidebar({ onNavigate }: Props) {
   const pathname = usePathname();
 
   return (
-    <aside className="bg-cream-paper border-ink-line h-full overflow-y-auto border-l px-5 py-8">
-      <div className="mb-1 flex items-baseline gap-0.5" dir="ltr">
-        <span className="text-navy text-[38px] leading-none font-extrabold tracking-tight">
+    <aside className="bg-cream-sidebar border-ink-line h-full overflow-y-auto border-l px-4 py-7">
+      <div className="mb-0.5 flex items-baseline gap-0.5 px-1" dir="ltr">
+        <span className="text-navy text-[36px] leading-none font-extrabold tracking-tight">
           OTTO
         </span>
         <span className="bg-navy mb-1 inline-block h-2 w-2 rounded-full" aria-hidden />
       </div>
 
-      <span className="font-caveat text-ink-faded mb-10 inline-block -rotate-1 text-lg" dir="ltr">
+      <span
+        className="font-caveat text-ink-faded mb-6 inline-block -rotate-1 px-1 text-[17px]"
+        dir="ltr"
+      >
         automate your success
       </span>
 
-      <nav className="space-y-6">
+      <div className="bg-ink-line mb-6 h-px" />
+
+      <nav className="space-y-5">
         {NAV_SECTIONS.map((section) => (
           <div key={section.label}>
-            <div className="text-ink-faded mb-2 px-3 text-[10px] font-semibold tracking-[0.18em] uppercase">
+            <div className="text-ink-soft mb-1.5 px-3 text-[11px] font-semibold tracking-[0.12em] uppercase">
               {section.label}
             </div>
 
-            <ul className="space-y-px">
+            <ul className="space-y-0.5">
               {section.items.map((item) => {
                 const isActive =
                   pathname === item.href ||
@@ -44,10 +49,10 @@ export function Sidebar({ onNavigate }: Props) {
                     <Link
                       href={item.href}
                       onClick={onNavigate}
-                      className={`group focus-visible:ring-navy/40 flex items-center gap-3 rounded-lg px-3.5 py-2.5 text-sm font-medium transition-all duration-200 ease-out focus-visible:ring-2 focus-visible:outline-none active:scale-[0.98] ${
+                      className={`group focus-visible:ring-navy/40 flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-all duration-200 ease-out focus-visible:ring-2 focus-visible:outline-none active:scale-[0.98] ${
                         isActive
-                          ? "bg-navy text-cream-paper font-semibold"
-                          : "text-ink-soft hover:bg-cream-deep hover:text-navy"
+                          ? "bg-cream-paper text-navy shadow-card border-navy border-e-[3px] font-semibold"
+                          : "text-ink-soft hover:bg-cream-paper/70 hover:text-navy"
                       }`}
                     >
                       <NavItemContent
@@ -90,13 +95,16 @@ function NavItemContent({
           aria-hidden
         />
       ) : (
-        <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
+        <Icon
+          className={`h-[17px] w-[17px] shrink-0 transition-colors ${isActive ? "text-navy" : "text-ink-faded group-hover:text-navy"}`}
+          strokeWidth={isActive ? 2.5 : 2}
+        />
       )}
       <span className="flex-1">{label}</span>
       {badge !== undefined && (
         <span
-          className={`min-w-[18px] rounded-full px-2 py-0.5 text-center text-[10px] font-bold ${
-            isActive ? "bg-cream-paper text-navy" : "bg-navy text-cream-paper"
+          className={`min-w-[18px] rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold ${
+            isActive ? "bg-navy/10 text-navy" : "bg-cream-shadow text-ink-soft"
           }`}
         >
           {badge}

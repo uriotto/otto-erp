@@ -17,13 +17,13 @@ type Props = {
 
 export function AppHeader({ greeting, displayName, subline, onMenuClick }: Props) {
   return (
-    <header className="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+    <header className="border-ink-line mb-8 flex flex-col gap-4 border-b pb-6 md:flex-row md:items-start md:justify-between">
       <div className="flex items-start gap-3">
         {onMenuClick && (
           <button
             type="button"
             onClick={onMenuClick}
-            className="bg-cream-paper border-ink-line text-ink-soft hover:border-navy hover:text-navy flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors lg:hidden"
+            className="bg-cream-paper shadow-card text-ink-soft hover:text-navy flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-all hover:shadow-md lg:hidden"
             aria-label="פתח תפריט"
           >
             <Menu className="h-5 w-5" />
@@ -35,27 +35,27 @@ export function AppHeader({ greeting, displayName, subline, onMenuClick }: Props
             {greeting}, {displayName}
           </h1>
           {subline && (
-            <span className="font-caveat text-ink-faded mt-1 inline-block text-[22px]" dir="auto">
+            <span className="font-caveat text-accent mt-0.5 inline-block text-[21px]" dir="auto">
               {subline}
             </span>
           )}
         </div>
       </div>
 
-      <div className="flex flex-1 items-center justify-end gap-2.5 md:max-w-[640px]">
+      <div className="flex flex-1 items-center justify-end gap-2 md:max-w-[600px]">
         <Timer />
         <NotificationBell />
 
-        <div className="flex-1 md:w-[400px] md:flex-none">
+        <div className="flex-1 md:w-[380px] md:flex-none">
           <HeaderSearch />
         </div>
 
         <Link
           href="/settings"
           aria-label="הגדרות"
-          className="bg-cream-paper border-ink-line text-ink-soft hover:border-navy hover:text-navy flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-colors"
+          className="bg-cream-paper shadow-card text-ink-soft hover:text-navy flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-all hover:shadow-md"
         >
-          <Settings className="h-[18px] w-[18px]" />
+          <Settings className="h-[17px] w-[17px]" />
         </Link>
       </div>
     </header>

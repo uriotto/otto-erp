@@ -121,18 +121,12 @@ export default async function DashboardPage() {
   const openPipelineValue = (openLeads ?? []).reduce((sum, l) => sum + (l.value ?? 0), 0);
   const wonValue = (leadsWon ?? []).reduce((sum, l) => sum + (l.value ?? 0), 0);
 
-  const displayName = profile?.full_name?.split(" ")[0] ?? profile?.email?.split("@")[0] ?? "אורי";
-  const greeting = getGreeting();
-
   const feedItems = (recentActivities ?? []) as unknown as ActivityFeedRow[];
   const tasks = (todayTasks ?? []) as unknown as TaskRow[];
 
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-display-md text-navy">
-          {greeting}, {displayName}
-        </h1>
         <p className="text-ink-soft mt-1 text-sm">
           {tenant?.name ?? "OTTO"} ·{" "}
           {new Date().toLocaleDateString("he-IL", {
@@ -146,32 +140,40 @@ export default async function DashboardPage() {
       {/* Top: 4 primary stats */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
-          icon={<Users size={18} />}
+          icon={<Users size={17} className="text-blue-600" />}
           label="לקוחות"
           value={customersTotal ?? 0}
           hint={customersActive ? `${customersActive} פעילים` : undefined}
           href="/customers"
+          iconBg="bg-blue-50"
         />
         <StatCard
-          icon={<TrendingUp size={18} />}
+          icon={<TrendingUp size={17} className="text-emerald-600" />}
           label="לידים פעילים"
           value={(openLeads ?? []).length}
           hint={leadsTotal ? `מתוך ${leadsTotal} סה"כ` : undefined}
           href="/leads"
-          tone="primary"
+          iconBg="bg-emerald-50"
         />
         <StatCard
-          icon={<CheckCircle2 size={18} />}
+          icon={
+            <CheckCircle2
+              size={17}
+              className={(tasksOverdue ?? 0) > 0 ? "text-red-600" : "text-orange-500"}
+            />
+          }
           label="משימות היום"
           value={tasksDueToday ?? 0}
           hint={(tasksOverdue ?? 0) > 0 ? `${tasksOverdue} באיחור` : undefined}
           href="/today"
           tone={(tasksOverdue ?? 0) > 0 ? "warning" : undefined}
+          iconBg={(tasksOverdue ?? 0) > 0 ? "bg-red-50" : "bg-orange-50"}
         />
         <StatCard
-          icon={<Activity size={18} />}
+          icon={<Activity size={17} className="text-purple-600" />}
           label="פעילויות השבוע"
           value={activitiesThisWeek ?? 0}
+          iconBg="bg-purple-50"
         />
       </div>
 
@@ -188,42 +190,42 @@ export default async function DashboardPage() {
       {/* Bottom: secondary stats */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
-          icon={<DollarSign size={18} />}
-          label="פוטנציאל"
+          icon={<DollarSign size={17} className="text-amber-600" />}
+          label="פוטנציאל בפייפליין"
           value={`₪${openPipelineValue.toLocaleString("he-IL")}`}
           hint={wonValue ? `נסגר: ₪${wonValue.toLocaleString("he-IL")}` : undefined}
+          iconBg="bg-amber-50"
         />
         <StatCard
-          icon={<AlertCircle size={18} />}
+          icon={
+            <AlertCircle
+              size={17}
+              className={(tasksOverdue ?? 0) > 0 ? "text-red-600" : "text-ink-faded"}
+            />
+          }
           label="משימות באיחור"
           value={tasksOverdue ?? 0}
           href="/today"
           tone={(tasksOverdue ?? 0) > 0 ? "warning" : undefined}
+          iconBg={(tasksOverdue ?? 0) > 0 ? "bg-red-50" : "bg-cream-deep"}
         />
         <StatCard
-          icon={<CheckCircle2 size={18} />}
+          icon={<CheckCircle2 size={17} className="text-teal-600" />}
           label="משימות פתוחות"
           value={tasksOpen ?? 0}
           href="/today"
+          iconBg="bg-teal-50"
         />
         <StatCard
-          icon={<Calendar size={18} />}
+          icon={<Calendar size={17} className="text-indigo-600" />}
           label="פגישות היום"
           value={meetingsToday ?? 0}
           href="/today"
+          iconBg="bg-indigo-50"
         />
       </div>
     </div>
   );
-}
-
-function getGreeting(): string {
-  const h = new Date().getHours();
-  if (h < 6) return "לילה טוב";
-  if (h < 12) return "בוקר טוב";
-  if (h < 17) return "צהריים טובים";
-  if (h < 21) return "ערב טוב";
-  return "לילה טוב";
 }
 
 function StatCard({
@@ -233,6 +235,7 @@ function StatCard({
   hint,
   href,
   tone,
+  iconBg,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -240,28 +243,30 @@ function StatCard({
   hint?: string;
   href?: string;
   tone?: "primary" | "warning";
+  iconBg?: string;
 }) {
-  const toneStyles =
-    tone === "primary"
-      ? "border-navy/15 bg-navy/5"
-      : tone === "warning"
-        ? "border-red-200 bg-red-50/40"
-        : "border-ink-line bg-cream-paper";
+  const cardStyles = tone === "warning" ? "bg-red-50 ring-1 ring-red-200" : "bg-cream-paper";
 
   const interactive = href
-    ? "hover:-translate-y-0.5 hover:shadow-md hover:border-navy/30 transition-all duration-200"
-    : "transition-all duration-200";
+    ? "hover:-translate-y-1 hover:shadow-lg transition-all duration-200 cursor-pointer"
+    : "";
 
   const valueColor = tone === "warning" ? "text-red-700" : "text-navy";
 
   const content = (
-    <div className={`rounded-2xl border p-5 ${toneStyles} ${interactive}`}>
-      <div className="text-ink-soft mb-2 flex items-center gap-1.5 text-xs">
-        {icon}
-        {label}
+    <div className={`shadow-card rounded-2xl p-5 ${cardStyles} ${interactive}`}>
+      <div className="mb-4 flex items-start justify-between">
+        <span
+          className={`flex h-9 w-9 items-center justify-center rounded-xl ${iconBg ?? "bg-navy/8"}`}
+        >
+          {icon}
+        </span>
       </div>
-      <div className={`text-display-md font-bold ${valueColor}`}>{value}</div>
-      {hint && <div className="text-ink-faded mt-1 text-xs">{hint}</div>}
+      <div className={`text-[30px] leading-none font-bold tracking-tight ${valueColor}`}>
+        {value}
+      </div>
+      <div className="text-ink-soft mt-2 text-xs font-medium">{label}</div>
+      {hint && <div className="text-ink-faded mt-1 text-[11px]">{hint}</div>}
     </div>
   );
 
@@ -299,7 +304,7 @@ function parentFromActivity(item: ActivityFeedRow | TaskRow): {
 
 function ActivityFeed({ items }: { items: ActivityFeedRow[] }) {
   return (
-    <div className="bg-cream-paper border-ink-line rounded-2xl border p-5">
+    <div className="bg-cream-paper shadow-card rounded-2xl p-5">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Activity size={14} className="text-navy" />
@@ -326,7 +331,7 @@ function ActivityFeed({ items }: { items: ActivityFeedRow[] }) {
                   href={href}
                   className="hover:bg-cream group -mx-2 flex items-start gap-3 rounded-lg px-2 py-2.5 transition-colors"
                 >
-                  <div className="border-ink-line bg-cream mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border">
+                  <div className="bg-cream-deep mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full">
                     {activityIcon(item.type)}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -356,7 +361,7 @@ function ActivityFeed({ items }: { items: ActivityFeedRow[] }) {
 
 function TodayTasksCard({ tasks, totalToday }: { tasks: TaskRow[]; totalToday: number }) {
   return (
-    <div className="bg-cream-paper border-ink-line rounded-2xl border p-5">
+    <div className="bg-cream-paper shadow-card rounded-2xl p-5">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <CheckSquare size={14} className="text-navy" />

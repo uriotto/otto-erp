@@ -8,6 +8,81 @@ export type Database = {
   };
   public: {
     Tables: {
+      agent_invocations: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          agent_id: string;
+          context_type: string;
+          context_id: string;
+          status: string;
+          result_html: string | null;
+          error: string | null;
+          created_at: string;
+          completed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          agent_id: string;
+          context_type: string;
+          context_id: string;
+          status?: string;
+          result_html?: string | null;
+          error?: string | null;
+          created_at?: string;
+          completed_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          agent_id?: string;
+          context_type?: string;
+          context_id?: string;
+          status?: string;
+          result_html?: string | null;
+          error?: string | null;
+          created_at?: string;
+          completed_at?: string | null;
+        };
+        Relationships: [];
+      };
+      external_agents: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          name: string;
+          description: string | null;
+          webhook_url: string;
+          trigger_contexts: string[];
+          icon: string;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          name: string;
+          description?: string | null;
+          webhook_url: string;
+          trigger_contexts?: string[];
+          icon?: string;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          name?: string;
+          description?: string | null;
+          webhook_url?: string;
+          trigger_contexts?: string[];
+          icon?: string;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       activities: {
         Row: {
           body: string | null;
@@ -316,6 +391,69 @@ export type Database = {
             columns: ["tenant_id"];
             isOneToOne: false;
             referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      reports: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          customer_id: string | null;
+          type: string;
+          period_start: string;
+          period_end: string;
+          title: string;
+          summary: string | null;
+          status: string;
+          visible_to_client: boolean;
+          data: Record<string, unknown> | null;
+          created_at: string;
+          approved_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          customer_id?: string | null;
+          type?: string;
+          period_start: string;
+          period_end: string;
+          title: string;
+          summary?: string | null;
+          status?: string;
+          visible_to_client?: boolean;
+          data?: Record<string, unknown> | null;
+          created_at?: string;
+          approved_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          customer_id?: string | null;
+          type?: string;
+          period_start?: string;
+          period_end?: string;
+          title?: string;
+          summary?: string | null;
+          status?: string;
+          visible_to_client?: boolean;
+          data?: Record<string, unknown> | null;
+          created_at?: string;
+          approved_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "reports_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "reports_customer_id_fkey";
+            columns: ["customer_id"];
+            isOneToOne: false;
+            referencedRelation: "customers";
             referencedColumns: ["id"];
           },
         ];
@@ -1228,9 +1366,14 @@ export type Database = {
           customer_id: string;
           document_url: string | null;
           id: string;
+          modules: Json | null;
           notes: string | null;
           project_id: string | null;
+          public_token: string;
+          signature_data: string | null;
           signed_at: string | null;
+          signer_email: string | null;
+          signer_name: string | null;
           status: string;
           tenant_id: string;
           title: string;
@@ -1242,9 +1385,14 @@ export type Database = {
           customer_id: string;
           document_url?: string | null;
           id?: string;
+          modules?: Json | null;
           notes?: string | null;
           project_id?: string | null;
+          public_token?: string;
+          signature_data?: string | null;
           signed_at?: string | null;
+          signer_email?: string | null;
+          signer_name?: string | null;
           status?: string;
           tenant_id: string;
           title: string;
@@ -1256,9 +1404,14 @@ export type Database = {
           customer_id?: string;
           document_url?: string | null;
           id?: string;
+          modules?: Json | null;
           notes?: string | null;
           project_id?: string | null;
+          public_token?: string;
+          signature_data?: string | null;
           signed_at?: string | null;
+          signer_email?: string | null;
+          signer_name?: string | null;
           status?: string;
           tenant_id?: string;
           title?: string;

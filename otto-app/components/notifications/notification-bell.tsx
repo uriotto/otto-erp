@@ -1,10 +1,24 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { AlertTriangle, Bell, CheckCheck, CheckCircle2, Info, OctagonAlert } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  AlertTriangle,
+  Bell,
+  CheckCheck,
+  CheckCircle2,
+  Info,
+  OctagonAlert,
+  Trash2,
+  X,
+} from "lucide-react";
 
-import { markAllNotificationsRead, markNotificationRead } from "@/app/(app)/notifications/actions";
+import {
+  deleteAllReadNotifications,
+  deleteNotification,
+  markAllNotificationsRead,
+  markNotificationRead,
+} from "@/app/(app)/notifications/actions";
 import type { NotificationItem, NotificationsResponse } from "@/app/api/notifications/route";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
@@ -38,10 +52,18 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<NotificationsResponse>({ unreadCount: 0, items: [] });
   const [loading, setLoading] = useState(false);
+  const [navigatingId, setNavigatingId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
+  const pathname = usePathname();
   const toast = useToast();
   const wrapperRef = useRef<HTMLDivElement | null>(null);
+
+  // clear navigation spinner when route changes
+  useEffect(() => {
+    setNavigatingId(null);
+    setOpen(false);
+  }, [pathname]);
 
   const refresh = useCallback(async () => {
     try {
@@ -86,7 +108,6 @@ export function NotificationBell() {
 
   function handleClickItem(n: NotificationItem) {
     if (!n.read_at) {
-      // optimistic
       setData((prev) => ({
         unreadCount: Math.max(0, prev.unreadCount - 1),
         items: prev.items.map((it) =>
@@ -101,8 +122,12 @@ export function NotificationBell() {
         }
       });
     }
-    setOpen(false);
-    if (n.link) router.push(n.link);
+    if (n.link) {
+      setNavigatingId(n.id);
+      router.push(n.link);
+    } else {
+      setOpen(false);
+    }
   }
 
   function handleMarkAll() {
@@ -122,6 +147,41 @@ export function NotificationBell() {
       }
     });
   }
+
+  function handleDelete(e: React.MouseEvent, id: string) {
+    e.stopPropagation();
+    setData((prev) => ({
+      unreadCount: prev.items.find((it) => it.id === id && !it.read_at)
+        ? Math.max(0, prev.unreadCount - 1)
+        : prev.unreadCount,
+      items: prev.items.filter((it) => it.id !== id),
+    }));
+    startTransition(async () => {
+      const result = await deleteNotification(id);
+      if (result?.error) {
+        toast.error(result.error);
+        void refresh();
+      }
+    });
+  }
+
+  function handleDeleteAllRead() {
+    const hasRead = data.items.some((it) => !!it.read_at);
+    if (!hasRead) return;
+    setData((prev) => ({
+      unreadCount: prev.unreadCount,
+      items: prev.items.filter((it) => !it.read_at),
+    }));
+    startTransition(async () => {
+      const result = await deleteAllReadNotifications();
+      if (result?.error) {
+        toast.error(result.error);
+        void refresh();
+      }
+    });
+  }
+
+  const hasRead = data.items.some((it) => !!it.read_at);
 
   return (
     <div ref={wrapperRef} className="relative">
@@ -168,14 +228,16 @@ export function NotificationBell() {
                 {data.items.map((n) => {
                   const sev = SEVERITY_STYLES[n.severity] ?? SEVERITY_STYLES.info;
                   const unread = !n.read_at;
+                  const isNavigating = navigatingId === n.id;
                   return (
-                    <li key={n.id}>
+                    <li key={n.id} className="group relative">
                       <button
                         type="button"
                         onClick={() => handleClickItem(n)}
-                        className={`group relative flex w-full items-start gap-3 px-4 py-3 text-start transition-colors ${
+                        disabled={isNavigating}
+                        className={`relative flex w-full items-start gap-3 px-4 py-3 text-start transition-colors ${
                           unread ? "bg-cream-paper" : "bg-cream-paper/60"
-                        } hover:bg-cream-deep/40`}
+                        } hover:bg-cream-deep/40 disabled:cursor-default`}
                       >
                         <span
                           aria-hidden
@@ -183,7 +245,9 @@ export function NotificationBell() {
                             unread ? sev.bar : "bg-transparent"
                           }`}
                         />
-                        <span className="mt-0.5 shrink-0">{sev.icon}</span>
+                        <span className="mt-0.5 shrink-0">
+                          {isNavigating ? <Spinner size={16} className="text-navy" /> : sev.icon}
+                        </span>
                         <span className="min-w-0 flex-1">
                           <span className="text-navy block truncate text-sm font-semibold">
                             {n.title}
@@ -197,12 +261,21 @@ export function NotificationBell() {
                             {relativeTimeHebrew(n.created_at)}
                           </span>
                         </span>
-                        {unread && (
+                        {unread && !isNavigating && (
                           <span
                             aria-hidden
                             className="mt-1.5 inline-block h-2 w-2 shrink-0 rounded-full bg-rose-500"
                           />
                         )}
+                      </button>
+                      {/* delete button — appears on group hover */}
+                      <button
+                        type="button"
+                        onClick={(e) => handleDelete(e, n.id)}
+                        aria-label="מחק התראה"
+                        className="text-ink-faded absolute end-2 top-1/2 -translate-y-1/2 rounded p-1 opacity-0 transition-opacity group-hover:opacity-100 hover:text-rose-500"
+                      >
+                        <X size={13} />
                       </button>
                     </li>
                   );
@@ -212,15 +285,28 @@ export function NotificationBell() {
           </div>
 
           <div className="border-ink-line flex items-center justify-between border-t px-4 py-2.5">
-            <button
-              type="button"
-              onClick={handleMarkAll}
-              disabled={pending || data.unreadCount === 0}
-              className="text-navy hover:text-navy-deep flex items-center gap-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <CheckCheck size={14} />
-              סמן הכל כנקרא
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleMarkAll}
+                disabled={pending || data.unreadCount === 0}
+                className="text-navy hover:text-navy-deep flex items-center gap-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <CheckCheck size={14} />
+                סמן הכל כנקרא
+              </button>
+              {hasRead && (
+                <button
+                  type="button"
+                  onClick={handleDeleteAllRead}
+                  disabled={pending}
+                  className="text-ink-soft flex items-center gap-1.5 text-xs transition-colors hover:text-rose-500 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Trash2 size={13} />
+                  מחק נקראו
+                </button>
+              )}
+            </div>
             <button
               type="button"
               onClick={() => {

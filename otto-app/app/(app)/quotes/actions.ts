@@ -6,6 +6,14 @@ import { createClient } from "@/lib/supabase/server";
 
 const QUOTE_STATUSES = ["draft", "sent", "signed", "rejected", "expired"] as const;
 
+const ModuleSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  price: z.number(),
+  optional: z.boolean(),
+});
+
 const QuoteSchema = z.object({
   title: z.string().min(1, "כותרת חובה"),
   customer_id: z.string().uuid("לקוח חובה"),
@@ -18,6 +26,14 @@ const QuoteSchema = z.object({
   document_url: z.string().url("כתובת URL לא תקינה").optional().or(z.literal("")),
   notes: z.string().optional(),
   valid_until: z.string().optional().or(z.literal("")),
+  modules: z.preprocess((v) => {
+    if (!v || v === "") return [];
+    try {
+      return JSON.parse(v as string);
+    } catch {
+      return [];
+    }
+  }, z.array(ModuleSchema).default([])),
 });
 
 export type QuoteFormState = {
@@ -53,6 +69,7 @@ export async function createQuote(
     document_url: (formData.get("document_url") as string) || "",
     notes: formData.get("notes") as string,
     valid_until: (formData.get("valid_until") as string) || "",
+    modules: (formData.get("modules") as string) || "",
   };
 
   const parsed = QuoteSchema.safeParse(raw);
@@ -72,6 +89,11 @@ export async function createQuote(
     document_url: parsed.data.document_url || null,
     notes: parsed.data.notes || null,
     valid_until: parsed.data.valid_until || null,
+    modules:
+      parsed.data.modules.length > 0
+        ? (parsed.data
+            .modules as unknown as import("@/lib/supabase/types").Database["public"]["Tables"]["quotes"]["Insert"]["modules"])
+        : null,
     tenant_id: ctx.tenant_id,
   });
 
@@ -98,6 +120,7 @@ export async function updateQuote(
     document_url: (formData.get("document_url") as string) || "",
     notes: formData.get("notes") as string,
     valid_until: (formData.get("valid_until") as string) || "",
+    modules: (formData.get("modules") as string) || "",
   };
 
   const parsed = QuoteSchema.safeParse(raw);
@@ -123,6 +146,11 @@ export async function updateQuote(
       document_url: parsed.data.document_url || null,
       notes: parsed.data.notes || null,
       valid_until: parsed.data.valid_until || null,
+      modules:
+        parsed.data.modules.length > 0
+          ? (parsed.data
+              .modules as unknown as import("@/lib/supabase/types").Database["public"]["Tables"]["quotes"]["Update"]["modules"])
+          : null,
       ...statusUpdate,
     })
     .eq("id", id)
@@ -148,4 +176,22 @@ export async function deleteQuote(id: string): Promise<{ error?: string }> {
   if (error) return { error: error.message };
   revalidatePath("/quotes");
   return {};
+}
+
+export async function bulkDeleteQuotes(
+  ids: string[],
+): Promise<{ deleted: number; error?: string }> {
+  if (ids.length === 0) return { deleted: 0 };
+  const ctx = await getTenant();
+  if (!ctx) return { deleted: 0, error: "לא מחובר" };
+
+  const { error, count } = await ctx.supabase
+    .from("quotes")
+    .delete({ count: "exact" })
+    .in("id", ids)
+    .eq("tenant_id", ctx.tenant_id);
+
+  if (error) return { deleted: 0, error: error.message };
+  revalidatePath("/quotes");
+  return { deleted: count ?? ids.length };
 }

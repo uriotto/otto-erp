@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -13,9 +13,16 @@ import {
   Calendar,
   Building2,
   ListTree,
+  LayoutGrid,
+  Table2,
+  Trash2,
 } from "lucide-react";
 import type { Tables } from "@/lib/supabase/types";
 import { NewProjectDialog } from "./new-project-dialog";
+import { ViewToggle, useStoredView } from "@/components/ui/view-toggle";
+import { BulkActionBar } from "@/components/ui/bulk-action-bar";
+import { bulkDeleteProjects, bulkUpdateProjectStatus } from "./actions";
+import { useToast } from "@/components/ui/toast";
 
 const STATUS_LABELS: Record<string, string> = {
   planning: "תכנון",
@@ -84,8 +91,12 @@ export function ProjectsList({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const toast = useToast();
 
+  const [view, setView] = useStoredView<"grid" | "table">("projects-view", "grid");
   const [showNew, setShowNew] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkPending, startBulk] = useTransition();
   const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
   const [statusFilter, setStatusFilter] = useState<string>(
     () => searchParams.get("status") ?? "all",
@@ -146,6 +157,52 @@ export function ProjectsList({
     updateUrl({ q: undefined, status: undefined, billing: undefined, customer: undefined });
   };
 
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selected.size === filtered.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(filtered.map((p) => p.id)));
+    }
+  }
+
+  function handleBulkDelete() {
+    const ids = Array.from(selected);
+    if (!confirm(`למחוק ${ids.length} פרויקטים?`)) return;
+    startBulk(async () => {
+      const res = await bulkDeleteProjects(ids);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(`נמחקו ${res.deleted} פרויקטים`);
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
+
+  function handleBulkStatus(status: "planning" | "active" | "on_hold" | "completed" | "cancelled") {
+    const ids = Array.from(selected);
+    startBulk(async () => {
+      const res = await bulkUpdateProjectStatus(ids, status);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(`עודכנו ${res.updated} פרויקטים`);
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
+
   return (
     <div>
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
@@ -153,14 +210,26 @@ export function ProjectsList({
           <h1 className="text-display-md text-navy">פרויקטים</h1>
           <p className="text-ink-soft mt-1 text-sm">{projects.length} פרויקטים סך הכל</p>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowNew(true)}
-          className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
-        >
-          <Plus size={16} />
-          פרויקט חדש
-        </button>
+        <div className="flex items-center gap-2">
+          <ViewToggle
+            storageKey="projects-view"
+            views={[
+              { id: "grid", icon: LayoutGrid, label: "גריד" },
+              { id: "table", icon: Table2, label: "טבלה" },
+            ]}
+            defaultView="grid"
+            current={view}
+            onChange={setView}
+          />
+          <button
+            type="button"
+            onClick={() => setShowNew(true)}
+            className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
+          >
+            <Plus size={16} />
+            פרויקט חדש
+          </button>
+        </div>
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2">
@@ -228,6 +297,85 @@ export function ProjectsList({
         <EmptyState onNew={() => setShowNew(true)} />
       ) : filtered.length === 0 ? (
         <NoResults query={query} onClear={clearAll} />
+      ) : view === "table" ? (
+        <div className="bg-cream-paper border-ink-line overflow-hidden rounded-2xl border">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-ink-line/60 border-b">
+                <th className="w-10 px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={selected.size === filtered.length && filtered.length > 0}
+                    onChange={toggleSelectAll}
+                    className="cursor-pointer rounded"
+                  />
+                </th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">שם</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">לקוח</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">סטטוס</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">מודל חיוב</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">תאריך יצירה</th>
+              </tr>
+            </thead>
+            <tbody className="divide-ink-line/40 divide-y">
+              {filtered.map((p) => (
+                <tr
+                  key={p.id}
+                  className={`transition-colors ${selected.has(p.id) ? "bg-navy/5" : "hover:bg-cream/30"}`}
+                >
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(p.id)}
+                      onChange={() => toggleSelect(p.id)}
+                      className="cursor-pointer rounded"
+                    />
+                  </td>
+                  <td className="px-4 py-3">
+                    <Link
+                      href={`/projects/${p.id}`}
+                      className="flex items-center gap-2 hover:underline"
+                    >
+                      {p.parent_project_id ? (
+                        <ListTree size={13} className="text-ink-faded shrink-0" />
+                      ) : (
+                        <FolderKanban size={13} className="text-ink-faded shrink-0" />
+                      )}
+                      <span className="text-navy font-medium">{p.name}</span>
+                    </Link>
+                  </td>
+                  <td className="px-4 py-3">
+                    {p.customer_name ? (
+                      <span className="text-ink-soft inline-flex items-center gap-1 text-xs">
+                        <Building2 size={11} />
+                        {p.customer_name}
+                      </span>
+                    ) : (
+                      <span className="text-ink-faded text-xs">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`rounded-full border px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[p.status] ?? "border-ink-line bg-cream text-ink-soft"}`}
+                    >
+                      {STATUS_LABELS[p.status] ?? p.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="text-ink-soft text-xs">
+                      {BILLING_LABELS[p.billing_model] ?? p.billing_model}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="text-ink-soft text-xs">
+                      {p.created_at ? new Date(p.created_at).toLocaleDateString("he-IL") : "—"}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((p) => (
@@ -235,6 +383,32 @@ export function ProjectsList({
           ))}
         </div>
       )}
+
+      <BulkActionBar
+        selectedCount={selected.size}
+        onClear={() => setSelected(new Set())}
+        actions={[
+          {
+            label: "העבר לפעיל",
+            variant: "default",
+            isPending: bulkPending,
+            onClick: () => handleBulkStatus("active"),
+          },
+          {
+            label: "סיים",
+            variant: "default",
+            isPending: bulkPending,
+            onClick: () => handleBulkStatus("completed"),
+          },
+          {
+            label: "מחק",
+            icon: Trash2,
+            variant: "danger",
+            isPending: bulkPending,
+            onClick: handleBulkDelete,
+          },
+        ]}
+      />
 
       {showNew && (
         <NewProjectDialog

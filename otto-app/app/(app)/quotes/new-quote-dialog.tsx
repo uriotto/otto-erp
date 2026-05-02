@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
-import { X, Upload, Link2, Loader2, FileCheck } from "lucide-react";
+import { X, Upload, Link2, Loader2, FileCheck, Plus, Trash2 } from "lucide-react";
 import { createQuote, type QuoteFormState } from "./actions";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
@@ -17,6 +17,7 @@ const STATUSES = [
 
 type CustomerOption = { id: string; name: string; company: string | null };
 type ProjectOption = { id: string; name: string; customer_id?: string | null };
+type Module = { id: string; name: string; description: string; price: number; optional: boolean };
 
 function useFileUpload() {
   const [uploading, startUpload] = useTransition();
@@ -87,8 +88,24 @@ export function NewQuoteDialog({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [docMode, setDocMode] = useState<"url" | "upload">("url");
   const [selectedCustomerId, setSelectedCustomerId] = useState(defaultCustomerId ?? "");
+  const [modules, setModules] = useState<Module[]>([]);
   const { upload, uploading, uploadedUrl, uploadedName, setUploadedUrl, setUploadedName } =
     useFileUpload();
+
+  function addModule() {
+    setModules((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), name: "", description: "", price: 0, optional: false },
+    ]);
+  }
+
+  function updateModule(id: string, patch: Partial<Module>) {
+    setModules((prev) => prev.map((m) => (m.id === id ? { ...m, ...patch } : m)));
+  }
+
+  function removeModule(id: string) {
+    setModules((prev) => prev.filter((m) => m.id !== id));
+  }
 
   const filteredProjects = selectedCustomerId
     ? projects.filter((p) => !p.customer_id || p.customer_id === selectedCustomerId)
@@ -113,7 +130,7 @@ export function NewQuoteDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="bg-navy/40 fixed inset-0" onClick={onClose} />
-      <div className="bg-cream-paper relative z-10 w-full max-w-lg rounded-2xl p-6 shadow-xl">
+      <div className="bg-cream-paper relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl p-6 shadow-xl">
         <div className="mb-5 flex items-center justify-between">
           <h2 className="text-display-sm text-navy">הצעת מחיר חדשה</h2>
           <button onClick={onClose} className="text-ink-soft hover:text-navy rounded-lg p-1">
@@ -341,6 +358,75 @@ export function NewQuoteDialog({
               rows={2}
               className="border-ink-line focus:border-navy w-full rounded-xl border bg-white px-3 py-2.5 text-sm outline-none"
             />
+          </div>
+
+          {/* Modules */}
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="text-navy text-sm font-medium">מודולים / שירותים</label>
+              <button
+                type="button"
+                onClick={addModule}
+                className="text-navy hover:bg-navy/5 flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium"
+              >
+                <Plus size={12} />
+                הוסף מודול
+              </button>
+            </div>
+            <input type="hidden" name="modules" value={JSON.stringify(modules)} />
+            {modules.length === 0 ? (
+              <p className="text-ink-faded border-ink-line rounded-xl border border-dashed py-3 text-center text-xs">
+                אין מודולים — לחץ &quot;הוסף מודול&quot; להוספה
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {modules.map((m) => (
+                  <div key={m.id} className="border-ink-line rounded-xl border bg-white p-3">
+                    <div className="mb-2 flex items-start gap-2">
+                      <input
+                        type="text"
+                        placeholder="שם המודול *"
+                        value={m.name}
+                        onChange={(e) => updateModule(m.id, { name: e.target.value })}
+                        className="border-ink-line focus:border-navy min-w-0 flex-1 rounded-lg border px-2.5 py-1.5 text-sm outline-none"
+                      />
+                      <input
+                        type="number"
+                        placeholder="₪ מחיר"
+                        value={m.price || ""}
+                        min="0"
+                        onChange={(e) => updateModule(m.id, { price: Number(e.target.value) })}
+                        className="border-ink-line focus:border-navy w-24 shrink-0 rounded-lg border px-2.5 py-1.5 text-sm outline-none"
+                        dir="ltr"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeModule(m.id)}
+                        className="text-ink-faded rounded p-1 hover:text-red-500"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                    <textarea
+                      placeholder="תיאור (אופציונלי)"
+                      value={m.description}
+                      onChange={(e) => updateModule(m.id, { description: e.target.value })}
+                      rows={1}
+                      className="border-ink-line focus:border-navy mb-2 w-full rounded-lg border px-2.5 py-1.5 text-xs outline-none"
+                    />
+                    <label className="flex cursor-pointer items-center gap-1.5 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={m.optional}
+                        onChange={(e) => updateModule(m.id, { optional: e.target.checked })}
+                        className="rounded accent-gray-700"
+                      />
+                      <span className="text-ink-soft">אופציונלי (הלקוח יכול לבטל)</span>
+                    </label>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end gap-3 pt-2">

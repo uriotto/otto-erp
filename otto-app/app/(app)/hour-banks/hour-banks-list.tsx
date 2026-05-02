@@ -1,10 +1,25 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { Plus, Building2, Calendar, Banknote, FileClock, LayoutGrid, Wallet } from "lucide-react";
+import {
+  Plus,
+  Building2,
+  Calendar,
+  Banknote,
+  FileClock,
+  LayoutGrid,
+  Wallet,
+  Table2,
+  Trash2,
+} from "lucide-react";
 import { HourBankProgress } from "@/components/domain/hour-bank-progress";
 import { NewHourBankDialog } from "./new-hour-bank-dialog";
+import { ViewToggle, useStoredView } from "@/components/ui/view-toggle";
+import { BulkActionBar } from "@/components/ui/bulk-action-bar";
+import { bulkCancelHourBanks } from "./actions";
+import { useToast } from "@/components/ui/toast";
+import { useRouter } from "next/navigation";
 
 export type HourBankStatus = "draft" | "active" | "depleted" | "expired" | "cancelled";
 
@@ -72,9 +87,14 @@ export function HourBanksList({
   defaultAlertPct: number;
   defaultAlertHours: number;
 }) {
+  const router = useRouter();
+  const toast = useToast();
+  const [view, setView] = useStoredView<"grid" | "table">("hour-banks-view", "grid");
   const [showNew, setShowNew] = useState(false);
   const [tab, setTab] = useState<"all" | HourBankStatus>("active");
   const [customerFilter, setCustomerFilter] = useState<string>("all");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkPending, startBulk] = useTransition();
 
   const counts = useMemo(() => {
     const map: Record<string, number> = { all: banks.length };
@@ -89,6 +109,38 @@ export function HourBanksList({
       return true;
     });
   }, [banks, tab, customerFilter]);
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selected.size === filtered.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(filtered.map((b) => b.id)));
+    }
+  }
+
+  function handleBulkCancel() {
+    const ids = Array.from(selected);
+    if (!confirm(`לבטל ${ids.length} בנקי שעות?`)) return;
+    startBulk(async () => {
+      const res = await bulkCancelHourBanks(ids);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(`בוטלו ${res.cancelled} בנקים`);
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
 
   return (
     <div>
@@ -107,6 +159,16 @@ export function HourBanksList({
               טיוטות חידוש ({draftCount})
             </Link>
           )}
+          <ViewToggle
+            storageKey="hour-banks-view"
+            views={[
+              { id: "grid", icon: LayoutGrid, label: "גריד" },
+              { id: "table", icon: Table2, label: "טבלה" },
+            ]}
+            defaultView="grid"
+            current={view}
+            onChange={setView}
+          />
           <button
             type="button"
             onClick={() => setShowNew(true)}
@@ -156,6 +218,75 @@ export function HourBanksList({
         <EmptyState onNew={() => setShowNew(true)} />
       ) : filtered.length === 0 ? (
         <NoResults />
+      ) : view === "table" ? (
+        <div className="bg-cream-paper border-ink-line overflow-hidden rounded-2xl border">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-ink-line/60 border-b">
+                <th className="w-10 px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={selected.size === filtered.length && filtered.length > 0}
+                    onChange={toggleSelectAll}
+                    className="cursor-pointer rounded"
+                  />
+                </th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">לקוח</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">שעות שנרכשו</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">זמינות</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">סטטוס</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">תפוגה</th>
+              </tr>
+            </thead>
+            <tbody className="divide-ink-line/40 divide-y">
+              {filtered.map((b) => (
+                <tr
+                  key={b.id}
+                  className={`transition-colors ${selected.has(b.id) ? "bg-navy/5" : "hover:bg-cream/30"}`}
+                >
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(b.id)}
+                      onChange={() => toggleSelect(b.id)}
+                      className="cursor-pointer rounded"
+                    />
+                  </td>
+                  <td className="px-4 py-3">
+                    <Link
+                      href={`/hour-banks/${b.id}`}
+                      className="text-navy font-medium hover:underline"
+                    >
+                      {b.customer_name ?? "—"}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-3" dir="ltr">
+                    <span className="text-navy text-xs font-medium">{b.purchased_hours}h</span>
+                  </td>
+                  <td className="px-4 py-3" dir="ltr">
+                    <span
+                      className={`text-xs font-medium ${b.available_hours <= 0 ? "text-rose-600" : "text-emerald-700"}`}
+                    >
+                      {b.available_hours}h
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`rounded-full border px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[b.status]}`}
+                    >
+                      {STATUS_LABELS[b.status]}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="text-ink-soft text-xs">
+                      {b.expiry_date ? new Date(b.expiry_date).toLocaleDateString("he-IL") : "—"}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((b) => (
@@ -163,6 +294,20 @@ export function HourBanksList({
           ))}
         </div>
       )}
+
+      <BulkActionBar
+        selectedCount={selected.size}
+        onClear={() => setSelected(new Set())}
+        actions={[
+          {
+            label: "בטל",
+            icon: Trash2,
+            variant: "danger",
+            isPending: bulkPending,
+            onClick: handleBulkCancel,
+          },
+        ]}
+      />
 
       {showNew && (
         <NewHourBankDialog

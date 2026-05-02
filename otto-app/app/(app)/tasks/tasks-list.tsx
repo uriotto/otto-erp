@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   Trash2,
   Check,
+  Table2,
 } from "lucide-react";
 import { CalendarView, toDateKey } from "./calendar-view";
 import type { Tables } from "@/lib/supabase/types";
@@ -29,7 +30,10 @@ import {
   toggleTaskComplete,
   updateTask,
   updateTaskStatus,
+  bulkDeleteTasks,
+  bulkUpdateTaskStatus,
 } from "./actions";
+import { BulkActionBar } from "@/components/ui/bulk-action-bar";
 
 const STATUS_LABELS: Record<string, string> = {
   todo: "לעשות",
@@ -93,7 +97,7 @@ export type LeadOption = { id: string; name: string };
 
 const SEARCH_DEBOUNCE_MS = 200;
 
-type ViewMode = "list" | "kanban" | "calendar" | "today";
+type ViewMode = "list" | "kanban" | "calendar" | "today" | "table";
 
 export function TasksList({
   tasks,
@@ -129,9 +133,11 @@ export function TasksList({
   );
   const [view, setView] = useState<ViewMode>(() => {
     const v = searchParams.get("view");
-    const modes = ["kanban", "calendar", "today"] as const;
+    const modes = ["kanban", "calendar", "today", "table"] as const;
     return modes.includes(v as (typeof modes)[number]) ? (v as ViewMode) : "list";
   });
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkPending, startBulk] = useTransition();
 
   const updateUrl = useCallback(
     (params: Record<string, string | undefined>) => {
@@ -189,6 +195,52 @@ export function TasksList({
     setView(v);
     updateUrl({ view: v !== "list" ? v : undefined });
   };
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selected.size === filtered.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(filtered.map((t) => t.id)));
+    }
+  }
+
+  function handleBulkDelete() {
+    const ids = Array.from(selected);
+    if (!confirm(`למחוק ${ids.length} משימות?`)) return;
+    startBulk(async () => {
+      const res = await bulkDeleteTasks(ids);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(`נמחקו ${res.deleted} משימות`);
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
+
+  function handleBulkStatus(status: string) {
+    const ids = Array.from(selected);
+    startBulk(async () => {
+      const res = await bulkUpdateTaskStatus(ids, status);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(`עודכנו ${res.updated} משימות`);
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
 
   const handleQuickCapture = async (title: string, dueDate: string | null) => {
     const res = await quickCreateTask({
@@ -318,9 +370,108 @@ export function TasksList({
         <CalendarView tasks={filtered} />
       ) : view === "today" ? (
         <TodayView tasks={filtered} />
+      ) : view === "table" ? (
+        <div className="bg-cream-paper border-ink-line overflow-hidden rounded-2xl border">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-ink-line/60 border-b">
+                <th className="w-10 px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={selected.size === filtered.length && filtered.length > 0}
+                    onChange={toggleSelectAll}
+                    className="cursor-pointer rounded"
+                  />
+                </th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">כותרת</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">פרויקט</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">סטטוס</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">עדיפות</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">תאריך יעד</th>
+              </tr>
+            </thead>
+            <tbody className="divide-ink-line/40 divide-y">
+              {filtered.map((t) => (
+                <tr
+                  key={t.id}
+                  className={`transition-colors ${selected.has(t.id) ? "bg-navy/5" : "hover:bg-cream/30"}`}
+                >
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(t.id)}
+                      onChange={() => toggleSelect(t.id)}
+                      className="cursor-pointer rounded"
+                    />
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`text-navy font-medium ${t.completed_at ? "line-through opacity-50" : ""}`}
+                    >
+                      {t.title}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {t.project_name ? (
+                      <span className="text-ink-soft inline-flex items-center gap-1 text-xs">
+                        <FolderKanban size={11} />
+                        {t.project_name}
+                      </span>
+                    ) : (
+                      <span className="text-ink-faded text-xs">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`rounded-full border px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[t.status ?? "todo"] ?? ""}`}
+                    >
+                      {STATUS_LABELS[t.status ?? "todo"] ?? t.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {t.priority ? (
+                      <span
+                        className={`rounded-full border px-2 py-0.5 text-xs font-medium ${PRIORITY_STYLES[t.priority] ?? ""}`}
+                      >
+                        {PRIORITY_LABELS[t.priority] ?? t.priority}
+                      </span>
+                    ) : (
+                      <span className="text-ink-faded text-xs">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="text-ink-soft text-xs">
+                      {t.due_date ? new Date(t.due_date).toLocaleDateString("he-IL") : "—"}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <ListView tasks={filtered} />
       )}
+
+      <BulkActionBar
+        selectedCount={selected.size}
+        onClear={() => setSelected(new Set())}
+        actions={[
+          {
+            label: "סמן כהושלם",
+            variant: "default",
+            isPending: bulkPending,
+            onClick: () => handleBulkStatus("done"),
+          },
+          {
+            label: "מחק",
+            icon: Trash2,
+            variant: "danger",
+            isPending: bulkPending,
+            onClick: handleBulkDelete,
+          },
+        ]}
+      />
 
       {showNew && (
         <NewTaskDialog
@@ -341,6 +492,7 @@ const VIEW_TABS: { mode: ViewMode; icon: React.ReactNode; label: string }[] = [
   { mode: "list", icon: <List size={14} />, label: "רשימה" },
   { mode: "kanban", icon: <KanbanSquare size={14} />, label: "קנבן" },
   { mode: "calendar", icon: <CalendarDays size={14} />, label: "יומן" },
+  { mode: "table", icon: <Table2 size={14} />, label: "טבלה" },
 ];
 
 function ViewToggle({ view, onChange }: { view: ViewMode; onChange: (v: ViewMode) => void }) {

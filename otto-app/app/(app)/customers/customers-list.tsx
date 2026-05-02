@@ -14,14 +14,19 @@ import {
   SearchX,
   UserX,
   Check,
+  LayoutGrid,
+  Table2,
+  Trash2,
 } from "lucide-react";
 import type { Tables } from "@/lib/supabase/types";
 import { NewCustomerDialog } from "./new-customer-dialog";
 import { ExportCsvButton } from "@/components/ui/export-csv-button";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
-import { bulkDeactivateCustomers, exportCustomersCsv } from "./actions";
+import { bulkDeactivateCustomers, bulkDeleteCustomers, exportCustomersCsv } from "./actions";
 import { Eye, EyeOff } from "lucide-react";
+import { ViewToggle, useStoredView } from "@/components/ui/view-toggle";
+import { BulkActionBar } from "@/components/ui/bulk-action-bar";
 
 type Customer = Tables<"customers">;
 type StatusFilter = "all" | "active" | "inactive";
@@ -62,6 +67,7 @@ export function CustomersList({
   const [pendingDelete, startDeleteTransition] = useTransition();
   const [showNew, setShowNew] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [view, setView] = useStoredView<"grid" | "table">("customers-view", "grid");
   const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(() =>
     parseStatus(searchParams.get("status")),
@@ -162,6 +168,21 @@ export function CustomersList({
     });
   };
 
+  const handleBulkDelete = () => {
+    const ids = Array.from(selectedIds);
+    if (!confirm(`למחוק ${ids.length} לקוחות לצמיתות?`)) return;
+    startDeleteTransition(async () => {
+      const result = await bulkDeleteCustomers(ids);
+      if (result?.error) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success(`נמחקו ${result.deleted} לקוחות`);
+      setSelectedIds(new Set());
+      router.refresh();
+    });
+  };
+
   const clearAll = () => {
     setQuery("");
     setStatusFilter("all");
@@ -181,6 +202,16 @@ export function CustomersList({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <ViewToggle
+            storageKey="customers-view"
+            views={[
+              { id: "grid", icon: LayoutGrid, label: "כרטיסים" },
+              { id: "table", icon: Table2, label: "טבלה" },
+            ]}
+            defaultView="grid"
+            current={view}
+            onChange={setView}
+          />
           <Link
             href={showInactive ? "/customers" : "/customers?inactive=1"}
             className="text-ink-soft hover:text-navy flex items-center gap-1.5 rounded-xl border border-transparent px-3 py-2.5 text-xs font-medium transition-colors hover:border-current"
@@ -283,6 +314,94 @@ export function CustomersList({
         <EmptyState onNew={() => setShowNew(true)} />
       ) : filtered.length === 0 ? (
         <NoResults query={query} onClear={clearAll} />
+      ) : view === "table" ? (
+        <div className="bg-cream-paper border-ink-line overflow-hidden rounded-2xl border">
+          <table className="w-full text-sm">
+            <thead className="bg-cream-deep text-ink-soft text-xs">
+              <tr>
+                <th className="w-10 px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={filtered.every((c) => selectedIds.has(c.id)) && filtered.length > 0}
+                    onChange={() => {
+                      const allSelected = filtered.every((c) => selectedIds.has(c.id));
+                      setSelectedIds(allSelected ? new Set() : new Set(filtered.map((c) => c.id)));
+                    }}
+                    className="cursor-pointer rounded"
+                  />
+                </th>
+                <th className="px-4 py-3 text-start font-medium">שם</th>
+                <th className="px-4 py-3 text-start font-medium">חברה</th>
+                <th className="px-4 py-3 text-start font-medium">אימייל</th>
+                <th className="px-4 py-3 text-start font-medium">מודל חיוב</th>
+                <th className="px-4 py-3 text-start font-medium">סטטוס</th>
+                <th className="px-4 py-3 text-start font-medium">תגיות</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((c) => (
+                <tr
+                  key={c.id}
+                  className={`border-ink-line cursor-pointer border-t transition-colors ${selectedIds.has(c.id) ? "bg-navy/5" : "hover:bg-cream-deep/40"}`}
+                  onClick={() => router.push(`/customers/${c.id}`)}
+                >
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(c.id)}
+                      onChange={() => toggleSelected(c.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="cursor-pointer rounded"
+                    />
+                  </td>
+                  <td className="px-4 py-3">
+                    <Link
+                      href={`/customers/${c.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-navy hover:text-navy-deep font-medium"
+                    >
+                      {c.name}
+                    </Link>
+                  </td>
+                  <td className="text-ink-soft px-4 py-3">{c.company ?? "—"}</td>
+                  <td className="text-ink-soft px-4 py-3">{c.email ?? "—"}</td>
+                  <td className="px-4 py-3">
+                    <span className="text-ink-soft text-xs">
+                      {c.billing_model_default === "hourly"
+                        ? "שעתי"
+                        : c.billing_model_default === "hour_bank"
+                          ? "בנק שעות"
+                          : c.billing_model_default === "fixed_price"
+                            ? "מחיר קבוע"
+                            : c.billing_model_default === "retainer"
+                              ? "ריטיינר"
+                              : (c.billing_model_default ?? "—")}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`rounded-full border px-2 py-0.5 text-xs font-medium ${c.active !== false ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-gray-200 bg-gray-100 text-gray-500"}`}
+                    >
+                      {c.active !== false ? "פעיל" : "לא פעיל"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap gap-1">
+                      {(c.tags ?? []).slice(0, 3).map((t) => (
+                        <span
+                          key={t}
+                          className="bg-navy/5 text-ink-soft rounded-full px-2 py-0.5 text-xs"
+                        >
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((c) => (
@@ -296,33 +415,25 @@ export function CustomersList({
         </div>
       )}
 
-      {selectedIds.size > 0 && (
-        <div
-          role="region"
-          aria-label="פעולות גורפות"
-          className="bg-navy text-cream-paper fixed bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-2xl px-5 py-3 shadow-lg"
-        >
-          <span className="text-sm font-medium">{selectedIds.size} נבחרו</span>
-          <button
-            type="button"
-            onClick={handleBulkDeactivate}
-            disabled={pendingDelete}
-            aria-busy={pendingDelete}
-            className="flex items-center gap-1.5 rounded-xl bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {pendingDelete ? <Spinner size={13} /> : <UserX size={13} />}
-            {pendingDelete ? "מעדכן" : "השבת"}
-          </button>
-          <button
-            type="button"
-            onClick={clearSelection}
-            disabled={pendingDelete}
-            className="text-cream-paper/80 hover:text-cream-paper rounded-xl px-2 py-1.5 text-xs font-medium transition-colors disabled:opacity-60"
-          >
-            ביטול בחירה
-          </button>
-        </div>
-      )}
+      <BulkActionBar
+        selectedCount={selectedIds.size}
+        onClear={clearSelection}
+        actions={[
+          {
+            label: "השבת",
+            icon: UserX,
+            isPending: pendingDelete,
+            onClick: handleBulkDeactivate,
+          },
+          {
+            label: "מחק",
+            icon: Trash2,
+            variant: "danger",
+            isPending: pendingDelete,
+            onClick: handleBulkDelete,
+          },
+        ]}
+      />
 
       {showNew && <NewCustomerDialog onClose={() => setShowNew(false)} />}
     </>

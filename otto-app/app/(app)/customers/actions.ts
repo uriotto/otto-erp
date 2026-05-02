@@ -311,3 +311,30 @@ export async function bulkDeactivateCustomers(
   revalidatePath("/customers");
   return { updated: cleanIds.length };
 }
+
+export async function bulkDeleteCustomers(
+  ids: string[],
+): Promise<{ deleted: number; error?: string }> {
+  if (ids.length === 0) return { deleted: 0 };
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { deleted: 0, error: "לא מחובר" };
+  const { data: profile } = await supabase
+    .from("users")
+    .select("tenant_id")
+    .eq("id", user.id)
+    .single();
+  if (!profile) return { deleted: 0, error: "לא מחובר" };
+
+  const { error, count } = await supabase
+    .from("customers")
+    .delete({ count: "exact" })
+    .in("id", ids)
+    .eq("tenant_id", profile.tenant_id);
+
+  if (error) return { deleted: 0, error: error.message };
+  revalidatePath("/customers");
+  return { deleted: count ?? ids.length };
+}

@@ -281,3 +281,41 @@ export async function assignCustomerToEntry(input: {
   revalidatePath(`/customers/${parsed.data.customer_id}`);
   return {};
 }
+
+export async function bulkDeleteTimeEntries(
+  ids: string[],
+): Promise<{ deleted: number; error?: string }> {
+  if (ids.length === 0) return { deleted: 0 };
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { deleted: 0, error: "לא מחובר" };
+
+  const { error, count } = await supabase
+    .from("time_entries")
+    .delete({ count: "exact" })
+    .in("id", ids)
+    .eq("tenant_id", profile.tenant_id)
+    .neq("billing_status", "invoiced");
+
+  if (error) return { deleted: 0, error: error.message };
+  revalidatePath("/time");
+  return { deleted: count ?? ids.length };
+}
+
+export async function bulkToggleBillable(
+  ids: string[],
+  billable: boolean,
+): Promise<{ updated: number; error?: string }> {
+  if (ids.length === 0) return { updated: 0 };
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { updated: 0, error: "לא מחובר" };
+
+  const { error, count } = await supabase
+    .from("time_entries")
+    .update({ billable })
+    .in("id", ids)
+    .eq("tenant_id", profile.tenant_id);
+
+  if (error) return { updated: 0, error: error.message };
+  revalidatePath("/time");
+  return { updated: count ?? ids.length };
+}

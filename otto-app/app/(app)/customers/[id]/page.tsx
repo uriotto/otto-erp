@@ -14,6 +14,7 @@ import {
 import { RecentTracker } from "@/components/search/recent-tracker";
 import { BreadcrumbLabel } from "@/components/layout/breadcrumb-label";
 import { CustomerCredentialsSection } from "./credentials-section";
+import { AgentSection } from "@/components/agents/agent-section";
 
 export const metadata = { title: "לקוח — OTTO" };
 
@@ -223,6 +224,12 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
       </div>
 
       <CustomerCredentialsSection customerId={customer.id} credentials={credentials ?? []} />
+
+      <AgentSection
+        contextType="customer"
+        contextId={customer.id}
+        contextData={{ customer_name: customer.name, customer_id: customer.id }}
+      />
 
       <div className="mt-6">
         <TasksSection tasks={tasks} />

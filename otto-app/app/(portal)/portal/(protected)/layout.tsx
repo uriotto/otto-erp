@@ -55,6 +55,10 @@ function PortalHeader({ customer }: { customer: PortalCustomer }) {
           <NavLink href="/portal/invoices">חשבוניות</NavLink>
           <NavLink href="/portal/hour-banks">בנקי שעות</NavLink>
           <NavLink href="/portal/projects">פרויקטים</NavLink>
+          <NavLink href="/portal/tasks">משימות</NavLink>
+          <NavLink href="/portal/documents">מסמכים</NavLink>
+          <NavLink href="/portal/meetings">פגישות</NavLink>
+          <NavLink href="/portal/timesheet">שעות</NavLink>
           <PortalSignOutButton />
         </div>
       </div>

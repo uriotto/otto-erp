@@ -383,3 +383,41 @@ export async function deleteMilestone(id: string, projectId: string): Promise<{ 
   revalidatePath(`/projects/${projectId}`);
   return {};
 }
+
+export async function bulkDeleteProjects(
+  ids: string[],
+): Promise<{ deleted: number; error?: string }> {
+  if (ids.length === 0) return { deleted: 0 };
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { deleted: 0, error: "לא מחובר" };
+
+  const { error, count } = await supabase
+    .from("projects")
+    .delete({ count: "exact" })
+    .in("id", ids)
+    .eq("tenant_id", profile.tenant_id)
+    .is("deleted_at", null);
+
+  if (error) return { deleted: 0, error: error.message };
+  revalidatePath("/projects");
+  return { deleted: count ?? ids.length };
+}
+
+export async function bulkUpdateProjectStatus(
+  ids: string[],
+  status: "planning" | "active" | "on_hold" | "completed" | "cancelled",
+): Promise<{ updated: number; error?: string }> {
+  if (ids.length === 0) return { updated: 0 };
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { updated: 0, error: "לא מחובר" };
+
+  const { error, count } = await supabase
+    .from("projects")
+    .update({ status })
+    .in("id", ids)
+    .eq("tenant_id", profile.tenant_id);
+
+  if (error) return { updated: 0, error: error.message };
+  revalidatePath("/projects");
+  return { updated: count ?? ids.length };
+}
