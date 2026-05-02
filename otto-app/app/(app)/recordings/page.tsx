@@ -1,21 +1,57 @@
-import { Mic, Clock } from "lucide-react";
+import Link from "next/link";
+import { Plus } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { RecordingsList } from "./recordings-list";
 
 export const metadata = { title: "הקלטות — OTTO" };
 
-export default function RecordingsPage() {
+export default async function RecordingsPage() {
+  const supabase = await createClient();
+
+  const { data: recordings } = await supabase
+    .from("recordings")
+    .select(
+      `
+      id, title, status, duration_seconds, file_size, storage_path, recorded_at, created_at,
+      customer_id, project_id,
+      customers(name),
+      projects(name)
+    `,
+    )
+    .order("recorded_at", { ascending: false });
+
+  const normalized = (recordings ?? []).map((r) => ({
+    ...r,
+    customer_name: Array.isArray(r.customers)
+      ? (r.customers[0] as { name: string } | null)?.name ?? null
+      : (r.customers as { name: string } | null)?.name ?? null,
+    project_name: Array.isArray(r.projects)
+      ? (r.projects[0] as { name: string } | null)?.name ?? null
+      : (r.projects as { name: string } | null)?.name ?? null,
+    transcript: null,
+    summary: null,
+    tenant_id: "",
+  }));
+
   return (
-    <div className="flex flex-col items-center justify-center py-24 text-center">
-      <div className="border-ink-line bg-cream-paper mb-6 rounded-2xl border p-6">
-        <Mic size={40} className="text-navy mx-auto mb-4 opacity-40" />
-        <div className="mb-2 flex items-center justify-center gap-2">
-          <Clock size={14} className="text-ink-faded" />
-          <span className="text-ink-faded text-sm">בפיתוח — Phase 5.4</span>
+    <div className="px-4 py-6 sm:px-6">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-navy text-xl font-bold">הקלטות</h1>
+          <p className="text-ink-faded mt-0.5 text-sm">
+            {normalized.length > 0 ? `${normalized.length} הקלטות` : "הקלט פגישות ושיחות"}
+          </p>
         </div>
-        <h1 className="text-display-sm text-navy mb-2">הקלטות ותמלולים</h1>
-        <p className="text-ink-soft max-w-sm text-sm">
-          בקרוב: pipeline אוטומטי מ-Zoom — הקלטה → תמלול → סיכום AI → פורטל לקוחות.
-        </p>
+        <Link
+          href="/recordings/new"
+          className="bg-navy text-cream-paper hover:bg-navy/90 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+        >
+          <Plus size={16} />
+          הקלט עכשיו
+        </Link>
       </div>
+
+      <RecordingsList recordings={normalized} />
     </div>
   );
 }

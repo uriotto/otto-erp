@@ -14,7 +14,9 @@ export function CommandPalette() {
   const [results, setResults] = useState<SearchResults>({
     customers: [],
     leads: [],
-    activities: [],
+    projects: [],
+    tasks: [],
+    documents: [],
   });
   const [loading, setLoading] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -54,7 +56,7 @@ export function CommandPalette() {
       setRecent(getRecent(RECENT_LIMIT));
     } else {
       setQuery("");
-      setResults({ customers: [], leads: [], activities: [] });
+      setResults({ customers: [], leads: [], projects: [], tasks: [], documents: [] });
       setActiveIndex(0);
     }
   }, [open]);
@@ -63,7 +65,7 @@ export function CommandPalette() {
   useEffect(() => {
     if (query.trim().length < 2) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setResults({ customers: [], leads: [], activities: [] });
+      setResults({ customers: [], leads: [], projects: [], tasks: [], documents: [] });
       return;
     }
     let cancelled = false;
@@ -87,7 +89,13 @@ export function CommandPalette() {
   }, [query]);
 
   const searchFlatList: SearchResultItem[] = useMemo(
-    () => [...results.customers, ...results.leads, ...results.activities],
+    () => [
+      ...results.customers,
+      ...results.leads,
+      ...results.projects,
+      ...results.tasks,
+      ...results.documents,
+    ],
     [results],
   );
 
@@ -197,9 +205,27 @@ export function CommandPalette() {
                 onHover={setActiveIndex}
               />
               <ResultGroup
-                title="פעילויות"
+                title="פרויקטים"
+                icon={<FileText size={13} className="text-emerald-600" />}
+                items={results.projects}
+                flatList={searchFlatList}
+                activeIndex={activeIndex}
+                onSelect={navigateSearch}
+                onHover={setActiveIndex}
+              />
+              <ResultGroup
+                title="משימות"
+                icon={<FileText size={13} className="text-amber-600" />}
+                items={results.tasks}
+                flatList={searchFlatList}
+                activeIndex={activeIndex}
+                onSelect={navigateSearch}
+                onHover={setActiveIndex}
+              />
+              <ResultGroup
+                title="מסמכים"
                 icon={<FileText size={13} className="text-gray-600" />}
-                items={results.activities}
+                items={results.documents}
                 flatList={searchFlatList}
                 activeIndex={activeIndex}
                 onSelect={navigateSearch}

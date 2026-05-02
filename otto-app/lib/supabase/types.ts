@@ -1242,6 +1242,76 @@ export type Database = {
           },
         ];
       };
+      recordings: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          customer_id: string | null;
+          project_id: string | null;
+          title: string;
+          duration_seconds: number | null;
+          storage_path: string | null;
+          file_size: number | null;
+          status: string;
+          transcript: string | null;
+          summary: string | null;
+          recorded_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          customer_id?: string | null;
+          project_id?: string | null;
+          title: string;
+          duration_seconds?: number | null;
+          storage_path?: string | null;
+          file_size?: number | null;
+          status?: string;
+          transcript?: string | null;
+          summary?: string | null;
+          recorded_at?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          customer_id?: string | null;
+          project_id?: string | null;
+          title?: string;
+          duration_seconds?: number | null;
+          storage_path?: string | null;
+          file_size?: number | null;
+          status?: string;
+          transcript?: string | null;
+          summary?: string | null;
+          recorded_at?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "recordings_customer_id_fkey";
+            columns: ["customer_id"];
+            isOneToOne: false;
+            referencedRelation: "customers";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "recordings_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "recordings_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       projects: {
         Row: {
           billing_model: Database["public"]["Enums"]["project_billing_model"];

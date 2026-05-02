@@ -7,7 +7,7 @@ export default function NotFound() {
         {/* big number */}
         <div className="relative mb-6 select-none">
           <span
-            className="text-navy/5 block font-bold leading-none"
+            className="text-navy/5 block leading-none font-bold"
             style={{ fontSize: "clamp(8rem, 30vw, 14rem)" }}
             aria-hidden
           >
