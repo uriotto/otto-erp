@@ -303,15 +303,26 @@ export function RecorderClient({ customers, projects }: Props) {
               {micBlocked ? (
                 <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-start text-sm text-red-700">
                   <p className="mb-2 font-semibold">גישה למיקרופון נחסמה</p>
-                  {/iPhone|iPad|iPod/.test(typeof navigator !== "undefined" ? navigator.userAgent : "") ? (
-                    <p>עבור להגדרות הטלפון ← פרטיות ואבטחה ← מיקרופון ← אפשר לדפדפן, ואז חזור לכאן.</p>
-                  ) : /Android/.test(typeof navigator !== "undefined" ? navigator.userAgent : "") ? (
-                    <p>עבור להגדרות הטלפון ← אפליקציות ← דפדפן ← הרשאות ← מיקרופון ← אפשר, ואז חזור לכאן.</p>
-                  ) : (
+                  {/iPhone|iPad|iPod/.test(
+                    typeof navigator !== "undefined" ? navigator.userAgent : "",
+                  ) ? (
                     <p>
-                      לחץ על סמל המנעול <span className="rounded bg-red-100 px-1 font-mono">🔒</span>{" "}
-                      בשורת הכתובת של הדפדפן ← אפשר מיקרופון ← רענן את הדף.
+                      עבור להגדרות הטלפון ← פרטיות ואבטחה ← מיקרופון ← אפשר לדפדפן, ואז חזור לכאן.
                     </p>
+                  ) : /Android/.test(
+                      typeof navigator !== "undefined" ? navigator.userAgent : "",
+                    ) ? (
+                    <p>
+                      עבור להגדרות הטלפון ← אפליקציות ← דפדפן ← הרשאות ← מיקרופון ← אפשר, ואז חזור
+                      לכאן.
+                    </p>
+                  ) : (
+                    <ol className="list-decimal space-y-1 ps-4">
+                      <li>לחץ על האייקון משמאל לכתובת האתר (מנעול, עיגול-i, או אייקון כוונון)</li>
+                      <li>בחר <strong>הגדרות אתר</strong> / <strong>Site settings</strong></li>
+                      <li>מיקרופון ← שנה ל-<strong>אפשר</strong></li>
+                      <li>רענן את הדף</li>
+                    </ol>
                   )}
                 </div>
               ) : error ? (
