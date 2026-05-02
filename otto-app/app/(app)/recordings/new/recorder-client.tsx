@@ -27,7 +27,8 @@ function formatTime(seconds: number): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = seconds % 60;
-  if (h > 0) return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  if (h > 0)
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
@@ -47,6 +48,21 @@ export function RecorderClient({ customers, projects }: Props) {
   const [state, setState] = useState<"idle" | "recording" | "preview">("idle");
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [micBlocked, setMicBlocked] = useState(false);
+
+  // Check permission status on mount
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.permissions) return;
+    navigator.permissions
+      .query({ name: "microphone" as PermissionName })
+      .then((result) => {
+        if (result.state === "denied") setMicBlocked(true);
+        result.onchange = () => setMicBlocked(result.state === "denied");
+      })
+      .catch(() => {
+        /* browser doesn't support permissions API */
+      });
+  }, []);
   const [blob, setBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
 
@@ -122,7 +138,8 @@ export function RecorderClient({ customers, projects }: Props) {
       }, 500);
     } catch (err) {
       if (err instanceof DOMException && err.name === "NotAllowedError") {
-        setError("לא אושרה גישה למיקרופון. אנא אשר גישה כשהדפדפן שואל.");
+        setMicBlocked(true);
+        setError(null);
       } else if (err instanceof DOMException && err.name === "NotFoundError") {
         setError("לא נמצא מיקרופון במכשיר זה.");
       } else {
@@ -155,8 +172,13 @@ export function RecorderClient({ customers, projects }: Props) {
     startTransition(async () => {
       try {
         const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { toast.show("לא מחובר", "error"); return; }
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) {
+          toast.show("לא מחובר", "error");
+          return;
+        }
 
         const { data: profile } = await supabase
           .from("users")
@@ -164,7 +186,10 @@ export function RecorderClient({ customers, projects }: Props) {
           .eq("id", user.id)
           .single();
 
-        if (!profile) { toast.show("שגיאה בטעינת פרופיל", "error"); return; }
+        if (!profile) {
+          toast.show("שגיאה בטעינת פרופיל", "error");
+          return;
+        }
 
         const fileExt = blob.type.includes("ogg") ? "ogg" : "webm";
         const fileName = `${crypto.randomUUID()}.${fileExt}`;
@@ -224,7 +249,7 @@ export function RecorderClient({ customers, projects }: Props) {
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="border-ink-line bg-cream-paper text-navy placeholder:text-ink-faded focus:border-navy w-full rounded-lg border px-3 py-2 text-sm outline-none transition-colors"
+              className="border-ink-line bg-cream-paper text-navy placeholder:text-ink-faded focus:border-navy w-full rounded-lg border px-3 py-2 text-sm transition-colors outline-none"
               placeholder="שם ההקלטה"
             />
           </div>
@@ -234,11 +259,13 @@ export function RecorderClient({ customers, projects }: Props) {
             <select
               value={customerId}
               onChange={(e) => setCustomerId(e.target.value)}
-              className="border-ink-line bg-cream-paper text-navy focus:border-navy w-full rounded-lg border px-3 py-2 text-sm outline-none transition-colors"
+              className="border-ink-line bg-cream-paper text-navy focus:border-navy w-full rounded-lg border px-3 py-2 text-sm transition-colors outline-none"
             >
               <option value="">— ללא לקוח —</option>
               {customers.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
               ))}
             </select>
           </div>
@@ -248,11 +275,13 @@ export function RecorderClient({ customers, projects }: Props) {
             <select
               value={projectId}
               onChange={(e) => setProjectId(e.target.value)}
-              className="border-ink-line bg-cream-paper text-navy focus:border-navy w-full rounded-lg border px-3 py-2 text-sm outline-none transition-colors disabled:opacity-50"
+              className="border-ink-line bg-cream-paper text-navy focus:border-navy w-full rounded-lg border px-3 py-2 text-sm transition-colors outline-none disabled:opacity-50"
             >
               <option value="">— ללא פרויקט —</option>
               {filteredProjects.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
               ))}
             </select>
           </div>
@@ -262,30 +291,45 @@ export function RecorderClient({ customers, projects }: Props) {
         <div className="border-ink-line bg-cream-paper rounded-xl border p-6 text-center">
           {state === "idle" && (
             <>
-              <div className="bg-navy/8 mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full">
-                <Mic size={32} className="text-navy opacity-60" />
+              <div
+                className={`mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full ${micBlocked ? "bg-red-500/10" : "bg-navy/8"}`}
+              >
+                {micBlocked ? (
+                  <MicOff size={32} className="text-red-500" />
+                ) : (
+                  <Mic size={32} className="text-navy opacity-60" />
+                )}
               </div>
-              {error && (
-                <div className="border-red-200 bg-red-50 mb-4 rounded-lg border px-4 py-3 text-sm text-red-700">
+              {micBlocked ? (
+                <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-start text-sm text-red-700">
+                  <p className="mb-1 font-semibold">גישה למיקרופון נחסמה</p>
+                  <p>
+                    לחץ על סמל המנעול <span className="rounded bg-red-100 px-1 font-mono">🔒</span>{" "}
+                    בשורת הכתובת של הדפדפן ואפשר גישה למיקרופון, ולאחר מכן רענן את הדף.
+                  </p>
+                </div>
+              ) : error ? (
+                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                   {error}
                 </div>
-              )}
+              ) : null}
               <button
                 onClick={startRecording}
-                className="bg-navy text-cream-paper hover:bg-navy/90 inline-flex items-center gap-2 rounded-xl px-8 py-3 text-sm font-semibold transition-colors"
+                disabled={micBlocked}
+                className="bg-navy text-cream-paper hover:bg-navy/90 inline-flex items-center gap-2 rounded-xl px-8 py-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Mic size={18} />
                 התחל הקלטה
               </button>
-              <p className="text-ink-faded mt-3 text-xs">תידרש הרשאה למיקרופון</p>
+              {!micBlocked && <p className="text-ink-faded mt-3 text-xs">תידרש הרשאה למיקרופון</p>}
             </>
           )}
 
           {state === "recording" && (
             <>
               <div className="relative mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full">
-                <span className="bg-red-500/20 absolute inset-0 animate-ping rounded-full" />
-                <div className="bg-red-500/10 flex h-20 w-20 items-center justify-center rounded-full">
+                <span className="absolute inset-0 animate-ping rounded-full bg-red-500/20" />
+                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-red-500/10">
                   <Mic size={32} className="text-red-500" />
                 </div>
               </div>
@@ -293,10 +337,7 @@ export function RecorderClient({ customers, projects }: Props) {
                 <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
                 <span className="text-ink-soft text-sm">מקליט</span>
               </div>
-              <div
-                className="text-navy mb-6 text-4xl font-bold tabular-nums"
-                dir="ltr"
-              >
+              <div className="text-navy mb-6 text-4xl font-bold tabular-nums" dir="ltr">
                 {formatTime(elapsed)}
               </div>
               <button
@@ -311,19 +352,16 @@ export function RecorderClient({ customers, projects }: Props) {
 
           {state === "preview" && blob && (
             <>
-              <div className="bg-green-500/10 mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10">
                 <Clock size={28} className="text-green-600" />
               </div>
               <p className="text-navy mb-1 text-sm font-semibold">ההקלטה הסתיימה</p>
-              <p className="text-ink-faded mb-4 text-xs" dir="ltr">{formatTime(elapsed)}</p>
+              <p className="text-ink-faded mb-4 text-xs" dir="ltr">
+                {formatTime(elapsed)}
+              </p>
 
               {audioUrl && (
-                <audio
-                  src={audioUrl}
-                  controls
-                  className="mx-auto mb-5 w-full max-w-xs"
-                  dir="ltr"
-                />
+                <audio src={audioUrl} controls className="mx-auto mb-5 w-full max-w-xs" dir="ltr" />
               )}
 
               <div className="flex justify-center gap-3">
