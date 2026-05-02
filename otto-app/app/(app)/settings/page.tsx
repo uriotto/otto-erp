@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { LogOut } from "lucide-react";
+import { LogOut, CalendarDays } from "lucide-react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { ProfileCard } from "./profile-card";
 import { TenantCard } from "./tenant-card";
@@ -74,6 +75,22 @@ export default async function SettingsPage() {
         <TagsCard initialTags={tags} />
 
         <ExportCard />
+
+        <Link
+          href="/settings/booking"
+          className="border-ink-line hover:border-navy flex items-center justify-between rounded-2xl border bg-white p-5 transition-colors"
+        >
+          <div className="flex items-center gap-4">
+            <div className="bg-navy/8 rounded-xl p-2.5">
+              <CalendarDays size={20} className="text-navy" />
+            </div>
+            <div>
+              <p className="text-navy font-semibold">קישורי הזמנה</p>
+              <p className="text-ink-faded text-xs">צור לינקים ישירים לקביעת פגישות</p>
+            </div>
+          </div>
+          <span className="text-ink-faded text-sm">←</span>
+        </Link>
 
         {tenant && profile.role === "admin" && <DangerZoneCard tenantName={tenant.name} />}
 

@@ -121,10 +121,12 @@ export function RecorderClient({ customers, projects }: Props) {
         setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
       }, 500);
     } catch (err) {
-      if (err instanceof Error && err.name === "NotAllowedError") {
-        setError("אין הרשאה למיקרופון. אנא אפשר גישה בהגדרות הדפדפן ונסה שוב.");
+      if (err instanceof DOMException && err.name === "NotAllowedError") {
+        setError("לא אושרה גישה למיקרופון. אנא אשר גישה כשהדפדפן שואל.");
+      } else if (err instanceof DOMException && err.name === "NotFoundError") {
+        setError("לא נמצא מיקרופון במכשיר זה.");
       } else {
-        setError("שגיאה בהפעלת המיקרופון. ודא שהמיקרופון מחובר ונסה שוב.");
+        setError("שגיאה בהפעלת המיקרופון. נסה שוב.");
       }
     }
   }, []);

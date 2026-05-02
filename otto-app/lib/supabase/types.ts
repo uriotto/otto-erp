@@ -8,6 +8,107 @@ export type Database = {
   };
   public: {
     Tables: {
+      booking_types: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          slug: string;
+          title: string;
+          description: string | null;
+          duration_minutes: number;
+          is_active: boolean;
+          color: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          slug: string;
+          title: string;
+          description?: string | null;
+          duration_minutes?: number;
+          is_active?: boolean;
+          color?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          slug?: string;
+          title?: string;
+          description?: string | null;
+          duration_minutes?: number;
+          is_active?: boolean;
+          color?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "booking_types_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      booking_slots: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          booking_type_id: string;
+          start_at: string;
+          end_at: string;
+          guest_name: string;
+          guest_email: string;
+          guest_phone: string | null;
+          notes: string | null;
+          status: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          booking_type_id: string;
+          start_at: string;
+          end_at: string;
+          guest_name: string;
+          guest_email: string;
+          guest_phone?: string | null;
+          notes?: string | null;
+          status?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          booking_type_id?: string;
+          start_at?: string;
+          end_at?: string;
+          guest_name?: string;
+          guest_email?: string;
+          guest_phone?: string | null;
+          notes?: string | null;
+          status?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "booking_slots_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "booking_slots_booking_type_id_fkey";
+            columns: ["booking_type_id"];
+            isOneToOne: false;
+            referencedRelation: "booking_types";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       agent_invocations: {
         Row: {
           id: string;
@@ -82,6 +183,76 @@ export type Database = {
           created_at?: string;
         };
         Relationships: [];
+      };
+      events: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          customer_id: string | null;
+          project_id: string | null;
+          title: string;
+          description: string | null;
+          start_at: string;
+          end_at: string;
+          all_day: boolean;
+          location: string | null;
+          type: string;
+          google_event_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          customer_id?: string | null;
+          project_id?: string | null;
+          title: string;
+          description?: string | null;
+          start_at: string;
+          end_at: string;
+          all_day?: boolean;
+          location?: string | null;
+          type?: string;
+          google_event_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          customer_id?: string | null;
+          project_id?: string | null;
+          title?: string;
+          description?: string | null;
+          start_at?: string;
+          end_at?: string;
+          all_day?: boolean;
+          location?: string | null;
+          type?: string;
+          google_event_id?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "events_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "events_customer_id_fkey";
+            columns: ["customer_id"];
+            isOneToOne: false;
+            referencedRelation: "customers";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "events_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       activities: {
         Row: {

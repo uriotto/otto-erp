@@ -46,6 +46,7 @@ export async function updateSession(request: NextRequest) {
     pathname === "/manifest.webmanifest";
   const isPublicRoot = pathname === "/";
   const isPublicProposal = pathname.startsWith("/proposal/");
+  const isPublicBooking = pathname.startsWith("/book/");
 
   // Portal route protection
   if (isPortalRoute && !isPortalAuthRoute && !user) {
@@ -63,7 +64,8 @@ export async function updateSession(request: NextRequest) {
     !isPortalRoute &&
     !isPublicApi &&
     !isPublicRoot &&
-    !isPublicProposal
+    !isPublicProposal &&
+    !isPublicBooking
   ) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
