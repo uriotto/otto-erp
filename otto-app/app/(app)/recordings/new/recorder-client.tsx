@@ -407,6 +407,18 @@ export function RecorderClient({ customers, projects }: Props) {
                   controls
                   preload="auto"
                   className="mx-auto mb-5 w-full max-w-xs"
+                  onLoadedMetadata={(e) => {
+                    const audio = e.currentTarget;
+                    // Chrome WebM duration bug: seek to end to force duration calculation
+                    if (audio.duration === Infinity || isNaN(audio.duration)) {
+                      audio.currentTime = 1e101;
+                      const fix = () => {
+                        audio.ontimeupdate = null;
+                        audio.currentTime = 0;
+                      };
+                      audio.ontimeupdate = fix;
+                    }
+                  }}
                 />
               )}
 
