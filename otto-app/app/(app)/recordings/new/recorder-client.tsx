@@ -66,6 +66,10 @@ export function RecorderClient({ customers, projects }: Props) {
   const [blob, setBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
 
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playProgress, setPlayProgress] = useState(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -402,24 +406,52 @@ export function RecorderClient({ customers, projects }: Props) {
               </p>
 
               {audioUrl && (
-                <audio
-                  src={audioUrl}
-                  controls
-                  preload="auto"
-                  className="mx-auto mb-5 w-full max-w-xs"
-                  onLoadedMetadata={(e) => {
-                    const audio = e.currentTarget;
-                    // Chrome WebM duration bug: seek to end to force duration calculation
-                    if (audio.duration === Infinity || isNaN(audio.duration)) {
-                      audio.currentTime = 1e101;
-                      const fix = () => {
-                        audio.ontimeupdate = null;
-                        audio.currentTime = 0;
-                      };
-                      audio.ontimeupdate = fix;
-                    }
-                  }}
-                />
+                <div className="mx-auto mb-5 w-full max-w-xs">
+                  {/* Hidden audio element */}
+                  <audio
+                    ref={audioRef}
+                    src={audioUrl}
+                    preload="auto"
+                    onPlay={() => setIsPlaying(true)}
+                    onPause={() => setIsPlaying(false)}
+                    onEnded={() => { setIsPlaying(false); setPlayProgress(0); }}
+                    onTimeUpdate={() => {
+                      const a = audioRef.current;
+                      if (a && a.duration && isFinite(a.duration)) {
+                        setPlayProgress(a.currentTime / a.duration);
+                      }
+                    }}
+                  />
+                  {/* Custom player */}
+                  <div className="border-ink-line flex items-center gap-3 rounded-xl border bg-white px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const a = audioRef.current;
+                        if (!a) return;
+                        if (isPlaying) { a.pause(); } else { void a.play(); }
+                      }}
+                      className="bg-navy text-cream-paper flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-opacity hover:opacity-80"
+                    >
+                      {isPlaying ? (
+                        <Square size={14} fill="currentColor" />
+                      ) : (
+                        <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 ms-0.5"><path d="M8 5v14l11-7z"/></svg>
+                      )}
+                    </button>
+                    <div className="flex-1">
+                      <div className="bg-ink-line relative h-1.5 w-full overflow-hidden rounded-full">
+                        <div
+                          className="bg-navy absolute inset-y-0 start-0 rounded-full transition-all"
+                          style={{ width: `${playProgress * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                    <span className="text-ink-faded w-10 text-end text-xs tabular-nums" dir="ltr">
+                      {formatTime(elapsed)}
+                    </span>
+                  </div>
+                </div>
               )}
 
               <div className="flex justify-center gap-3">
