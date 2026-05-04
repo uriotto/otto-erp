@@ -352,7 +352,11 @@ export function RecorderClient({ customers, projects }: Props) {
                 </div>
               ) : null}
               <button
-                onClick={() => { setMicBlocked(false); setError(null); startRecording(); }}
+                onClick={() => {
+                  setMicBlocked(false);
+                  setError(null);
+                  startRecording();
+                }}
                 className="bg-navy text-cream-paper hover:bg-navy/90 inline-flex items-center gap-2 rounded-xl px-8 py-3 text-sm font-semibold transition-colors"
               >
                 <Mic size={18} />
@@ -398,7 +402,12 @@ export function RecorderClient({ customers, projects }: Props) {
               </p>
 
               {audioUrl && (
-                <audio src={audioUrl} controls className="mx-auto mb-5 w-full max-w-xs" dir="ltr" />
+                <audio
+                  src={audioUrl}
+                  controls
+                  preload="auto"
+                  className="mx-auto mb-5 w-full max-w-xs"
+                />
               )}
 
               <div className="flex justify-center gap-3">
