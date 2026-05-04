@@ -75,6 +75,10 @@ export function RecorderClient({ customers, projects }: Props) {
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const animFrameRef = useRef<number | null>(null);
 
   // Filter projects by selected customer
   const filteredProjects = customerId
@@ -104,6 +108,36 @@ export function RecorderClient({ customers, projects }: Props) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
+      // Set up Web Audio waveform visualizer
+      const audioCtx = new AudioContext();
+      audioCtxRef.current = audioCtx;
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 128;
+      analyserRef.current = analyser;
+      audioCtx.createMediaStreamSource(stream).connect(analyser);
+
+      const drawBars = () => {
+        animFrameRef.current = requestAnimationFrame(drawBars);
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(data);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const barW = (canvas.width / data.length) * 1.8;
+        data.forEach((val, i) => {
+          const h = Math.max(3, (val / 255) * canvas.height);
+          const alpha = 0.35 + (val / 255) * 0.65;
+          ctx.fillStyle = `rgba(10, 25, 80, ${alpha})`;
+          const x = i * (barW + 1);
+          ctx.beginPath();
+          ctx.roundRect(x, (canvas.height - h) / 2, barW, h, 2);
+          ctx.fill();
+        });
+      };
+      drawBars();
+
       const mimeType = MediaRecorder.isTypeSupported("audio/webm")
         ? "audio/webm"
         : MediaRecorder.isTypeSupported("audio/ogg")
@@ -119,9 +153,8 @@ export function RecorderClient({ customers, projects }: Props) {
       };
 
       recorder.onstop = () => {
-        const recorded = new Blob(chunksRef.current, {
-          type: mimeType || "audio/webm",
-        });
+        const actualType = recorder.mimeType || mimeType || "audio/webm;codecs=opus";
+        const recorded = new Blob(chunksRef.current, { type: actualType });
         setBlob(recorded);
         const url = URL.createObjectURL(recorded);
         setAudioUrl(url);
@@ -171,6 +204,8 @@ export function RecorderClient({ customers, projects }: Props) {
 
   const stopRecording = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    if (audioCtxRef.current) { void audioCtxRef.current.close(); audioCtxRef.current = null; }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.stop();
     }
@@ -378,10 +413,17 @@ export function RecorderClient({ customers, projects }: Props) {
                   <Mic size={32} className="text-red-500" />
                 </div>
               </div>
-              <div className="mb-5 flex items-center justify-center gap-2">
+              <div className="mb-3 flex items-center justify-center gap-2">
                 <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
                 <span className="text-ink-soft text-sm">מקליט</span>
               </div>
+              {/* Waveform canvas */}
+              <canvas
+                ref={canvasRef}
+                width={280}
+                height={60}
+                className="mx-auto mb-3 block rounded-lg"
+              />
               <div className="text-navy mb-6 text-4xl font-bold tabular-nums" dir="ltr">
                 {formatTime(elapsed)}
               </div>
@@ -414,7 +456,10 @@ export function RecorderClient({ customers, projects }: Props) {
                     preload="auto"
                     onPlay={() => setIsPlaying(true)}
                     onPause={() => setIsPlaying(false)}
-                    onEnded={() => { setIsPlaying(false); setPlayProgress(0); }}
+                    onEnded={() => {
+                      setIsPlaying(false);
+                      setPlayProgress(0);
+                    }}
                     onTimeUpdate={() => {
                       const a = audioRef.current;
                       if (a && a.duration && isFinite(a.duration)) {
@@ -429,14 +474,20 @@ export function RecorderClient({ customers, projects }: Props) {
                       onClick={() => {
                         const a = audioRef.current;
                         if (!a) return;
-                        if (isPlaying) { a.pause(); } else { void a.play(); }
+                        if (isPlaying) {
+                          a.pause();
+                        } else {
+                          void a.play();
+                        }
                       }}
                       className="bg-navy text-cream-paper flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-opacity hover:opacity-80"
                     >
                       {isPlaying ? (
                         <Square size={14} fill="currentColor" />
                       ) : (
-                        <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 ms-0.5"><path d="M8 5v14l11-7z"/></svg>
+                        <svg viewBox="0 0 24 24" fill="currentColor" className="ms-0.5 h-4 w-4">
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
                       )}
                     </button>
                     <div className="flex-1">
