@@ -138,8 +138,23 @@ export function RecorderClient({ customers, projects }: Props) {
       }, 500);
     } catch (err) {
       if (err instanceof DOMException && err.name === "NotAllowedError") {
-        setMicBlocked(true);
-        setError(null);
+        if (navigator.permissions) {
+          navigator.permissions
+            .query({ name: "microphone" as PermissionName })
+            .then((result) => {
+              if (result.state === "denied") {
+                setMicBlocked(true);
+                setError(null);
+              } else {
+                setError("לא אושרה גישה למיקרופון. לחץ 'התחל הקלטה' שוב ואשר את הגישה בחלון שיפתח.");
+              }
+            })
+            .catch(() => {
+              setError("לא אושרה גישה למיקרופון. אנא אשר גישה כשהדפדפן שואל.");
+            });
+        } else {
+          setError("לא אושרה גישה למיקרופון. אנא אשר גישה כשהדפדפן שואל.");
+        }
       } else if (err instanceof DOMException && err.name === "NotFoundError") {
         setError("לא נמצא מיקרופון במכשיר זה.");
       } else {
@@ -319,8 +334,12 @@ export function RecorderClient({ customers, projects }: Props) {
                   ) : (
                     <ol className="list-decimal space-y-1 ps-4">
                       <li>לחץ על האייקון משמאל לכתובת האתר (מנעול, עיגול-i, או אייקון כוונון)</li>
-                      <li>בחר <strong>הגדרות אתר</strong> / <strong>Site settings</strong></li>
-                      <li>מיקרופון ← שנה ל-<strong>אפשר</strong></li>
+                      <li>
+                        בחר <strong>הגדרות אתר</strong> / <strong>Site settings</strong>
+                      </li>
+                      <li>
+                        מיקרופון ← שנה ל-<strong>אפשר</strong>
+                      </li>
                       <li>רענן את הדף</li>
                     </ol>
                   )}
