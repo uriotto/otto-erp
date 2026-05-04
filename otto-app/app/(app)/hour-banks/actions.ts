@@ -640,3 +640,40 @@ export async function bulkCancelHourBanks(
   revalidatePath("/hour-banks");
   return { cancelled: count ?? ids.length };
 }
+
+export async function bulkDeleteHourBanks(
+  ids: string[],
+): Promise<{ deleted: number; error?: string; skipped?: number }> {
+  if (ids.length === 0) return { deleted: 0 };
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { deleted: 0, error: "לא מחובר" };
+
+  // Only delete banks with no allocated time entries
+  const { data: allocated } = await supabase
+    .from("time_entries")
+    .select("consumed_from_bank_id")
+    .in("consumed_from_bank_id", ids)
+    .eq("tenant_id", profile.tenant_id)
+    .limit(ids.length);
+
+  const blockedIds = new Set((allocated ?? []).map((e) => e.consumed_from_bank_id));
+  const deletableIds = ids.filter((id) => !blockedIds.has(id));
+
+  if (deletableIds.length === 0) {
+    return {
+      deleted: 0,
+      skipped: ids.length,
+      error: "לא ניתן למחוק בנקים עם שעות מוקצות. ביטול בלבד.",
+    };
+  }
+
+  const { error, count } = await supabase
+    .from("hour_banks")
+    .delete()
+    .in("id", deletableIds)
+    .eq("tenant_id", profile.tenant_id);
+
+  if (error) return { deleted: 0, error: error.message };
+  revalidatePath("/hour-banks");
+  return { deleted: count ?? deletableIds.length, skipped: ids.length - deletableIds.length };
+}

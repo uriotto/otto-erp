@@ -264,7 +264,7 @@ export function TasksList({
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-display-md text-navy">משימות</h1>
           <p className="text-ink-soft mt-1 text-sm">{tasks.length} משימות סך הכל</p>
@@ -274,7 +274,7 @@ export function TasksList({
           <button
             type="button"
             onClick={() => setShowNew(true)}
-            className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
+            className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors"
           >
             <Plus size={16} />
             משימה חדשה
@@ -1039,7 +1039,7 @@ function KanbanCard({
 
 function EmptyState({ onNew }: { onNew: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 text-center">
+    <div className="border-ink-line bg-cream-paper/40 flex flex-col items-center justify-center rounded-2xl border border-dashed py-16 text-center">
       <div className="bg-cream-deep mb-4 flex h-20 w-20 items-center justify-center rounded-full">
         <CheckSquare size={48} className="text-navy/60" />
       </div>
@@ -1050,7 +1050,7 @@ function EmptyState({ onNew }: { onNew: () => void }) {
       <button
         type="button"
         onClick={onNew}
-        className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-semibold transition-colors"
+        className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors"
       >
         <Plus size={16} />
         צור משימה ראשונה
@@ -1061,7 +1061,7 @@ function EmptyState({ onNew }: { onNew: () => void }) {
 
 function NoResults({ query, onClear }: { query: string; onClear: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 text-center">
+    <div className="border-ink-line bg-cream-paper/40 flex flex-col items-center justify-center rounded-2xl border border-dashed py-16 text-center">
       <div className="bg-cream-deep mb-4 flex h-20 w-20 items-center justify-center rounded-full">
         <SearchX size={48} className="text-navy/60" />
       </div>

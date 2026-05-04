@@ -227,7 +227,7 @@ export function TimeList({
 
   return (
     <div>
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-display-md text-navy">שעות</h1>
           <p className="text-ink-soft mt-1 text-sm">{entries.length} רשומות ב-30 הימים האחרונים</p>
@@ -235,7 +235,7 @@ export function TimeList({
         <button
           type="button"
           onClick={() => setShowNew(true)}
-          className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
+          className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors"
         >
           <Plus size={16} />
           רשומה חדשה

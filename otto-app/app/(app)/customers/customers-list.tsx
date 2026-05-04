@@ -194,7 +194,7 @@ export function CustomersList({
 
   return (
     <>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-display-sm text-navy">לקוחות</h1>
           <p className="text-ink-soft mt-1 text-sm">
@@ -317,8 +317,8 @@ export function CustomersList({
       ) : view === "table" ? (
         <div className="bg-cream-paper border-ink-line overflow-hidden rounded-2xl border">
           <table className="w-full text-sm">
-            <thead className="bg-cream-deep text-ink-soft text-xs">
-              <tr>
+            <thead>
+              <tr className="border-ink-line/60 border-b">
                 <th className="w-10 px-4 py-3">
                   <input
                     type="checkbox"
@@ -330,12 +330,12 @@ export function CustomersList({
                     className="cursor-pointer rounded"
                   />
                 </th>
-                <th className="px-4 py-3 text-start font-medium">שם</th>
-                <th className="px-4 py-3 text-start font-medium">חברה</th>
-                <th className="px-4 py-3 text-start font-medium">אימייל</th>
-                <th className="px-4 py-3 text-start font-medium">מודל חיוב</th>
-                <th className="px-4 py-3 text-start font-medium">סטטוס</th>
-                <th className="px-4 py-3 text-start font-medium">תגיות</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">שם</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">חברה</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">אימייל</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">מודל חיוב</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">סטטוס</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">תגיות</th>
               </tr>
             </thead>
             <tbody>

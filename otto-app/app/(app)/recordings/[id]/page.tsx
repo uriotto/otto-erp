@@ -55,25 +55,25 @@ export default async function RecordingDetailPage({ params }: Props) {
 
   const { data: recording } = await supabase
     .from("recordings")
-    .select(`
+    .select(
+      `
       *,
       customers(name),
       projects(name)
-    `)
+    `,
+    )
     .eq("id", id)
     .single();
 
   if (!recording) notFound();
 
-  const customerName =
-    Array.isArray(recording.customers)
-      ? (recording.customers[0] as { name: string } | null)?.name ?? null
-      : (recording.customers as { name: string } | null)?.name ?? null;
+  const customerName = Array.isArray(recording.customers)
+    ? ((recording.customers[0] as { name: string } | null)?.name ?? null)
+    : ((recording.customers as { name: string } | null)?.name ?? null);
 
-  const projectName =
-    Array.isArray(recording.projects)
-      ? (recording.projects[0] as { name: string } | null)?.name ?? null
-      : (recording.projects as { name: string } | null)?.name ?? null;
+  const projectName = Array.isArray(recording.projects)
+    ? ((recording.projects[0] as { name: string } | null)?.name ?? null)
+    : ((recording.projects as { name: string } | null)?.name ?? null);
 
   const statusLabel = STATUS_LABELS[recording.status] ?? recording.status;
   const statusStyle = STATUS_STYLES[recording.status] ?? "bg-gray-50 text-gray-700 border-gray-200";
@@ -97,7 +97,9 @@ export default async function RecordingDetailPage({ params }: Props) {
         <div className="border-ink-line bg-cream-paper rounded-xl border p-5">
           <div className="flex items-start justify-between gap-3">
             <h1 className="text-navy text-lg font-bold">{recording.title}</h1>
-            <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusStyle}`}>
+            <span
+              className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusStyle}`}
+            >
               {statusLabel}
             </span>
           </div>
@@ -140,7 +142,7 @@ export default async function RecordingDetailPage({ params }: Props) {
               <FileText size={16} className="text-navy" />
               <h2 className="text-navy text-sm font-semibold">תמליל</h2>
             </div>
-            <p className="text-ink-soft whitespace-pre-wrap text-sm leading-relaxed">
+            <p className="text-ink-soft text-sm leading-relaxed whitespace-pre-wrap">
               {recording.transcript}
             </p>
           </div>
@@ -153,7 +155,7 @@ export default async function RecordingDetailPage({ params }: Props) {
               <Sparkles size={16} className="text-navy" />
               <h2 className="text-navy text-sm font-semibold">סיכום AI</h2>
             </div>
-            <p className="text-ink-soft whitespace-pre-wrap text-sm leading-relaxed">
+            <p className="text-ink-soft text-sm leading-relaxed whitespace-pre-wrap">
               {recording.summary}
             </p>
           </div>

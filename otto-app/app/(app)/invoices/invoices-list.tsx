@@ -250,7 +250,7 @@ export function InvoicesList({
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-display-md text-navy">חשבוניות</h1>
           <p className="text-ink-soft mt-1 text-sm">{invoices.length} חשבוניות סך הכל</p>
@@ -258,7 +258,7 @@ export function InvoicesList({
         <button
           type="button"
           onClick={() => setShowNew(true)}
-          className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
+          className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors"
         >
           <Plus size={16} />
           חשבונית חדשה
@@ -334,8 +334,8 @@ export function InvoicesList({
       ) : (
         <div className="bg-cream-paper border-ink-line overflow-hidden rounded-2xl border">
           <table className="w-full text-sm">
-            <thead className="bg-cream-deep text-ink-soft text-xs">
-              <tr>
+            <thead>
+              <tr className="border-ink-line/60 border-b">
                 <th className="w-10 px-4 py-3">
                   <input
                     type="checkbox"
@@ -408,7 +408,7 @@ export function InvoicesList({
 function Th({ children, align }: { children: React.ReactNode; align?: "end" }) {
   return (
     <th
-      className={`px-4 py-3 font-medium ${align === "end" ? "text-end" : "text-start"}`}
+      className={`text-ink-soft px-4 py-3 font-medium ${align === "end" ? "text-end" : "text-start"}`}
       scope="col"
     >
       {children}
@@ -547,7 +547,7 @@ function KpiCard({
 
 function EmptyState({ onNew }: { onNew: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 text-center">
+    <div className="border-ink-line bg-cream-paper/40 flex flex-col items-center justify-center rounded-2xl border border-dashed py-16 text-center">
       <div className="bg-cream-deep mb-4 flex h-20 w-20 items-center justify-center rounded-full">
         <Receipt size={48} className="text-navy/60" />
       </div>
@@ -558,7 +558,7 @@ function EmptyState({ onNew }: { onNew: () => void }) {
       <button
         type="button"
         onClick={onNew}
-        className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-semibold transition-colors"
+        className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors"
       >
         <Plus size={16} />
         חשבונית חדשה
@@ -569,7 +569,7 @@ function EmptyState({ onNew }: { onNew: () => void }) {
 
 function NoResults() {
   return (
-    <div className="flex flex-col items-center justify-center py-16 text-center">
+    <div className="border-ink-line bg-cream-paper/40 flex flex-col items-center justify-center rounded-2xl border border-dashed py-16 text-center">
       <div className="bg-cream-deep mb-4 flex h-20 w-20 items-center justify-center rounded-full">
         <Calendar size={48} className="text-navy/60" />
       </div>

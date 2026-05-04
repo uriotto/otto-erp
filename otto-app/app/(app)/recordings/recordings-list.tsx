@@ -95,18 +95,18 @@ export function RecordingsList({ recordings }: Props) {
 
   if (recordings.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center">
-        <div className="border-ink-line bg-cream-paper mb-6 rounded-2xl border p-8">
-          <Mic size={40} className="text-navy mx-auto mb-4 opacity-30" />
-          <p className="text-ink-soft mb-4 text-sm">אין הקלטות עדיין</p>
-          <Link
-            href="/recordings/new"
-            className="bg-navy text-cream-paper hover:bg-navy/90 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-          >
-            <Plus size={16} />
-            הקלט עכשיו
-          </Link>
+      <div className="border-ink-line bg-cream-paper/40 flex flex-col items-center justify-center rounded-2xl border border-dashed py-16 text-center">
+        <div className="bg-cream-deep mb-5 flex h-20 w-20 items-center justify-center rounded-full">
+          <Mic size={40} className="text-navy opacity-30" />
         </div>
+        <p className="text-ink-soft mb-4 text-sm">אין הקלטות עדיין</p>
+        <Link
+          href="/recordings/new"
+          className="bg-navy text-cream-paper hover:bg-navy-deep inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors"
+        >
+          <Plus size={16} />
+          הקלט עכשיו
+        </Link>
       </div>
     );
   }

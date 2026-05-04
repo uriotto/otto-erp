@@ -220,7 +220,7 @@ export function DocumentsList({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-display-md text-navy">מסמכים</h1>
           <p className="text-ink-soft mt-1 text-sm">
@@ -246,7 +246,7 @@ export function DocumentsList({
           />
           <button
             onClick={() => setShowUpload(true)}
-            className="bg-navy text-cream-paper hover:bg-navy/90 flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium"
+            className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors"
           >
             <Upload size={15} />
             העלאת מסמך
@@ -326,7 +326,7 @@ export function DocumentsList({
 
       {/* Documents grid/table */}
       {filtered.length === 0 ? (
-        <div className="border-ink-line rounded-2xl border py-16 text-center">
+        <div className="border-ink-line bg-cream-paper/40 flex flex-col items-center justify-center rounded-2xl border border-dashed py-16 text-center">
           <FileText size={32} className="text-ink-faded mx-auto mb-3 opacity-40" />
           <p className="text-ink-soft text-sm">
             {search || hasFilters ? "לא נמצאו מסמכים" : "אין מסמכים עדיין"}
@@ -499,7 +499,7 @@ function DocumentCard({
 }) {
   return (
     <div
-      className="bg-cream-paper border-ink-line group flex cursor-pointer flex-col gap-3 rounded-2xl border p-4 transition-shadow hover:shadow-sm"
+      className="bg-cream-paper border-ink-line group flex cursor-pointer flex-col gap-3 rounded-2xl border p-4 transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md"
       onClick={onPreview}
     >
       {/* Header */}

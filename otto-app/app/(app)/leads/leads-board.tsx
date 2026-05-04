@@ -224,7 +224,7 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
 
   return (
     <>
-      <div className="mb-6 flex items-start justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-display-sm text-navy">לידים</h1>
           <div className="text-ink-soft mt-1 flex items-center gap-3 text-sm">
