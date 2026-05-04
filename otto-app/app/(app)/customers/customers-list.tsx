@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -17,19 +17,34 @@ import {
   LayoutGrid,
   Table2,
   Trash2,
+  Pencil,
+  ChevronDown,
 } from "lucide-react";
 import type { Tables } from "@/lib/supabase/types";
 import { NewCustomerDialog } from "./new-customer-dialog";
 import { ExportCsvButton } from "@/components/ui/export-csv-button";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
-import { bulkDeactivateCustomers, bulkDeleteCustomers, exportCustomersCsv } from "./actions";
+import {
+  bulkDeactivateCustomers,
+  bulkDeleteCustomers,
+  exportCustomersCsv,
+  quickUpdateCustomer,
+} from "./actions";
 import { Eye, EyeOff } from "lucide-react";
 import { ViewToggle, useStoredView } from "@/components/ui/view-toggle";
 import { BulkActionBar } from "@/components/ui/bulk-action-bar";
 
 type Customer = Tables<"customers">;
 type StatusFilter = "all" | "active" | "inactive";
+
+const BILLING_LABELS: Record<string, string> = {
+  hourly: "שעתי",
+  hour_bank: "בנק שעות",
+  fixed_price: "מחיר קבוע",
+  retainer: "ריטיינר",
+};
+const BILLING_OPTIONS = Object.entries(BILLING_LABELS);
 
 const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: "all", label: "הכל" },
@@ -152,20 +167,41 @@ export function CustomersList({
 
   const clearSelection = () => setSelectedIds(new Set());
 
+  const selectedCustomers = useMemo(
+    () => customers.filter((c) => selectedIds.has(c.id)),
+    [customers, selectedIds],
+  );
+  const allSelectedInactive =
+    selectedCustomers.length > 0 && selectedCustomers.every((c) => c.active === false);
+
   const handleBulkDeactivate = () => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
-    if (!confirm(`להשבית ${ids.length} לקוחות?`)) return;
-    startDeleteTransition(async () => {
-      const result = await bulkDeactivateCustomers(ids);
-      if (result?.error) {
-        toast.error(result.error);
-        return;
-      }
-      toast.success(`הושבתו ${result.updated ?? ids.length} לקוחות`);
-      setSelectedIds(new Set());
-      router.refresh();
-    });
+    if (allSelectedInactive) {
+      if (!confirm(`להפעיל מחדש ${ids.length} לקוחות?`)) return;
+      startDeleteTransition(async () => {
+        const result = await bulkDeactivateCustomers(ids, true);
+        if (result?.error) {
+          toast.error(result.error);
+          return;
+        }
+        toast.success(`הופעלו מחדש ${result.updated ?? ids.length} לקוחות`);
+        setSelectedIds(new Set());
+        router.refresh();
+      });
+    } else {
+      if (!confirm(`להשבית ${ids.length} לקוחות?`)) return;
+      startDeleteTransition(async () => {
+        const result = await bulkDeactivateCustomers(ids, false);
+        if (result?.error) {
+          toast.error(result.error);
+          return;
+        }
+        toast.success(`הושבתו ${result.updated ?? ids.length} לקוחות`);
+        setSelectedIds(new Set());
+        router.refresh();
+      });
+    }
   };
 
   const handleBulkDelete = () => {
@@ -340,64 +376,14 @@ export function CustomersList({
             </thead>
             <tbody>
               {filtered.map((c) => (
-                <tr
+                <TableRow
                   key={c.id}
-                  className={`border-ink-line cursor-pointer border-t transition-colors ${selectedIds.has(c.id) ? "bg-navy/5" : "hover:bg-cream-deep/40"}`}
-                  onClick={() => router.push(`/customers/${c.id}`)}
-                >
-                  <td className="px-4 py-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(c.id)}
-                      onChange={() => toggleSelected(c.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="cursor-pointer rounded"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/customers/${c.id}`}
-                      onClick={(e) => e.stopPropagation()}
-                      className="text-navy hover:text-navy-deep font-medium"
-                    >
-                      {c.name}
-                    </Link>
-                  </td>
-                  <td className="text-ink-soft px-4 py-3">{c.company ?? "—"}</td>
-                  <td className="text-ink-soft px-4 py-3">{c.email ?? "—"}</td>
-                  <td className="px-4 py-3">
-                    <span className="text-ink-soft text-xs">
-                      {c.billing_model_default === "hourly"
-                        ? "שעתי"
-                        : c.billing_model_default === "hour_bank"
-                          ? "בנק שעות"
-                          : c.billing_model_default === "fixed_price"
-                            ? "מחיר קבוע"
-                            : c.billing_model_default === "retainer"
-                              ? "ריטיינר"
-                              : (c.billing_model_default ?? "—")}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`rounded-full border px-2 py-0.5 text-xs font-medium ${c.active !== false ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-gray-200 bg-gray-100 text-gray-500"}`}
-                    >
-                      {c.active !== false ? "פעיל" : "לא פעיל"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-1">
-                      {(c.tags ?? []).slice(0, 3).map((t) => (
-                        <span
-                          key={t}
-                          className="bg-navy/5 text-ink-soft rounded-full px-2 py-0.5 text-xs"
-                        >
-                          {t}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                </tr>
+                  customer={c}
+                  selected={selectedIds.has(c.id)}
+                  onToggleSelect={() => toggleSelected(c.id)}
+                  onNavigate={() => router.push(`/customers/${c.id}`)}
+                  onSaved={() => router.refresh()}
+                />
               ))}
             </tbody>
           </table>
@@ -410,6 +396,7 @@ export function CustomersList({
               customer={c}
               selected={selectedIds.has(c.id)}
               onToggleSelect={() => toggleSelected(c.id)}
+              onSaved={() => router.refresh()}
             />
           ))}
         </div>
@@ -420,7 +407,7 @@ export function CustomersList({
         onClear={clearSelection}
         actions={[
           {
-            label: "השבת",
+            label: allSelectedInactive ? "הפעל מחדש" : "השבת",
             icon: UserX,
             isPending: pendingDelete,
             onClick: handleBulkDeactivate,
@@ -440,15 +427,237 @@ export function CustomersList({
   );
 }
 
-function CustomerCard({
+function InlineEditCell({
+  value,
+  onSave,
+  type = "text",
+  className = "",
+}: {
+  value: string;
+  onSave: (val: string) => Promise<void>;
+  type?: "text" | "email" | "tel";
+  className?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const [saving, startSaving] = useTransition();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const start = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDraft(value);
+    setEditing(true);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  const save = () => {
+    if (draft === value) {
+      setEditing(false);
+      return;
+    }
+    startSaving(async () => {
+      await onSave(draft);
+      setEditing(false);
+    });
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") save();
+    if (e.key === "Escape") {
+      setDraft(value);
+      setEditing(false);
+    }
+  };
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        type={type}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={save}
+        onKeyDown={onKeyDown}
+        onClick={(e) => e.stopPropagation()}
+        disabled={saving}
+        dir={type === "email" || type === "tel" ? "ltr" : undefined}
+        className={`border-navy text-navy focus:ring-navy/20 w-full rounded border bg-white px-2 py-0.5 text-sm outline-none focus:ring-2 disabled:opacity-60 ${className}`}
+      />
+    );
+  }
+
+  return (
+    <span
+      onClick={start}
+      title="לחץ לעריכה"
+      className={`hover:bg-cream-deep group/cell inline-flex cursor-text items-center gap-1 rounded px-1 py-0.5 transition-colors ${className}`}
+    >
+      <span className={value ? "" : "text-ink-faded"}>{value || "—"}</span>
+      <Pencil
+        size={11}
+        className="text-ink-faded shrink-0 opacity-0 transition-opacity group-hover/cell:opacity-100"
+      />
+    </span>
+  );
+}
+
+function InlineBillingCell({
+  value,
+  onSave,
+}: {
+  value: string | null;
+  onSave: (val: string | null) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [saving, startSaving] = useTransition();
+
+  const start = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditing(true);
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value || null;
+    startSaving(async () => {
+      await onSave(val);
+      setEditing(false);
+    });
+  };
+
+  if (editing) {
+    return (
+      <select
+        autoFocus
+        defaultValue={value ?? ""}
+        onChange={handleChange}
+        onBlur={() => setEditing(false)}
+        onClick={(e) => e.stopPropagation()}
+        disabled={saving}
+        className="border-navy text-navy focus:ring-navy/20 rounded border bg-white px-2 py-0.5 text-xs outline-none focus:ring-2"
+      >
+        <option value="">—</option>
+        {BILLING_OPTIONS.map(([val, label]) => (
+          <option key={val} value={val}>
+            {label}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  return (
+    <span
+      onClick={start}
+      title="לחץ לעריכה"
+      className="hover:bg-cream-deep group/cell inline-flex cursor-pointer items-center gap-1 rounded px-1 py-0.5 text-xs transition-colors"
+    >
+      <span className={value ? "text-ink-soft" : "text-ink-faded"}>
+        {value ? (BILLING_LABELS[value] ?? value) : "—"}
+      </span>
+      <ChevronDown
+        size={11}
+        className="text-ink-faded shrink-0 opacity-0 transition-opacity group-hover/cell:opacity-100"
+      />
+    </span>
+  );
+}
+
+function TableRow({
   customer: c,
   selected,
   onToggleSelect,
+  onNavigate,
+  onSaved,
 }: {
   customer: Customer;
   selected: boolean;
   onToggleSelect: () => void;
+  onNavigate: () => void;
+  onSaved: () => void;
 }) {
+  const toast = useToast();
+
+  const save = async (field: string, val: string | null) => {
+    const result = await quickUpdateCustomer(c.id, { [field]: val });
+    if (result.error) toast.error(result.error);
+    else onSaved();
+  };
+
+  return (
+    <tr
+      className={`border-ink-line cursor-pointer border-t transition-colors ${selected ? "bg-navy/5" : "hover:bg-cream-deep/40"}`}
+      onClick={onNavigate}
+    >
+      <td className="px-4 py-3">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onToggleSelect}
+          onClick={(e) => e.stopPropagation()}
+          className="cursor-pointer rounded"
+        />
+      </td>
+      <td className="px-4 py-3 font-medium">
+        <InlineEditCell
+          value={c.name}
+          onSave={(v) => save("name", v)}
+          className="text-navy font-semibold"
+        />
+      </td>
+      <td className="text-ink-soft px-4 py-3">
+        <InlineEditCell value={c.company ?? ""} onSave={(v) => save("company", v)} />
+      </td>
+      <td className="text-ink-soft px-4 py-3">
+        <InlineEditCell value={c.email ?? ""} onSave={(v) => save("email", v)} type="email" />
+      </td>
+      <td className="px-4 py-3">
+        <InlineBillingCell
+          value={c.billing_model_default}
+          onSave={(v) => save("billing_model_default", v)}
+        />
+      </td>
+      <td className="px-4 py-3">
+        <span
+          className={`rounded-full border px-2 py-0.5 text-xs font-medium ${c.active !== false ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-gray-200 bg-gray-100 text-gray-500"}`}
+        >
+          {c.active !== false ? "פעיל" : "לא פעיל"}
+        </span>
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex flex-wrap gap-1">
+          {(c.tags ?? []).slice(0, 3).map((t) => (
+            <span key={t} className="bg-navy/5 text-ink-soft rounded-full px-2 py-0.5 text-xs">
+              {t}
+            </span>
+          ))}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+function CustomerCard({
+  customer: c,
+  selected,
+  onToggleSelect,
+  onSaved,
+}: {
+  customer: Customer;
+  selected: boolean;
+  onToggleSelect: () => void;
+  onSaved: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [saving, startSaving] = useTransition();
+  const [draft, setDraft] = useState({
+    name: c.name,
+    email: c.email ?? "",
+    phone: c.phone ?? "",
+    company: c.company ?? "",
+    billing_model_default: c.billing_model_default ?? "",
+  });
+  const toast = useToast();
+
   const initials = c.name
     .split(" ")
     .slice(0, 2)
@@ -462,6 +671,132 @@ function CustomerCard({
     onToggleSelect();
   };
 
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDraft({
+      name: c.name,
+      email: c.email ?? "",
+      phone: c.phone ?? "",
+      company: c.company ?? "",
+      billing_model_default: c.billing_model_default ?? "",
+    });
+    setEditing(true);
+  };
+
+  const handleSave = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!draft.name.trim()) return;
+    startSaving(async () => {
+      const result = await quickUpdateCustomer(c.id, {
+        name: draft.name,
+        email: draft.email,
+        phone: draft.phone,
+        company: draft.company,
+        billing_model_default: draft.billing_model_default || null,
+      });
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success("הלקוח עודכן");
+        setEditing(false);
+        onSaved();
+      }
+    });
+  };
+
+  const handleCancel = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <div className="bg-cream-paper border-navy ring-navy/20 rounded-2xl border p-5 ring-2">
+        <div className="mb-3 flex items-center justify-between">
+          <span className="text-navy text-sm font-semibold">עריכת לקוח</span>
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="text-ink-faded hover:text-navy rounded-lg p-1 transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <div className="space-y-2.5">
+          <input
+            type="text"
+            value={draft.name}
+            onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+            placeholder="שם *"
+            className="border-ink-line text-navy placeholder:text-ink-faded focus:border-navy w-full rounded-lg border bg-white px-3 py-2 text-sm transition-colors outline-none"
+            autoFocus
+            onClick={(e) => e.stopPropagation()}
+          />
+          <input
+            type="text"
+            value={draft.company}
+            onChange={(e) => setDraft((d) => ({ ...d, company: e.target.value }))}
+            placeholder="חברה"
+            className="border-ink-line text-navy placeholder:text-ink-faded focus:border-navy w-full rounded-lg border bg-white px-3 py-2 text-sm transition-colors outline-none"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <input
+            type="email"
+            value={draft.email}
+            onChange={(e) => setDraft((d) => ({ ...d, email: e.target.value }))}
+            placeholder="אימייל"
+            className="border-ink-line text-navy placeholder:text-ink-faded focus:border-navy w-full rounded-lg border bg-white px-3 py-2 text-sm transition-colors outline-none"
+            dir="ltr"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <input
+            type="tel"
+            value={draft.phone}
+            onChange={(e) => setDraft((d) => ({ ...d, phone: e.target.value }))}
+            placeholder="טלפון"
+            className="border-ink-line text-navy placeholder:text-ink-faded focus:border-navy w-full rounded-lg border bg-white px-3 py-2 text-sm transition-colors outline-none"
+            dir="ltr"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <select
+            value={draft.billing_model_default}
+            onChange={(e) => setDraft((d) => ({ ...d, billing_model_default: e.target.value }))}
+            className="border-ink-line text-navy focus:border-navy w-full rounded-lg border bg-white px-3 py-2 text-sm transition-colors outline-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <option value="">ללא מודל חיוב</option>
+            {BILLING_OPTIONS.map(([val, label]) => (
+              <option key={val} value={val}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="mt-3 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="border-ink-line text-ink-soft hover:text-navy rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
+          >
+            ביטול
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving || !draft.name.trim()}
+            className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50"
+          >
+            {saving ? <Spinner size={12} /> : <Check size={12} />}
+            שמור
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Link
       href={`/customers/${c.id}`}
@@ -472,6 +807,7 @@ function CustomerCard({
           selected ? "border-navy ring-navy/30 ring-2" : "border-ink-line hover:border-ink-soft"
         }`}
       >
+        {/* Checkbox */}
         <button
           type="button"
           role="checkbox"
@@ -486,6 +822,17 @@ function CustomerCard({
         >
           {selected && <Check size={12} strokeWidth={3} />}
         </button>
+
+        {/* Edit pencil */}
+        <button
+          type="button"
+          aria-label="ערוך לקוח"
+          onClick={handleEditClick}
+          className="text-ink-faded hover:text-navy hover:bg-cream-deep absolute end-9 top-3 z-10 rounded-md p-1 opacity-0 transition-all group-hover:opacity-100 focus:opacity-100"
+        >
+          <Pencil size={13} />
+        </button>
+
         <div className="mb-3 flex items-start gap-3">
           <div className="bg-navy text-cream-paper flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold">
             {initials}

@@ -230,6 +230,65 @@ export async function exportCustomersCsv(): Promise<
   return { csv, filename };
 }
 
+export async function quickUpdateCustomer(
+  id: string,
+  data: Partial<{
+    name: string;
+    email: string;
+    phone: string;
+    company: string;
+    billing_model_default: string | null;
+    hourly_rate_override: number | null;
+  }>,
+): Promise<{ error?: string }> {
+  if (!id) return { error: "חסר id" };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "לא מחובר" };
+  const { data: profile } = await supabase
+    .from("users")
+    .select("tenant_id")
+    .eq("id", user.id)
+    .single();
+  if (!profile) return { error: "לא מחובר" };
+
+  type CustomerUpdate = {
+    name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    company?: string | null;
+    billing_model_default?: string | null;
+    hourly_rate_override?: number | null;
+  };
+  const updates: CustomerUpdate = {};
+  if (data.name !== undefined) updates.name = data.name.trim() || null;
+  if (data.email !== undefined) updates.email = data.email.trim() || null;
+  if (data.phone !== undefined) updates.phone = data.phone.trim() || null;
+  if (data.company !== undefined) updates.company = data.company.trim() || null;
+  if (data.billing_model_default !== undefined)
+    updates.billing_model_default = data.billing_model_default;
+  if (data.hourly_rate_override !== undefined)
+    updates.hourly_rate_override = data.hourly_rate_override;
+
+  if (Object.keys(updates).length === 0) return {};
+
+  const { error } = await supabase
+    .from("customers")
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .update(updates as any)
+    .eq("id", id)
+    .eq("tenant_id", profile.tenant_id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/customers");
+  revalidatePath(`/customers/${id}`);
+  return {};
+}
+
 export async function deactivateCustomer(id: string): Promise<{ error?: string }> {
   const supabase = await createClient();
   const {
@@ -278,6 +337,7 @@ export async function reactivateCustomer(id: string): Promise<{ error?: string }
 
 export async function bulkDeactivateCustomers(
   ids: string[],
+  activate = false,
 ): Promise<{ error?: string; updated?: number }> {
   if (!Array.isArray(ids) || ids.length === 0) {
     return { error: "לא נבחרו לקוחות" };
@@ -302,7 +362,7 @@ export async function bulkDeactivateCustomers(
 
   const { error } = await supabase
     .from("customers")
-    .update({ active: false })
+    .update({ active: activate ? true : false })
     .in("id", cleanIds)
     .eq("tenant_id", profile.tenant_id);
 
