@@ -146,7 +146,9 @@ export function RecorderClient({ customers, projects }: Props) {
                 setMicBlocked(true);
                 setError(null);
               } else {
-                setError("לא אושרה גישה למיקרופון. לחץ 'התחל הקלטה' שוב ואשר את הגישה בחלון שיפתח.");
+                setError(
+                  "לא אושרה גישה למיקרופון. לחץ 'התחל הקלטה' שוב ואשר את הגישה בחלון שיפתח.",
+                );
               }
             })
             .catch(() => {
@@ -350,12 +352,11 @@ export function RecorderClient({ customers, projects }: Props) {
                 </div>
               ) : null}
               <button
-                onClick={startRecording}
-                disabled={micBlocked}
-                className="bg-navy text-cream-paper hover:bg-navy/90 inline-flex items-center gap-2 rounded-xl px-8 py-3 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => { setMicBlocked(false); setError(null); startRecording(); }}
+                className="bg-navy text-cream-paper hover:bg-navy/90 inline-flex items-center gap-2 rounded-xl px-8 py-3 text-sm font-semibold transition-colors"
               >
                 <Mic size={18} />
-                התחל הקלטה
+                {micBlocked ? "נסה שוב" : "התחל הקלטה"}
               </button>
               {!micBlocked && <p className="text-ink-faded mt-3 text-xs">תידרש הרשאה למיקרופון</p>}
             </>
