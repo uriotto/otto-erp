@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ChevronRight, User, FolderKanban, Clock, FileText, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { DownloadButton } from "./download-button";
+import { AudioPlayer } from "./audio-player";
 
 export const metadata = { title: "פרטי הקלטה — OTTO" };
 
@@ -128,7 +128,7 @@ export default async function RecordingDetailPage({ params }: Props) {
 
           {recording.storage_path && (
             <div className="mt-4">
-              <DownloadButton storagePath={recording.storage_path} title={recording.title} />
+              <AudioPlayer storagePath={recording.storage_path} title={recording.title} />
             </div>
           )}
         </div>
