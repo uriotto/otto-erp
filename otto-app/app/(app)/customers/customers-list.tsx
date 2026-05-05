@@ -562,6 +562,37 @@ function InlineBillingCell({
   );
 }
 
+function InlineStatusCell({
+  active,
+  onToggle,
+}: {
+  active: boolean | null;
+  onToggle: () => Promise<void>;
+}) {
+  const [pending, startTransition] = useTransition();
+  const isActive = active !== false;
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        startTransition(onToggle);
+      }}
+      disabled={pending}
+      title="לחץ לשינוי סטטוס"
+      className={`inline-flex cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium transition-all hover:opacity-80 disabled:opacity-50 ${
+        isActive
+          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+          : "border-gray-200 bg-gray-100 text-gray-500"
+      }`}
+    >
+      {pending ? <Spinner size={10} /> : null}
+      {isActive ? "פעיל" : "לא פעיל"}
+    </button>
+  );
+}
+
 function TableRow({
   customer: c,
   selected,
@@ -617,11 +648,14 @@ function TableRow({
         />
       </td>
       <td className="px-4 py-3">
-        <span
-          className={`rounded-full border px-2 py-0.5 text-xs font-medium ${c.active !== false ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-gray-200 bg-gray-100 text-gray-500"}`}
-        >
-          {c.active !== false ? "פעיל" : "לא פעיל"}
-        </span>
+        <InlineStatusCell
+          active={c.active}
+          onToggle={async () => {
+            const result = await quickUpdateCustomer(c.id, { active: c.active !== false ? false : true });
+            if (result.error) toast.error(result.error);
+            else onSaved();
+          }}
+        />
       </td>
       <td className="px-4 py-3">
         <div className="flex flex-wrap gap-1">
@@ -655,6 +689,7 @@ function CustomerCard({
     phone: c.phone ?? "",
     company: c.company ?? "",
     billing_model_default: c.billing_model_default ?? "",
+    active: c.active !== false,
   });
   const toast = useToast();
 
@@ -680,6 +715,7 @@ function CustomerCard({
       phone: c.phone ?? "",
       company: c.company ?? "",
       billing_model_default: c.billing_model_default ?? "",
+      active: c.active !== false,
     });
     setEditing(true);
   };
@@ -695,6 +731,7 @@ function CustomerCard({
         phone: draft.phone,
         company: draft.company,
         billing_model_default: draft.billing_model_default || null,
+        active: draft.active,
       });
       if (result.error) {
         toast.error(result.error);
@@ -774,6 +811,20 @@ function CustomerCard({
               </option>
             ))}
           </select>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setDraft((d) => ({ ...d, active: !d.active }));
+            }}
+            className={`w-full rounded-lg border px-3 py-2 text-start text-sm font-medium transition-colors ${
+              draft.active
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                : "border-gray-200 bg-gray-100 text-gray-500"
+            }`}
+          >
+            {draft.active ? "✓ פעיל" : "✗ לא פעיל"}
+          </button>
         </div>
         <div className="mt-3 flex justify-end gap-2">
           <button
