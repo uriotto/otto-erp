@@ -240,6 +240,7 @@ export async function quickUpdateCustomer(
     billing_model_default: string | null;
     hourly_rate_override: number | null;
     active: boolean;
+    status: string;
   }>,
 ): Promise<{ error?: string }> {
   if (!id) return { error: "חסר id" };
@@ -264,6 +265,7 @@ export async function quickUpdateCustomer(
     billing_model_default?: string | null;
     hourly_rate_override?: number | null;
     active?: boolean;
+    status?: string;
   };
   const updates: CustomerUpdate = {};
   if (data.name !== undefined) updates.name = data.name.trim() || null;
@@ -275,6 +277,7 @@ export async function quickUpdateCustomer(
   if (data.hourly_rate_override !== undefined)
     updates.hourly_rate_override = data.hourly_rate_override;
   if (data.active !== undefined) updates.active = data.active;
+  if (data.status !== undefined) updates.status = data.status;
 
   if (Object.keys(updates).length === 0) return {};
 

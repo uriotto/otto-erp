@@ -38,6 +38,18 @@ import { BulkActionBar } from "@/components/ui/bulk-action-bar";
 type Customer = Tables<"customers">;
 type StatusFilter = "all" | "active" | "inactive";
 
+const STATUS_OPTIONS = [
+  { value: "active", label: "פעיל", cls: "border-emerald-200 bg-emerald-50 text-emerald-700" },
+  { value: "inactive", label: "לא פעיל", cls: "border-gray-200 bg-gray-100 text-gray-500" },
+  { value: "pending", label: "בהמתנה", cls: "border-amber-200 bg-amber-50 text-amber-700" },
+] as const;
+
+type CustomerStatus = (typeof STATUS_OPTIONS)[number]["value"];
+
+function getStatusOption(status: string | null) {
+  return STATUS_OPTIONS.find((s) => s.value === status) ?? STATUS_OPTIONS[0];
+}
+
 const BILLING_LABELS: Record<string, string> = {
   hourly: "שעתי",
   hour_bank: "בנק שעות",
@@ -563,33 +575,58 @@ function InlineBillingCell({
 }
 
 function InlineStatusCell({
-  active,
-  onToggle,
+  status,
+  onSave,
 }: {
-  active: boolean | null;
-  onToggle: () => Promise<void>;
+  status: string | null;
+  onSave: (val: CustomerStatus) => Promise<void>;
 }) {
+  const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
-  const isActive = active !== false;
+  const ref = useRef<HTMLDivElement>(null);
+  const opt = getStatusOption(status);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
 
   return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        startTransition(onToggle);
-      }}
-      disabled={pending}
-      title="לחץ לשינוי סטטוס"
-      className={`inline-flex cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium transition-all hover:opacity-80 disabled:opacity-50 ${
-        isActive
-          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-          : "border-gray-200 bg-gray-100 text-gray-500"
-      }`}
-    >
-      {pending ? <Spinner size={10} /> : null}
-      {isActive ? "פעיל" : "לא פעיל"}
-    </button>
+    <div ref={ref} className="relative" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        disabled={pending}
+        className={`inline-flex cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium transition-all hover:opacity-80 disabled:opacity-50 ${opt.cls}`}
+      >
+        {pending ? <Spinner size={10} /> : <ChevronDown size={10} />}
+        {opt.label}
+      </button>
+      {open && (
+        <div className="bg-cream-paper border-ink-line absolute top-full z-20 mt-1 min-w-[110px] rounded-xl border shadow-lg">
+          {STATUS_OPTIONS.map((s) => (
+            <button
+              key={s.value}
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                startTransition(() => onSave(s.value));
+              }}
+              className={`flex w-full items-center gap-2 px-3 py-2 text-start text-xs transition-colors first:rounded-t-xl last:rounded-b-xl hover:bg-cream-deep ${
+                s.value === opt.value ? "font-semibold" : ""
+              }`}
+            >
+              <span className={`h-2 w-2 rounded-full border ${s.cls}`} />
+              {s.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -649,9 +686,9 @@ function TableRow({
       </td>
       <td className="px-4 py-3">
         <InlineStatusCell
-          active={c.active}
-          onToggle={async () => {
-            const result = await quickUpdateCustomer(c.id, { active: c.active !== false ? false : true });
+          status={c.status}
+          onSave={async (val) => {
+            const result = await quickUpdateCustomer(c.id, { status: val });
             if (result.error) toast.error(result.error);
             else onSaved();
           }}
@@ -689,7 +726,7 @@ function CustomerCard({
     phone: c.phone ?? "",
     company: c.company ?? "",
     billing_model_default: c.billing_model_default ?? "",
-    active: c.active !== false,
+    status: (c.status ?? "active") as CustomerStatus,
   });
   const toast = useToast();
 
@@ -715,7 +752,7 @@ function CustomerCard({
       phone: c.phone ?? "",
       company: c.company ?? "",
       billing_model_default: c.billing_model_default ?? "",
-      active: c.active !== false,
+      status: (c.status ?? "active") as CustomerStatus,
     });
     setEditing(true);
   };
@@ -731,7 +768,7 @@ function CustomerCard({
         phone: draft.phone,
         company: draft.company,
         billing_model_default: draft.billing_model_default || null,
-        active: draft.active,
+        status: draft.status,
       });
       if (result.error) {
         toast.error(result.error);
@@ -811,20 +848,18 @@ function CustomerCard({
               </option>
             ))}
           </select>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setDraft((d) => ({ ...d, active: !d.active }));
-            }}
-            className={`w-full rounded-lg border px-3 py-2 text-start text-sm font-medium transition-colors ${
-              draft.active
-                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                : "border-gray-200 bg-gray-100 text-gray-500"
-            }`}
+          <select
+            value={draft.status}
+            onChange={(e) => setDraft((d) => ({ ...d, status: e.target.value as CustomerStatus }))}
+            onClick={(e) => e.stopPropagation()}
+            className={`w-full rounded-lg border px-3 py-2 text-sm font-medium outline-none transition-colors ${getStatusOption(draft.status).cls}`}
           >
-            {draft.active ? "✓ פעיל" : "✗ לא פעיל"}
-          </button>
+            {STATUS_OPTIONS.map((s) => (
+              <option key={s.value} value={s.value} className="bg-white text-gray-800">
+                {s.label}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="mt-3 flex justify-end gap-2">
           <button
@@ -940,16 +975,10 @@ function CustomerCard({
 }
 
 function StatusPill({ status }: { status: string }) {
-  const styles =
-    status === "active"
-      ? "bg-green-50 text-green-700 border-green-200"
-      : "bg-gray-100 text-gray-500 border-gray-200";
-  const label = status === "active" ? "פעיל" : "לא פעיל";
+  const opt = getStatusOption(status);
   return (
-    <span
-      className={`ms-auto shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium ${styles}`}
-    >
-      {label}
+    <span className={`ms-auto shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium ${opt.cls}`}>
+      {opt.label}
     </span>
   );
 }
