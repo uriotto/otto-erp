@@ -49,6 +49,7 @@ export function Sidebar({ onNavigate }: Props) {
                     <Link
                       href={item.href}
                       onClick={onNavigate}
+                      prefetch={true}
                       className={`group focus-visible:ring-navy/40 flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-all duration-200 ease-out focus-visible:ring-2 focus-visible:outline-none active:scale-[0.98] ${
                         isActive
                           ? "bg-cream-paper text-navy shadow-card border-navy border-e-[3px] font-semibold"
