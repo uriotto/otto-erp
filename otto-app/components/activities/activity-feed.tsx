@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Pencil, MessageSquarePlus } from "lucide-react";
+import { Plus, Trash2, Pencil } from "lucide-react";
 import { ACTIVITY_META, LOGGED_ACTIVITY_TYPES, type ActivityType } from "./activity-types";
 import { NewActivityDialog } from "./new-activity-dialog";
 import { EditActivityDialog } from "./edit-activity-dialog";
@@ -55,19 +55,16 @@ export function ActivityFeed({
       </div>
 
       {visible.length === 0 ? (
-        <div className="border-ink-line bg-cream-paper/40 flex flex-col items-center justify-center rounded-2xl border border-dashed px-6 py-16 text-center">
-          <div className="bg-cream-deep mb-5 flex h-20 w-20 items-center justify-center rounded-full">
-            <MessageSquarePlus size={48} className="text-navy/60" />
-          </div>
-          <h3 className="text-display-sm text-navy mb-2">אין עדיין פעילות</h3>
-          <p className="text-ink-soft mx-auto mb-6 max-w-md text-sm leading-relaxed">
-            הוסיפו פגישה, שיחה או הערה כדי להתחיל לתעד את ההיסטוריה.
-          </p>
+        <div className="border-ink-line rounded-xl border border-dashed px-6 py-10 text-center">
+          <span className="font-caveat text-ink-faded mb-1 block text-[22px]">
+            אין עדיין פעילות
+          </span>
+          <p className="text-ink-faded mb-4 text-xs">הוסיפו פגישה, שיחה או הערה</p>
           <button
             onClick={() => setShowNew(true)}
-            className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors"
+            className="text-navy hover:text-navy-deep inline-flex items-center gap-1.5 text-sm font-semibold underline-offset-4 hover:underline"
           >
-            <Plus size={16} />
+            <Plus size={14} />
             הוסף פעילות
           </button>
         </div>
@@ -109,12 +106,9 @@ function ActivityItem({ activity, parentPath }: { activity: Activity; parentPath
 
   return (
     <li className="group border-ink-line bg-cream-paper relative flex gap-3 rounded-xl border p-3.5 transition-all duration-300 ease-out motion-reduce:transition-none">
-      <div
-        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${meta.color}`}
-        aria-label={meta.label}
-      >
+      <span className={`mt-1 shrink-0 ${meta.iconColor}`} aria-label={meta.label}>
         <Icon size={16} />
-      </div>
+      </span>
 
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">

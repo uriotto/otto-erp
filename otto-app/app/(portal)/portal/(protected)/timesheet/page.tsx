@@ -177,10 +177,7 @@ export default async function PortalTimesheetPage() {
                   </tbody>
                   <tfoot>
                     <tr className="border-ink-line/60 border-t">
-                      <td
-                        colSpan={3}
-                        className="text-ink-soft px-4 py-2.5 text-xs font-medium"
-                      >
+                      <td colSpan={3} className="text-ink-soft px-4 py-2.5 text-xs font-medium">
                         סה״כ חודשי
                       </td>
                       <td

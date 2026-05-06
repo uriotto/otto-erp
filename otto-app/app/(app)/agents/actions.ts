@@ -10,9 +10,7 @@ const AgentSchema = z.object({
   name: z.string().min(1, "שם חובה"),
   description: z.string().optional(),
   webhook_url: z.string().url("כתובת Webhook לא תקינה"),
-  trigger_contexts: z
-    .array(z.enum(VALID_CONTEXTS))
-    .min(1, "יש לבחור לפחות הקשר אחד"),
+  trigger_contexts: z.array(z.enum(VALID_CONTEXTS)).min(1, "יש לבחור לפחות הקשר אחד"),
   icon: z.string().default("Sparkles"),
   is_active: z.boolean().default(true),
 });

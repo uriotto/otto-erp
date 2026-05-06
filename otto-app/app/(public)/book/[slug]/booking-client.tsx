@@ -44,9 +44,7 @@ function formatTimeHe(date: Date): string {
 }
 
 function isBusy(slotStart: Date, slotEnd: Date, busyIntervals: BusyInterval[]): boolean {
-  return busyIntervals.some(
-    (b) => slotStart < b.end && slotEnd > b.start,
-  );
+  return busyIntervals.some((b) => slotStart < b.end && slotEnd > b.start);
 }
 
 function buildTimeSlots(date: Date, durationMinutes: number, busyIntervals: BusyInterval[]) {
@@ -140,7 +138,7 @@ export function BookingClient({ bookingType, busySlots }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8F6F1] py-8 px-4">
+    <div className="min-h-screen bg-[#F8F6F1] px-4 py-8">
       <div className="mx-auto max-w-lg">
         {/* Header */}
         <div className="mb-8 text-center">
@@ -216,7 +214,11 @@ export function BookingClient({ bookingType, busySlots }: Props) {
               </div>
 
               {(() => {
-                const slots = buildTimeSlots(selectedDate, bookingType.duration_minutes, busyIntervals);
+                const slots = buildTimeSlots(
+                  selectedDate,
+                  bookingType.duration_minutes,
+                  busyIntervals,
+                );
                 const available = slots.filter((s) => s.available);
 
                 if (available.length === 0) {
@@ -283,7 +285,7 @@ export function BookingClient({ bookingType, busySlots }: Props) {
                     onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
                     required
                     placeholder="ישראל ישראלי"
-                    className="border-ink-line text-navy w-full rounded-xl border px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-navy/20"
+                    className="border-ink-line text-navy focus:ring-navy/20 w-full rounded-xl border px-4 py-3 text-sm outline-none focus:ring-2"
                   />
                 </div>
 
@@ -298,14 +300,13 @@ export function BookingClient({ bookingType, busySlots }: Props) {
                     required
                     dir="ltr"
                     placeholder="israel@example.com"
-                    className="border-ink-line text-navy w-full rounded-xl border px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-navy/20"
+                    className="border-ink-line text-navy focus:ring-navy/20 w-full rounded-xl border px-4 py-3 text-sm outline-none focus:ring-2"
                   />
                 </div>
 
                 <div>
                   <label className="text-navy mb-1 block text-sm font-medium">
-                    טלפון{" "}
-                    <span className="text-ink-faded text-xs font-normal">(אופציונלי)</span>
+                    טלפון <span className="text-ink-faded text-xs font-normal">(אופציונלי)</span>
                   </label>
                   <input
                     type="tel"
@@ -313,21 +314,20 @@ export function BookingClient({ bookingType, busySlots }: Props) {
                     onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
                     dir="ltr"
                     placeholder="050-0000000"
-                    className="border-ink-line text-navy w-full rounded-xl border px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-navy/20"
+                    className="border-ink-line text-navy focus:ring-navy/20 w-full rounded-xl border px-4 py-3 text-sm outline-none focus:ring-2"
                   />
                 </div>
 
                 <div>
                   <label className="text-navy mb-1 block text-sm font-medium">
-                    הערה{" "}
-                    <span className="text-ink-faded text-xs font-normal">(אופציונלי)</span>
+                    הערה <span className="text-ink-faded text-xs font-normal">(אופציונלי)</span>
                   </label>
                   <textarea
                     value={form.notes}
                     onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
                     rows={3}
                     placeholder="ספר/י על הצורך שלך..."
-                    className="border-ink-line text-navy w-full rounded-xl border px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-navy/20"
+                    className="border-ink-line text-navy focus:ring-navy/20 w-full rounded-xl border px-4 py-3 text-sm outline-none focus:ring-2"
                   />
                 </div>
 

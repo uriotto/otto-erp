@@ -10,8 +10,6 @@ import {
   Building2,
   Search,
   X,
-  Users,
-  SearchX,
   UserX,
   Check,
   LayoutGrid,
@@ -988,21 +986,17 @@ function StatusPill({ status }: { status: string }) {
 function NoResults({ query, onClear }: { query: string; onClear: () => void }) {
   const trimmed = query.trim();
   return (
-    <div className="border-ink-line bg-cream-paper/40 flex flex-col items-center justify-center rounded-2xl border border-dashed py-16 text-center">
-      <div className="bg-cream-deep mb-5 flex h-20 w-20 items-center justify-center rounded-full">
-        <SearchX size={48} className="text-navy/60" />
-      </div>
-      <h3 className="text-display-sm text-navy mb-2">
-        {trimmed ? "לא מצאנו לקוחות שתואמים את החיפוש" : "לא מצאנו לקוחות שתואמים את הסינון"}
-      </h3>
-      <p className="text-ink-soft mx-auto mb-5 max-w-md text-sm">
+    <div className="border-ink-line flex flex-col items-center justify-center rounded-2xl border border-dashed py-16 text-center">
+      <span className="text-navy mb-1 block text-[52px] leading-none font-bold tabular-nums">
+        0
+      </span>
+      <p className="text-ink-soft mb-5 max-w-md text-sm">
         {trimmed ? (
           <>
-            לא נמצאו תוצאות עבור <span className="text-navy font-semibold">{`"${trimmed}"`}</span>.
-            נסו ביטוי אחר או נקו את הסינון.
+            לא נמצאו לקוחות עבור <span className="text-navy font-semibold">{`"${trimmed}"`}</span>
           </>
         ) : (
-          "אף לקוח לא תואם לסינון הנוכחי. נסו לשנות את הפילטרים."
+          "אף לקוח לא תואם לסינון הנוכחי"
         )}
       </p>
       <button
@@ -1019,10 +1013,10 @@ function NoResults({ query, onClear }: { query: string; onClear: () => void }) {
 
 function EmptyState({ onNew }: { onNew: () => void }) {
   return (
-    <div className="border-ink-line bg-cream-paper/40 flex flex-col items-center justify-center rounded-2xl border border-dashed px-6 py-16 text-center">
-      <div className="bg-cream-deep mb-5 flex h-20 w-20 items-center justify-center rounded-full">
-        <Users size={48} className="text-navy/60" />
-      </div>
+    <div className="border-ink-line flex flex-col items-center justify-center rounded-2xl border border-dashed px-6 py-20 text-center">
+      <span className="font-caveat text-accent mb-3 block text-[36px] leading-none">
+        יאללה, נתחיל!
+      </span>
       <h3 className="text-display-sm text-navy mb-2">הוסף את הלקוח הראשון</h3>
       <p className="text-ink-soft mx-auto mb-6 max-w-md text-sm leading-relaxed">
         כאן תנהל את כל הלקוחות שלך — פרטי קשר, פעילויות, תגיות והיסטוריה במקום אחד.

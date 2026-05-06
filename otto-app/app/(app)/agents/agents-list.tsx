@@ -89,9 +89,7 @@ export function AgentsList({ agents }: Props) {
             <Sparkles size={40} />
           </div>
           <p className="text-navy mb-1 font-semibold">אין סוכנים עדיין</p>
-          <p className="text-ink-soft mb-4 text-sm">
-            הוסף סוכן AI חיצוני כדי לאוטומציה של משימות
-          </p>
+          <p className="text-ink-soft mb-4 text-sm">הוסף סוכן AI חיצוני כדי לאוטומציה של משימות</p>
           <button
             onClick={handleNew}
             className="bg-navy text-cream-paper flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-medium"
@@ -138,7 +136,7 @@ export function AgentsList({ agents }: Props) {
                   <button
                     onClick={() => handleDelete(agent.id, agent.name)}
                     disabled={isPending}
-                    className="text-ink-faded hover:text-red-500 rounded-lg p-1.5 transition-colors"
+                    className="text-ink-faded rounded-lg p-1.5 transition-colors hover:text-red-500"
                     title="מחק"
                   >
                     <Trash2 size={14} />
@@ -165,11 +163,7 @@ export function AgentsList({ agents }: Props) {
         </div>
       )}
 
-      <NewAgentDialog
-        open={dialogOpen}
-        onClose={handleClose}
-        agent={editingAgent}
-      />
+      <NewAgentDialog open={dialogOpen} onClose={handleClose} agent={editingAgent} />
     </div>
   );
 }

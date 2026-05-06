@@ -1,17 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import {
-  Search,
-  Users,
-  FolderKanban,
-  CheckSquare,
-  FileText,
-  UserPlus,
-  Loader2,
-} from "lucide-react";
+import { Search, Users, FolderKanban, CheckSquare, FileText, UserPlus } from "lucide-react";
 import type { SearchResultItem, SearchResults } from "@/app/api/search/route";
 
 const TYPE_LABELS: Record<SearchResultItem["type"], string> = {
@@ -22,13 +14,7 @@ const TYPE_LABELS: Record<SearchResultItem["type"], string> = {
   document: "מסמכים",
 };
 
-const TYPE_ORDER: SearchResultItem["type"][] = [
-  "customer",
-  "lead",
-  "project",
-  "task",
-  "document",
-];
+const TYPE_ORDER: SearchResultItem["type"][] = ["customer", "lead", "project", "task", "document"];
 
 function TypeIcon({ type }: { type: SearchResultItem["type"] }) {
   const cls = "h-4 w-4 shrink-0";
@@ -74,45 +60,12 @@ function ResultSkeleton() {
 
 export function SearchClient() {
   const searchParams = useSearchParams();
-  const router = useRouter();
 
-  const initialQ = searchParams.get("q") ?? "";
-  const [inputValue, setInputValue] = useState(initialQ);
-  const [query, setQuery] = useState(initialQ);
+  const query = searchParams.get("q")?.trim() ?? "";
   const [results, setResults] = useState<SearchResults | null>(null);
   const [loading, setLoading] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
-  // autofocus
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  // debounce input → update URL + fetch
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-
-    debounceRef.current = setTimeout(() => {
-      const trimmed = inputValue.trim();
-      setQuery(trimmed);
-
-      // sync URL param
-      const params = new URLSearchParams(searchParams.toString());
-      if (trimmed) {
-        params.set("q", trimmed);
-      } else {
-        params.delete("q");
-      }
-      router.replace(`/search?${params.toString()}`, { scroll: false });
-    }, 300);
-
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [inputValue]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // fetch when query changes
+  // fetch when query (URL param) changes
   useEffect(() => {
     if (query.length < 2) {
       setResults(null);
@@ -134,33 +87,27 @@ export function SearchClient() {
   }, [query]);
 
   // build grouped sections in fixed order
-  const sections =
-    results
-      ? TYPE_ORDER.map((type) => ({
-          type,
-          label: TYPE_LABELS[type],
-          items: (results[type as keyof SearchResults] as SearchResultItem[]),
-        })).filter((s) => s.items.length > 0)
-      : [];
+  const sections = results
+    ? TYPE_ORDER.map((type) => ({
+        type,
+        label: TYPE_LABELS[type],
+        items: (results[type as keyof SearchResults] ?? []) as SearchResultItem[],
+      })).filter((s) => s.items.length > 0)
+    : [];
 
   const totalCount = sections.reduce((acc, s) => acc + s.items.length, 0);
 
   return (
     <div className="mx-auto max-w-2xl">
-      {/* שדה חיפוש */}
-      <div className="mb-8 relative">
-        <Search className="text-ink-faded pointer-events-none absolute end-4 top-1/2 h-5 w-5 -translate-y-1/2" />
-        <input
-          ref={inputRef}
-          type="search"
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          placeholder="חפש לקוחות, פרויקטים, משימות..."
-          dir="auto"
-          className="bg-cream-paper border-ink-line text-navy placeholder:text-ink-faded focus:border-navy w-full rounded-2xl border px-5 py-3.5 pe-12 text-base shadow-sm outline-none transition-colors focus:shadow-md"
-        />
-        {loading && (
-          <Loader2 className="text-ink-soft pointer-events-none absolute end-4 top-1/2 h-5 w-5 -translate-y-1/2 animate-spin" />
+      {/* כותרת */}
+      <div className="mb-8">
+        <h1 className="text-display-md text-navy">חיפוש</h1>
+        {query.length >= 2 && !loading && (
+          <p className="text-ink-soft mt-1 text-sm">
+            {totalCount > 0
+              ? `${totalCount} תוצאות עבור "${query}"`
+              : `לא נמצאו תוצאות עבור "${query}"`}
+          </p>
         )}
       </div>
 
@@ -186,7 +133,7 @@ export function SearchClient() {
         <div className="space-y-7">
           {sections.map(({ type, label, items }) => (
             <section key={type}>
-              <h2 className="text-ink-soft mb-2.5 pe-1 text-xs font-semibold uppercase tracking-wider">
+              <h2 className="text-ink-soft mb-2.5 pe-1 text-xs font-semibold tracking-wider uppercase">
                 {label}
               </h2>
               <ul className="space-y-1.5">
@@ -200,7 +147,7 @@ export function SearchClient() {
                         <TypeIcon type={item.type} />
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="text-navy block truncate text-sm font-medium leading-snug">
+                        <span className="text-navy block truncate text-sm leading-snug font-medium">
                           {item.title}
                         </span>
                         {item.subtitle && (

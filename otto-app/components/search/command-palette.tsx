@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, X, Users, TrendingUp, FileText, Loader2, Clock } from "lucide-react";
+import { Search, Users, TrendingUp, FileText, Loader2, Clock } from "lucide-react";
 import type { SearchResults, SearchResultItem } from "@/app/api/search/route";
 import { clearRecent, getRecent, type RecentItem } from "./recent-items";
 
@@ -19,6 +19,7 @@ export function CommandPalette() {
     documents: [],
   });
   const [loading, setLoading] = useState(false);
+  const [searchError, setSearchError] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [recent, setRecent] = useState<RecentItem[]>([]);
   const router = useRouter();
@@ -37,8 +38,11 @@ export function CommandPalette() {
         setOpen(false);
       }
     }
-    function onOpenEvent() {
+    function onOpenEvent(e: Event) {
       setOpen(true);
+      if (e instanceof CustomEvent && typeof e.detail?.query === "string" && e.detail.query) {
+        setQuery(e.detail.query);
+      }
     }
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("otto:command-palette:open", onOpenEvent);
@@ -51,7 +55,13 @@ export function CommandPalette() {
   // Focus on open + load recent items
   useEffect(() => {
     if (open) {
-      setTimeout(() => inputRef.current?.focus(), 50);
+      setTimeout(() => {
+        const el = inputRef.current;
+        if (!el) return;
+        el.focus();
+        // move cursor to end of any pre-filled query
+        el.setSelectionRange(el.value.length, el.value.length);
+      }, 50);
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setRecent(getRecent(RECENT_LIMIT));
     } else {
@@ -66,18 +76,28 @@ export function CommandPalette() {
     if (query.trim().length < 2) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setResults({ customers: [], leads: [], projects: [], tasks: [], documents: [] });
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSearchError(false);
       return;
     }
     let cancelled = false;
     setLoading(true);
+    setSearchError(false);
     const t = setTimeout(async () => {
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-        if (!cancelled && res.ok) {
-          const data = (await res.json()) as SearchResults;
-          setResults(data);
-          setActiveIndex(0);
+        if (!cancelled) {
+          if (res.ok) {
+            const data = (await res.json()) as SearchResults;
+            setResults(data);
+            setActiveIndex(0);
+            setSearchError(false);
+          } else {
+            setSearchError(true);
+          }
         }
+      } catch {
+        if (!cancelled) setSearchError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -145,35 +165,40 @@ export function CommandPalette() {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 pt-[10vh]">
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[10vh]"
+      style={{ background: "oklch(17% 0.025 237 / 0.35)", backdropFilter: "blur(2px)" }}
+      onClick={() => setOpen(false)}
+    >
       <div
-        className="bg-cream w-full max-w-xl overflow-hidden rounded-2xl shadow-xl"
+        className="bg-cream-paper w-full max-w-2xl overflow-hidden rounded-2xl"
+        style={{
+          boxShadow:
+            "0 0 0 1px rgba(0,63,124,0.1), 0 8px 32px rgba(0,31,60,0.2), 0 2px 8px rgba(0,0,0,0.08)",
+        }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="border-ink-line relative flex items-center border-b">
-          <Search size={18} className="text-ink-soft absolute right-4" />
+        {/* search bar */}
+        <div className="border-ink-line relative flex items-center gap-3 border-b px-5">
+          <Search size={16} className="text-ink-faded shrink-0" />
           <input
             ref={inputRef}
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onInputKeyDown}
-            placeholder="חפש לקוחות, לידים, פעילויות..."
-            className="placeholder:text-ink-faded text-navy w-full bg-transparent py-4 ps-12 pe-4 text-base outline-none"
+            placeholder="חפש לקוחות, לידים, פרויקטים, משימות..."
+            dir="rtl"
+            className="placeholder:text-ink-faded text-navy min-w-0 flex-1 bg-transparent py-4 text-[15px] outline-none"
           />
-          {loading && (
-            <Loader2 size={16} className="text-ink-faded absolute left-12 animate-spin" />
-          )}
-          <button
-            onClick={() => setOpen(false)}
-            className="text-ink-faded hover:text-navy absolute left-4 transition-colors"
-            aria-label="סגור"
-          >
-            <X size={18} />
-          </button>
+          {loading && <Loader2 size={14} className="text-ink-faded shrink-0 animate-spin" />}
+          <kbd className="border-ink-line text-ink-faded shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-medium">
+            esc
+          </kbd>
         </div>
 
-        <div className="max-h-[60vh] overflow-y-auto">
+        {/* results */}
+        <div className="max-h-[55vh] overflow-y-auto">
           {showRecent ? (
             <RecentSection
               recent={recent}
@@ -182,13 +207,17 @@ export function CommandPalette() {
               onHover={setActiveIndex}
               onClear={handleClearRecent}
             />
+          ) : searchError ? (
+            <div className="text-ink-soft px-5 py-10 text-center text-sm">
+              שגיאה בחיפוש — נסה שוב
+            </div>
           ) : searchFlatList.length === 0 && !loading ? (
-            <div className="text-ink-soft px-4 py-8 text-center text-sm">לא נמצאו תוצאות</div>
+            <div className="text-ink-soft px-5 py-10 text-center text-sm">לא נמצאו תוצאות</div>
           ) : (
             <>
               <ResultGroup
                 title="לקוחות"
-                icon={<Users size={13} className="text-blue-600" />}
+                icon={<Users size={12} className="text-navy/60" />}
                 items={results.customers}
                 flatList={searchFlatList}
                 activeIndex={activeIndex}
@@ -197,7 +226,7 @@ export function CommandPalette() {
               />
               <ResultGroup
                 title="לידים"
-                icon={<TrendingUp size={13} className="text-purple-600" />}
+                icon={<TrendingUp size={12} className="text-navy/60" />}
                 items={results.leads}
                 flatList={searchFlatList}
                 activeIndex={activeIndex}
@@ -206,7 +235,7 @@ export function CommandPalette() {
               />
               <ResultGroup
                 title="פרויקטים"
-                icon={<FileText size={13} className="text-emerald-600" />}
+                icon={<FileText size={12} className="text-navy/60" />}
                 items={results.projects}
                 flatList={searchFlatList}
                 activeIndex={activeIndex}
@@ -215,7 +244,7 @@ export function CommandPalette() {
               />
               <ResultGroup
                 title="משימות"
-                icon={<FileText size={13} className="text-amber-600" />}
+                icon={<FileText size={12} className="text-navy/60" />}
                 items={results.tasks}
                 flatList={searchFlatList}
                 activeIndex={activeIndex}
@@ -224,7 +253,7 @@ export function CommandPalette() {
               />
               <ResultGroup
                 title="מסמכים"
-                icon={<FileText size={13} className="text-gray-600" />}
+                icon={<FileText size={12} className="text-navy/60" />}
                 items={results.documents}
                 flatList={searchFlatList}
                 activeIndex={activeIndex}
@@ -233,6 +262,24 @@ export function CommandPalette() {
               />
             </>
           )}
+        </div>
+
+        {/* footer hints */}
+        <div className="border-ink-line text-ink-faded flex items-center gap-5 border-t px-5 py-2.5 text-[11px]">
+          <span className="flex items-center gap-1">
+            <kbd className="border-ink-line rounded border px-1 py-px font-mono text-[9px]">↑↓</kbd>
+            ניווט
+          </span>
+          <span className="flex items-center gap-1">
+            <kbd className="border-ink-line rounded border px-1 py-px font-mono text-[9px]">⏎</kbd>
+            בחר
+          </span>
+          <span className="flex items-center gap-1">
+            <kbd className="border-ink-line rounded border px-1 py-px font-mono text-[9px]">
+              esc
+            </kbd>
+            סגור
+          </span>
         </div>
       </div>
     </div>
@@ -254,32 +301,16 @@ function RecentSection({
 }) {
   if (recent.length === 0) {
     return (
-      <div className="text-ink-soft px-4 py-8 text-center text-sm">
-        אין פעילות אחרונה
-        <div className="text-ink-faded mt-2 text-xs">
-          הקלד לפחות 2 תווים לחיפוש{" "}
-          <kbd className="bg-cream-paper border-ink-line rounded border px-1.5 py-0.5 text-[10px]">
-            ↑
-          </kbd>{" "}
-          <kbd className="bg-cream-paper border-ink-line rounded border px-1.5 py-0.5 text-[10px]">
-            ↓
-          </kbd>{" "}
-          לניווט,{" "}
-          <kbd className="bg-cream-paper border-ink-line rounded border px-1.5 py-0.5 text-[10px]">
-            Enter
-          </kbd>{" "}
-          לבחירה
-        </div>
-      </div>
+      <div className="text-ink-faded px-5 py-10 text-center text-sm">הקלד לחיפוש או בחר ⌘K</div>
     );
   }
 
   return (
     <div className="border-ink-line border-b last:border-b-0">
-      <div className="text-micro text-ink-faded flex items-center justify-between px-4 py-2 uppercase">
+      <div className="text-micro text-ink-faded flex items-center justify-between px-5 py-2.5 uppercase">
         <span className="flex items-center gap-1.5">
-          <Clock size={13} className="text-ink-soft" />
-          פריטים אחרונים
+          <Clock size={12} />
+          אחרון
         </span>
         <button
           type="button"
@@ -297,13 +328,13 @@ function RecentSection({
             key={`${item.type}-${item.id}`}
             onClick={() => onSelect(item)}
             onMouseEnter={() => onHover(idx)}
-            className={`flex w-full items-center gap-3 px-4 py-2.5 text-right transition-colors ${
-              isActive ? "bg-navy/5" : "hover:bg-cream-paper"
+            className={`flex w-full items-center gap-3 px-5 py-2.5 text-right transition-colors ${
+              isActive ? "bg-navy/[0.05]" : "hover:bg-cream"
             }`}
           >
             <div className="min-w-0 flex-1">
-              <div className="text-navy truncate text-sm font-medium">{item.label}</div>
-              <div className="text-ink-faded truncate text-xs">
+              <div className="text-navy truncate text-[13px] font-medium">{item.label}</div>
+              <div className="text-ink-faded truncate text-[11px]">
                 {typeLabel}
                 {item.sublabel ? ` · ${item.sublabel}` : ""}
               </div>
@@ -335,7 +366,7 @@ function ResultGroup({
   if (items.length === 0) return null;
   return (
     <div className="border-ink-line border-b last:border-b-0">
-      <div className="text-micro text-ink-faded flex items-center gap-1.5 px-4 py-2 uppercase">
+      <div className="text-micro text-ink-faded flex items-center gap-1.5 px-5 py-2.5 uppercase">
         {icon}
         {title}
       </div>
@@ -347,14 +378,18 @@ function ResultGroup({
             key={`${item.type}-${item.id}`}
             onClick={() => onSelect(item)}
             onMouseEnter={() => onHover(idx)}
-            className={`flex w-full items-center gap-3 px-4 py-2.5 text-right transition-colors ${
-              isActive ? "bg-navy/5" : "hover:bg-cream-paper"
+            className={`flex w-full items-center gap-3 px-5 py-2.5 text-right transition-colors ${
+              isActive ? "bg-navy/[0.05]" : "hover:bg-cream"
             }`}
           >
             <div className="min-w-0 flex-1">
-              <div className="text-navy truncate text-sm font-medium">{item.title}</div>
+              <div className="text-navy truncate text-[13px] leading-snug font-medium">
+                {item.title}
+              </div>
               {item.subtitle && (
-                <div className="text-ink-faded truncate text-xs">{item.subtitle}</div>
+                <div className="text-ink-faded truncate text-[11px] leading-snug">
+                  {item.subtitle}
+                </div>
               )}
             </div>
           </button>

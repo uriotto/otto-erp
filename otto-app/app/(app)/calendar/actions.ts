@@ -46,7 +46,7 @@ async function getTenant() {
 
 export async function createEvent(
   _prev: EventFormState,
-  formData: FormData
+  formData: FormData,
 ): Promise<EventFormState> {
   const raw = {
     ...Object.fromEntries(formData.entries()),
@@ -89,7 +89,7 @@ export async function createEvent(
 export async function updateEvent(
   id: string,
   _prev: EventFormState,
-  formData: FormData
+  formData: FormData,
 ): Promise<EventFormState> {
   const raw = {
     ...Object.fromEntries(formData.entries()),

@@ -34,7 +34,10 @@ export async function createBooking(input: {
 }): Promise<BookingResult> {
   const parsed = BookingSchema.safeParse(input);
   if (!parsed.success) {
-    return { ok: false, error: Object.values(parsed.error.flatten().fieldErrors).flat().join(", ") };
+    return {
+      ok: false,
+      error: Object.values(parsed.error.flatten().fieldErrors).flat().join(", "),
+    };
   }
 
   const supabase = serviceClient();

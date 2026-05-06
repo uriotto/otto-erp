@@ -1,56 +1,85 @@
 import Link from "next/link";
-import {
-  Users,
-  TrendingUp,
-  CheckCircle2,
-  AlertCircle,
-  Calendar,
-  DollarSign,
-  Activity,
-} from "lucide-react";
+import { Users, TrendingUp, CheckSquare, BarChart2, AlertCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 
 function StatCard({
-  icon,
-  label,
   value,
-  hint,
+  label,
+  sub,
   href,
-  tone,
-  iconBg,
+  icon,
+  accent,
 }: {
-  icon: React.ReactNode;
-  label: string;
   value: string | number;
-  hint?: string;
+  label: string;
+  sub?: string;
   href?: string;
-  tone?: "primary" | "warning";
-  iconBg?: string;
+  icon: React.ReactNode;
+  accent?: boolean;
 }) {
-  const cardStyles = tone === "warning" ? "bg-red-50 ring-1 ring-red-200" : "bg-cream-paper";
-  const interactive = href
-    ? "hover:-translate-y-1 hover:shadow-lg transition-all duration-200 cursor-pointer"
-    : "";
-  const valueColor = tone === "warning" ? "text-red-700" : "text-navy";
-
   const content = (
-    <div className={`shadow-card rounded-2xl p-5 ${cardStyles} ${interactive}`}>
-      <div className="mb-4 flex items-start justify-between">
-        <span
-          className={`flex h-9 w-9 items-center justify-center rounded-xl ${iconBg ?? "bg-navy/8"}`}
-        >
-          {icon}
-        </span>
-      </div>
-      <div className={`text-[30px] leading-none font-bold tracking-tight ${valueColor}`}>
+    <div
+      className={[
+        "bg-cream-paper flex flex-col gap-3 rounded-2xl p-5",
+        accent ? "animate-accent-pulse" : "shadow-card",
+        href && "cursor-pointer",
+        href && accent && "transition-transform duration-200 hover:-translate-y-1",
+        href && !accent && "transition-all duration-200 hover:-translate-y-1 hover:shadow-lg",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      <div
+        className={`text-[30px] leading-none font-bold tracking-tight tabular-nums ${
+          accent ? "text-accent" : "text-navy"
+        }`}
+      >
         {value}
       </div>
-      <div className="text-ink-soft mt-2 text-xs font-medium">{label}</div>
-      {hint && <div className="text-ink-faded mt-1 text-[11px]">{hint}</div>}
+      <div>
+        <div
+          className={`flex items-center gap-1.5 text-xs font-medium ${accent ? "text-accent/80" : "text-ink-soft"}`}
+        >
+          <span className="shrink-0">{icon}</span>
+          {label}
+        </div>
+        {sub && <div className="text-ink-faded mt-0.5 text-[11px]">{sub}</div>}
+      </div>
     </div>
   );
 
   return href ? <Link href={href}>{content}</Link> : content;
+}
+
+function SecondaryStatItem({
+  value,
+  label,
+  href,
+  accent,
+}: {
+  value: string | number;
+  label: string;
+  href?: string;
+  accent?: boolean;
+}) {
+  const content = (
+    <div className="flex items-baseline gap-1.5">
+      <span
+        className={`text-[18px] leading-none font-bold tabular-nums ${accent ? "text-accent" : "text-navy"}`}
+      >
+        {value}
+      </span>
+      <span className="text-ink-faded text-xs">{label}</span>
+    </div>
+  );
+
+  return href ? (
+    <Link href={href} className="transition-opacity hover:opacity-70">
+      {content}
+    </Link>
+  ) : (
+    content
+  );
 }
 
 export async function DashboardStats() {
@@ -109,83 +138,66 @@ export async function DashboardStats() {
 
   const openPipelineValue = (openLeads ?? []).reduce((sum, l) => sum + (l.value ?? 0), 0);
   const wonValue = (leadsWon ?? []).reduce((sum, l) => sum + (l.value ?? 0), 0);
+  const isOverdue = (tasksOverdue ?? 0) > 0;
 
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard
-          icon={<Users size={17} className="text-blue-600" />}
-          label="לקוחות"
-          value={customersTotal ?? 0}
-          hint={customersActive ? `${customersActive} פעילים` : undefined}
-          href="/customers"
-          iconBg="bg-blue-50"
-        />
-        <StatCard
-          icon={<TrendingUp size={17} className="text-emerald-600" />}
-          label="לידים פעילים"
-          value={(openLeads ?? []).length}
-          hint={leadsTotal ? `מתוך ${leadsTotal} סה"כ` : undefined}
-          href="/leads"
-          iconBg="bg-emerald-50"
-        />
-        <StatCard
-          icon={
-            <CheckCircle2
-              size={17}
-              className={(tasksOverdue ?? 0) > 0 ? "text-red-600" : "text-orange-500"}
-            />
-          }
-          label="משימות היום"
-          value={tasksDueToday ?? 0}
-          hint={(tasksOverdue ?? 0) > 0 ? `${tasksOverdue} באיחור` : undefined}
-          href="/today"
-          tone={(tasksOverdue ?? 0) > 0 ? "warning" : undefined}
-          iconBg={(tasksOverdue ?? 0) > 0 ? "bg-red-50" : "bg-orange-50"}
-        />
-        <StatCard
-          icon={<Activity size={17} className="text-purple-600" />}
-          label="פעילויות השבוע"
-          value={activitiesThisWeek ?? 0}
-          iconBg="bg-purple-50"
-        />
+        {[
+          <StatCard
+            key="customers"
+            icon={<Users size={13} />}
+            label="לקוחות"
+            value={customersTotal ?? 0}
+            sub={customersActive ? `${customersActive} פעילים` : undefined}
+            href="/customers"
+          />,
+          <StatCard
+            key="leads"
+            icon={<TrendingUp size={13} />}
+            label="לידים פעילים"
+            value={(openLeads ?? []).length}
+            sub={leadsTotal ? `מתוך ${leadsTotal} סה"כ` : undefined}
+            href="/leads"
+          />,
+          <StatCard
+            key="tasks"
+            icon={<CheckSquare size={13} />}
+            label="משימות להיום"
+            value={tasksDueToday ?? 0}
+            sub={isOverdue ? `${tasksOverdue} באיחור` : undefined}
+            href="/today"
+            accent={isOverdue}
+          />,
+          <StatCard
+            key="pipeline"
+            icon={<BarChart2 size={13} />}
+            label="פוטנציאל בפייפליין"
+            value={`₪${openPipelineValue.toLocaleString("he-IL")}`}
+            sub={wonValue ? `נסגר: ₪${wonValue.toLocaleString("he-IL")}` : undefined}
+          />,
+        ].map((card, i) => (
+          <div key={i} className="animate-slide-up" style={{ animationDelay: `${i * 60}ms` }}>
+            {card}
+          </div>
+        ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard
-          icon={<DollarSign size={17} className="text-amber-600" />}
-          label="פוטנציאל בפייפליין"
-          value={`₪${openPipelineValue.toLocaleString("he-IL")}`}
-          hint={wonValue ? `נסגר: ₪${wonValue.toLocaleString("he-IL")}` : undefined}
-          iconBg="bg-amber-50"
-        />
-        <StatCard
-          icon={
-            <AlertCircle
-              size={17}
-              className={(tasksOverdue ?? 0) > 0 ? "text-red-600" : "text-ink-faded"}
-            />
-          }
-          label="משימות באיחור"
-          value={tasksOverdue ?? 0}
-          href="/today"
-          tone={(tasksOverdue ?? 0) > 0 ? "warning" : undefined}
-          iconBg={(tasksOverdue ?? 0) > 0 ? "bg-red-50" : "bg-cream-deep"}
-        />
-        <StatCard
-          icon={<CheckCircle2 size={17} className="text-teal-600" />}
-          label="משימות פתוחות"
-          value={tasksOpen ?? 0}
-          href="/today"
-          iconBg="bg-teal-50"
-        />
-        <StatCard
-          icon={<Calendar size={17} className="text-indigo-600" />}
-          label="פגישות היום"
-          value={meetingsToday ?? 0}
-          href="/today"
-          iconBg="bg-indigo-50"
-        />
+      <div
+        className="animate-fade-in flex items-center gap-6 px-1"
+        style={{ animationDelay: "280ms" }}
+      >
+        <SecondaryStatItem value={tasksOpen ?? 0} label="משימות פתוחות" href="/today" />
+        <div className="bg-ink-line h-3 w-px" aria-hidden />
+        <SecondaryStatItem value={meetingsToday ?? 0} label="פגישות היום" href="/calendar" />
+        <div className="bg-ink-line h-3 w-px" aria-hidden />
+        <SecondaryStatItem value={activitiesThisWeek ?? 0} label="פעילויות השבוע" />
+        {isOverdue && (
+          <>
+            <div className="bg-ink-line h-3 w-px" aria-hidden />
+            <SecondaryStatItem value={tasksOverdue ?? 0} label="באיחור" href="/today" accent />
+          </>
+        )}
       </div>
     </div>
   );

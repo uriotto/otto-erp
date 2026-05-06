@@ -36,9 +36,7 @@ const BookingTypeSchema = z.object({
   is_active: z.boolean().optional().default(true),
 });
 
-export async function createBookingType(
-  formData: FormData,
-): Promise<ActionResult<{ id: string }>> {
+export async function createBookingType(formData: FormData): Promise<ActionResult<{ id: string }>> {
   const ctx = await getCurrentTenant();
   if (!ctx) return { ok: false, error: "לא מחובר" };
 
@@ -53,7 +51,10 @@ export async function createBookingType(
 
   const parsed = BookingTypeSchema.safeParse(raw);
   if (!parsed.success) {
-    return { ok: false, error: Object.values(parsed.error.flatten().fieldErrors).flat().join(", ") };
+    return {
+      ok: false,
+      error: Object.values(parsed.error.flatten().fieldErrors).flat().join(", "),
+    };
   }
 
   const { data, error } = await ctx.supabase
@@ -71,10 +72,7 @@ export async function createBookingType(
   return { ok: true, data: { id: data.id } };
 }
 
-export async function updateBookingType(
-  id: string,
-  formData: FormData,
-): Promise<ActionResult> {
+export async function updateBookingType(id: string, formData: FormData): Promise<ActionResult> {
   const ctx = await getCurrentTenant();
   if (!ctx) return { ok: false, error: "לא מחובר" };
 
@@ -89,7 +87,10 @@ export async function updateBookingType(
 
   const parsed = BookingTypeSchema.safeParse(raw);
   if (!parsed.success) {
-    return { ok: false, error: Object.values(parsed.error.flatten().fieldErrors).flat().join(", ") };
+    return {
+      ok: false,
+      error: Object.values(parsed.error.flatten().fieldErrors).flat().join(", "),
+    };
   }
 
   const { error } = await ctx.supabase

@@ -16,7 +16,6 @@ import {
   Megaphone,
   CalendarDays,
   BarChart2,
-  Search,
   type LucideIcon,
 } from "lucide-react";
 
@@ -38,7 +37,6 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: "בית", href: "/dashboard", icon: Home },
       { label: "היום", href: "/today", icon: Clock },
-      { label: "חיפוש", href: "/search", icon: Search },
       { label: "לידים", href: "/leads", icon: PlusCircle },
     ],
   },

@@ -116,7 +116,10 @@ export function ReportDetail({
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       {/* Back */}
-      <Link href="/reports" className="text-ink-soft hover:text-navy flex items-center gap-1 text-sm">
+      <Link
+        href="/reports"
+        className="text-ink-soft hover:text-navy flex items-center gap-1 text-sm"
+      >
         <ArrowRight size={15} className="rtl:rotate-180" />
         חזרה לדוחות
       </Link>
@@ -258,7 +261,9 @@ export function ReportDetail({
           </div>
         ) : (
           <p className="text-ink-soft text-sm whitespace-pre-wrap">
-            {summary || <span className="text-ink-faded italic">אין סיכום עדיין. לחץ על עריכה להוספה.</span>}
+            {summary || (
+              <span className="text-ink-faded italic">אין סיכום עדיין. לחץ על עריכה להוספה.</span>
+            )}
           </p>
         )}
       </div>

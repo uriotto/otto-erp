@@ -6,10 +6,7 @@ export default function Loading() {
       <PageHeaderSkeleton />
       <div className="mb-6 grid grid-cols-3 gap-4 sm:grid-cols-3">
         {Array.from({ length: 3 }).map((_, i) => (
-          <div
-            key={i}
-            className="bg-cream-paper border-ink-line space-y-2 rounded-2xl border p-5"
-          >
+          <div key={i} className="bg-cream-paper border-ink-line space-y-2 rounded-2xl border p-5">
             <Skeleton className="h-3 w-20" />
             <Skeleton className="h-8 w-16" />
           </div>

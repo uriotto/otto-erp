@@ -82,10 +82,7 @@ export async function approveReport(id: string): Promise<ReportUpdateResult> {
   return { ok: true };
 }
 
-export async function saveDraftReport(
-  id: string,
-  summary: string,
-): Promise<ReportUpdateResult> {
+export async function saveDraftReport(id: string, summary: string): Promise<ReportUpdateResult> {
   const { supabase, profile } = await getTenant();
   if (!profile) return { ok: false, error: "לא מחובר" };
 
@@ -169,9 +166,7 @@ export async function generateMonthlyReport(
   const [{ data: timeEntriesRaw }, { data: invoicesRaw }] = await Promise.all([
     supabase
       .from("time_entries")
-      .select(
-        "id, date, hours, description, tasks(title), projects(name)",
-      )
+      .select("id, date, hours, description, tasks(title), projects(name)")
       .eq("customer_id", customerId)
       .gte("date", periodStart)
       .lte("date", periodEnd)

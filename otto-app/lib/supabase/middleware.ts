@@ -80,12 +80,14 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(dashUrl);
   }
 
-  // Block authenticated admin-area users who have no users row (not invited)
+  // Block authenticated admin-area users who have no users row.
+  // Fetch full_name + email here so the layout can read them from a request header
+  // instead of making a second DB round-trip.
   const isAccessPending = pathname === "/access-pending";
   if (user && !isAuthRoute && !isPortalRoute && !isPublicApi && !isPublicRoot && !isAccessPending) {
     const { data: profile } = await supabase
       .from("users")
-      .select("id")
+      .select("id, full_name, email")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -95,6 +97,13 @@ export async function updateSession(request: NextRequest) {
       pendingUrl.search = "";
       return NextResponse.redirect(pendingUrl);
     }
+
+    // Pass display name to Server Components via request header — avoids a second DB call in layout
+    const displayName = profile.full_name?.split(" ")[0] ?? profile.email?.split("@")[0] ?? "";
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-display-name", encodeURIComponent(displayName));
+
+    return NextResponse.next({ request: { headers: requestHeaders } });
   }
 
   return response;

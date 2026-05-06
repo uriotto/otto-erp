@@ -23,10 +23,7 @@ export default function Loading() {
         {Array.from({ length: 5 }).map((_, row) => (
           <div key={row} className="border-ink-line grid grid-cols-7 border-b last:border-b-0">
             {Array.from({ length: 7 }).map((_, col) => (
-              <div
-                key={col}
-                className="border-ink-line min-h-[100px] border-e p-2 last:border-e-0"
-              >
+              <div key={col} className="border-ink-line min-h-[100px] border-e p-2 last:border-e-0">
                 <Skeleton className="mb-2 h-4 w-6" />
                 {row === 1 && col === 2 && <Skeleton className="h-6 w-full rounded-md" />}
                 {row === 2 && col === 4 && <Skeleton className="h-6 w-full rounded-md" />}

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertCircle, Clock, Calendar, ArrowLeft, TrendingUp, Coffee } from "lucide-react";
+import { AlertCircle, Clock, Calendar, ArrowLeft, TrendingUp } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import type { ParentSearchItem } from "@/components/activities/parent-picker";
 import { TodayActivityRow } from "./today-activity-row";
@@ -199,9 +199,9 @@ export default async function TodayPage() {
 
       {allTasks.length === 0 && allMeetings.length === 0 && (
         <div className="bg-cream-paper shadow-card flex flex-col items-center justify-center rounded-2xl px-6 py-16 text-center">
-          <div className="bg-cream-deep mb-5 flex h-20 w-20 items-center justify-center rounded-full">
-            <Coffee size={40} className="text-navy/50" />
-          </div>
+          <span className="font-caveat text-accent mb-2 block text-[48px] leading-none opacity-75">
+            יום חופשי ☕
+          </span>
           <h3 className="text-display-sm text-navy mb-2">היום הזה פנוי</h3>
           <p className="text-ink-soft mx-auto mb-6 max-w-md text-sm leading-relaxed">
             אין משימות או פגישות מתוזמנות. אולי זה זמן ליצור פעילות חדשה או לקפוץ ללקוחות?

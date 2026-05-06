@@ -11,6 +11,9 @@ import {
   ListChecks,
   Check,
   Table2,
+  CalendarDays,
+  CalendarRange,
+  Calendar,
 } from "lucide-react";
 import type { Tables } from "@/lib/supabase/types";
 import { useToast } from "@/components/ui/toast";
@@ -49,11 +52,11 @@ export type TaskOpt = Pick<Tables<"tasks">, "id" | "title" | "project_id">;
 
 type View = "daily" | "weekly" | "monthly" | "table";
 
-const VIEWS: { value: View; label: string; icon?: React.ReactNode }[] = [
-  { value: "daily", label: "יומי" },
-  { value: "weekly", label: "שבועי" },
-  { value: "monthly", label: "חודשי" },
-  { value: "table", label: "טבלה", icon: <Table2 size={13} /> },
+const VIEWS: { value: View; label: string; icon: React.ReactNode }[] = [
+  { value: "daily", label: "יומי", icon: <CalendarDays size={14} /> },
+  { value: "weekly", label: "שבועי", icon: <CalendarRange size={14} /> },
+  { value: "monthly", label: "חודשי", icon: <Calendar size={14} /> },
+  { value: "table", label: "טבלה", icon: <Table2 size={14} /> },
 ];
 
 function formatDurationMinutes(min: number | null | undefined): string {
@@ -232,14 +235,23 @@ export function TimeList({
           <h1 className="text-display-md text-navy">שעות</h1>
           <p className="text-ink-soft mt-1 text-sm">{entries.length} רשומות ב-30 הימים האחרונים</p>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowNew(true)}
-          className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors"
-        >
-          <Plus size={16} />
-          רשומה חדשה
-        </button>
+        <div className="flex items-center gap-2">
+          <TimeViewToggle
+            view={view}
+            onChange={(v) => {
+              setView(v);
+              updateUrl({ view: v });
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => setShowNew(true)}
+            className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors"
+          >
+            <Plus size={16} />
+            רשומה חדשה
+          </button>
+        </div>
       </div>
 
       {/* Summary */}
@@ -249,25 +261,8 @@ export function TimeList({
         <SummaryCard label="שעות לא מחויבות" minutes={summary.unbilledMin} accent />
       </div>
 
-      {/* View tabs + filters */}
+      {/* Filters */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="bg-cream-paper border-ink-line inline-flex rounded-lg border p-1">
-          {VIEWS.map((v) => (
-            <button
-              key={v.value}
-              type="button"
-              onClick={() => {
-                setView(v.value);
-                updateUrl({ view: v.value });
-              }}
-              className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
-                view === v.value ? "bg-navy text-cream-paper" : "text-ink-soft hover:text-navy"
-              }`}
-            >
-              {v.label}
-            </button>
-          ))}
-        </div>
         <select
           value={customerFilter}
           onChange={(e) => {
@@ -458,6 +453,27 @@ export function TimeList({
           onClose={() => setShowNew(false)}
         />
       )}
+    </div>
+  );
+}
+
+function TimeViewToggle({ view, onChange }: { view: View; onChange: (v: View) => void }) {
+  return (
+    <div className="border-ink-line bg-cream flex rounded-xl border p-0.5">
+      {VIEWS.map(({ value, label, icon }) => (
+        <button
+          key={value}
+          type="button"
+          onClick={() => onChange(value)}
+          className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+            view === value ? "bg-navy text-cream-paper shadow-sm" : "text-ink-soft hover:text-navy"
+          }`}
+          aria-pressed={view === value}
+        >
+          {icon}
+          <span className="hidden sm:inline">{label}</span>
+        </button>
+      ))}
     </div>
   );
 }

@@ -17,11 +17,7 @@ export default async function BookingPage({ params }: { params: Promise<{ slug: 
   to.setDate(to.getDate() + 15);
   to.setHours(23, 59, 59, 999);
 
-  const busySlots = await getBusySlots(
-    bookingType.tenant_id,
-    from.toISOString(),
-    to.toISOString(),
-  );
+  const busySlots = await getBusySlots(bookingType.tenant_id, from.toISOString(), to.toISOString());
 
   return <BookingClient bookingType={bookingType} busySlots={busySlots} />;
 }

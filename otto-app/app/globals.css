@@ -1,12 +1,12 @@
 @import "tailwindcss";
 
 @theme {
-  /* Colors — cream */
-  --color-cream: #ffffff;
-  --color-cream-deep: #f5f5f5;
-  --color-cream-paper: #ffffff;
-  --color-cream-shadow: #e8e8e8;
-  --color-cream-sidebar: #f7f7f7;
+  /* Colors — cream (tinted toward navy hue 237°) */
+  --color-cream: oklch(99.4% 0.005 237);
+  --color-cream-deep: oklch(97% 0.007 237);
+  --color-cream-paper: oklch(99.8% 0.003 237);
+  --color-cream-shadow: oklch(94% 0.008 237);
+  --color-cream-sidebar: oklch(98% 0.009 237);
 
   /* Colors — navy */
   --color-navy: #003f7c;
@@ -67,6 +67,36 @@ body {
   background-color: var(--color-cream);
 }
 
+/* Animation keyframes */
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Animation utilities */
+.animate-slide-up {
+  animation: slide-up 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-fade-in {
+  animation: fade-in 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 /* Card shadow utility */
 .shadow-card {
   box-shadow:
@@ -78,6 +108,42 @@ body {
   100% {
     transform: translateX(100%);
   }
+}
+
+@keyframes dot-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.55);
+    opacity: 0.72;
+  }
+}
+
+@keyframes accent-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 1px 4px rgba(0, 0, 0, 0.06),
+      0 0 0 1px rgba(0, 0, 0, 0.04),
+      0 0 0 2px rgba(224, 125, 60, 0.14);
+  }
+  50% {
+    box-shadow:
+      0 2px 10px rgba(0, 0, 0, 0.09),
+      0 0 0 1px rgba(0, 0, 0, 0.04),
+      0 0 0 5px rgba(224, 125, 60, 0.3);
+  }
+}
+
+.animate-dot-breathe {
+  animation: dot-breathe 2.8s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+.animate-accent-pulse {
+  animation: accent-pulse 2.5s cubic-bezier(0.65, 0, 0.35, 1) infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {

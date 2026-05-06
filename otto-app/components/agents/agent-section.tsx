@@ -27,7 +27,7 @@ export async function AgentSection({ contextType, contextId, contextData = {} }:
         contextType={contextType}
         contextId={contextId}
         contextData={contextData}
-        agents={(agents as ExternalAgent[])}
+        agents={agents as ExternalAgent[]}
       />
     </div>
   );

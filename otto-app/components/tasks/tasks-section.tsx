@@ -44,11 +44,9 @@ export function TasksSection({ tasks }: { tasks: TasksSectionItem[] }) {
       </div>
 
       {tasks.length === 0 ? (
-        <div className="border-ink-line bg-cream-paper/40 flex flex-col items-center justify-center rounded-2xl border border-dashed px-6 py-12 text-center">
-          <div className="bg-cream-deep mb-4 flex h-16 w-16 items-center justify-center rounded-full">
-            <CheckCheck size={36} className="text-navy/60" />
-          </div>
-          <p className="text-ink-soft text-sm">אין משימות פתוחות</p>
+        <div className="border-ink-line rounded-xl border border-dashed py-8 text-center">
+          <CheckCheck size={18} className="text-ink-faded mx-auto mb-1.5" strokeWidth={1.5} />
+          <p className="text-ink-faded text-xs">אין משימות פתוחות</p>
         </div>
       ) : (
         <ul className="space-y-2">

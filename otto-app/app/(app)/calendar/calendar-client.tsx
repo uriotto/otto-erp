@@ -12,35 +12,45 @@ const DAYS_HE = ["ראשון", "שני", "שלישי", "רביעי", "חמישי
 const DAYS_HE_SHORT = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
 
 const MONTHS_HE = [
-  "ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני",
-  "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר",
+  "ינואר",
+  "פברואר",
+  "מרץ",
+  "אפריל",
+  "מאי",
+  "יוני",
+  "יולי",
+  "אוגוסט",
+  "ספטמבר",
+  "אוקטובר",
+  "נובמבר",
+  "דצמבר",
 ];
 
 const STATUS_DONE = new Set(["done"]);
 
 const PRIORITY_COLORS: Record<string, string> = {
   urgent: "bg-rose-500",
-  high:   "bg-orange-400",
+  high: "bg-orange-400",
   medium: "bg-navy",
-  low:    "bg-ink-faded",
+  low: "bg-ink-faded",
 };
 
 const EVENT_TYPE_COLORS: Record<string, string> = {
-  meeting:  "bg-amber-500",
-  call:     "bg-teal-500",
+  meeting: "bg-amber-500",
+  call: "bg-teal-500",
   deadline: "bg-rose-500",
-  other:    "bg-purple-400",
+  other: "bg-purple-400",
 };
 
 type ViewMode = "month" | "week";
 
 type CustomerOption = { id: string; name: string };
-type ProjectOption  = { id: string; name: string; customer_id: string | null };
+type ProjectOption = { id: string; name: string; customer_id: string | null };
 
 type DialogState =
   | { open: false }
   | { open: true; mode: "create"; date: string }
-  | { open: true; mode: "edit";   event: EventItem };
+  | { open: true; mode: "edit"; event: EventItem };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -84,13 +94,12 @@ function eventDateKey(startAt: string): string {
 
 function TaskChip({ task }: { task: CalendarTask }) {
   const done = STATUS_DONE.has(task.status);
-  const dot  = PRIORITY_COLORS[task.priority] ?? "bg-navy";
+  const dot = PRIORITY_COLORS[task.priority] ?? "bg-navy";
 
   return (
     <div
       title={task.title}
-      className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium leading-tight truncate
-        ${done ? "bg-cream-shadow text-ink-faded line-through" : "bg-navy-pale/60 text-navy hover:bg-navy-pale"}`}
+      className={`flex items-center gap-1 truncate rounded px-1.5 py-0.5 text-[11px] leading-tight font-medium ${done ? "bg-cream-shadow text-ink-faded line-through" : "bg-navy-pale/60 text-navy hover:bg-navy-pale"}`}
     >
       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
       <span className="truncate">{task.title}</span>
@@ -101,34 +110,37 @@ function TaskChip({ task }: { task: CalendarTask }) {
 // ─── Event chip ──────────────────────────────────────────────────────────────
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
-  meeting:  "פגישה",
-  call:     "שיחה",
+  meeting: "פגישה",
+  call: "שיחה",
   deadline: "דדליין",
-  other:    "אחר",
+  other: "אחר",
 };
 
-function EventChip({
-  event,
-  onClick,
-}: {
-  event: CalendarEvent;
-  onClick: () => void;
-}) {
+function EventChip({ event, onClick }: { event: CalendarEvent; onClick: () => void }) {
   const dot = EVENT_TYPE_COLORS[event.type] ?? "bg-amber-500";
   const startTime = event.all_day
     ? null
-    : new Date(event.start_at).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", hour12: false });
+    : new Date(event.start_at).toLocaleTimeString("he-IL", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
 
   return (
     <button
       type="button"
       title={`${EVENT_TYPE_LABELS[event.type] ?? "אירוע"}: ${event.title}`}
-      onClick={(e) => { e.stopPropagation(); onClick(); }}
-      className="flex w-full items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium leading-tight truncate bg-amber-50 text-amber-800 hover:bg-amber-100 transition-colors text-start"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className="flex w-full items-center gap-1 truncate rounded bg-amber-50 px-1.5 py-0.5 text-start text-[11px] leading-tight font-medium text-amber-800 transition-colors hover:bg-amber-100"
     >
       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
       {startTime && (
-        <span className="shrink-0 font-mono text-[10px] opacity-70" dir="ltr">{startTime}</span>
+        <span className="shrink-0 font-mono text-[10px] opacity-70" dir="ltr">
+          {startTime}
+        </span>
       )}
       <span className="truncate">{event.title}</span>
     </button>
@@ -164,11 +176,11 @@ function MonthView({
   return (
     <div className="flex-1 overflow-auto">
       {/* Day headers */}
-      <div className="grid grid-cols-7 border-b border-ink-line">
+      <div className="border-ink-line grid grid-cols-7 border-b">
         {DAYS_HE.map((d) => (
           <div
             key={d}
-            className="py-2 text-center text-[11px] font-semibold tracking-wide text-ink-soft uppercase"
+            className="text-ink-soft py-2 text-center text-[11px] font-semibold tracking-wide uppercase"
           >
             {d}
           </div>
@@ -176,48 +188,41 @@ function MonthView({
       </div>
 
       {/* Grid */}
-      <div className="grid grid-cols-7 flex-1">
+      <div className="grid flex-1 grid-cols-7">
         {cells.map((cell, i) => {
-          const key    = toDateKey(cell);
-          const tasks  = tasksByDate.get(key) ?? [];
+          const key = toDateKey(cell);
+          const tasks = tasksByDate.get(key) ?? [];
           const events = eventsByDate.get(key) ?? [];
-          const total  = tasks.length + events.length;
+          const total = tasks.length + events.length;
           const inMonth = sameMonth(cell, year, month);
-          const today   = isToday(cell);
+          const today = isToday(cell);
 
           return (
             <div
               key={i}
-              className={`min-h-[90px] border-b border-e border-ink-line p-1.5 cursor-pointer group
-                ${!inMonth ? "bg-cream-deep/50" : "bg-cream-paper hover:bg-cream-deep/30"}
-                ${today ? "ring-1 ring-inset ring-navy/30" : ""}`}
+              className={`border-ink-line group min-h-[90px] cursor-pointer border-e border-b p-1.5 ${!inMonth ? "bg-cream-deep/50" : "bg-cream-paper hover:bg-cream-deep/30"} ${today ? "ring-navy/30 ring-1 ring-inset" : ""}`}
               onClick={() => onDayClick(key)}
             >
               {/* Date number */}
               <div className="mb-1 flex items-center justify-between">
                 <span
-                  className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-semibold
-                    ${today ? "bg-navy text-white" : inMonth ? "text-navy" : "text-ink-faded"}`}
+                  className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-semibold ${today ? "bg-navy text-white" : inMonth ? "text-navy" : "text-ink-faded"}`}
                 >
                   {cell.getDate()}
                 </span>
-                <Plus className="h-3 w-3 text-ink-faded opacity-0 group-hover:opacity-60 transition-opacity" />
+                <Plus className="text-ink-faded h-3 w-3 opacity-0 transition-opacity group-hover:opacity-60" />
               </div>
 
               {/* Events first (amber), then tasks */}
               <div className="space-y-0.5">
                 {events.slice(0, 2).map((ev) => (
-                  <EventChip
-                    key={ev.id}
-                    event={ev}
-                    onClick={() => onEventClick(ev)}
-                  />
+                  <EventChip key={ev.id} event={ev} onClick={() => onEventClick(ev)} />
                 ))}
                 {tasks.slice(0, events.length >= 2 ? 1 : 3).map((t) => (
                   <TaskChip key={t.id} task={t} />
                 ))}
                 {total > 3 && (
-                  <div className="px-1.5 text-[10px] font-medium text-ink-faded">
+                  <div className="text-ink-faded px-1.5 text-[10px] font-medium">
                     +{total - 3} נוספות
                   </div>
                 )}
@@ -252,21 +257,17 @@ function WeekView({
   return (
     <div className="flex-1 overflow-auto">
       {/* Day headers */}
-      <div className="sticky top-0 z-10 grid grid-cols-[48px_repeat(7,1fr)] border-b border-ink-line bg-cream-paper">
+      <div className="border-ink-line bg-cream-paper sticky top-0 z-10 grid grid-cols-[48px_repeat(7,1fr)] border-b">
         <div />
         {days.map((d) => {
           const today = isToday(d);
           return (
-            <div
-              key={d.toISOString()}
-              className="border-s border-ink-line py-2 text-center"
-            >
-              <div className="text-[11px] font-semibold text-ink-soft">
+            <div key={d.toISOString()} className="border-ink-line border-s py-2 text-center">
+              <div className="text-ink-soft text-[11px] font-semibold">
                 {DAYS_HE_SHORT[d.getDay()]}
               </div>
               <div
-                className={`mx-auto mt-0.5 flex h-7 w-7 items-center justify-center rounded-full text-[13px] font-bold
-                  ${today ? "bg-navy text-white" : "text-navy"}`}
+                className={`mx-auto mt-0.5 flex h-7 w-7 items-center justify-center rounded-full text-[13px] font-bold ${today ? "bg-navy text-white" : "text-navy"}`}
               >
                 {d.getDate()}
               </div>
@@ -276,24 +277,20 @@ function WeekView({
       </div>
 
       {/* All-day row */}
-      <div className="grid grid-cols-[48px_repeat(7,1fr)] border-b border-ink-line">
-        <div className="py-1 text-center text-[10px] text-ink-faded">כל היום</div>
+      <div className="border-ink-line grid grid-cols-[48px_repeat(7,1fr)] border-b">
+        <div className="text-ink-faded py-1 text-center text-[10px]">כל היום</div>
         {days.map((d) => {
-          const key    = toDateKey(d);
-          const tasks  = tasksByDate.get(key) ?? [];
+          const key = toDateKey(d);
+          const tasks = tasksByDate.get(key) ?? [];
           const events = (eventsByDate.get(key) ?? []).filter((ev) => ev.all_day);
           return (
             <div
               key={key}
-              className="border-s border-ink-line p-1 space-y-0.5 min-h-[32px] cursor-pointer hover:bg-cream-deep/30"
+              className="border-ink-line hover:bg-cream-deep/30 min-h-[32px] cursor-pointer space-y-0.5 border-s p-1"
               onClick={() => onDayClick(key)}
             >
               {events.map((ev) => (
-                <EventChip
-                  key={ev.id}
-                  event={ev}
-                  onClick={() => onEventClick(ev)}
-                />
+                <EventChip key={ev.id} event={ev} onClick={() => onEventClick(ev)} />
               ))}
               {tasks.map((t) => (
                 <TaskChip key={t.id} task={t} />
@@ -309,7 +306,7 @@ function WeekView({
           const hasEvents = days.some((d) => {
             const key = toDateKey(d);
             const dayEvents = (eventsByDate.get(key) ?? []).filter(
-              (ev) => !ev.all_day && new Date(ev.start_at).getHours() === h
+              (ev) => !ev.all_day && new Date(ev.start_at).getHours() === h,
             );
             return dayEvents.length > 0;
           });
@@ -317,29 +314,25 @@ function WeekView({
           return (
             <div
               key={h}
-              className={`grid grid-cols-[48px_repeat(7,1fr)] border-b border-ink-line ${hasEvents ? "min-h-[56px]" : ""}`}
+              className={`border-ink-line grid grid-cols-[48px_repeat(7,1fr)] border-b ${hasEvents ? "min-h-[56px]" : ""}`}
               style={{ minHeight: hasEvents ? 56 : 40 }}
             >
-              <div className="py-1 pe-2 text-end text-[11px] text-ink-faded leading-none pt-1.5">
+              <div className="text-ink-faded py-1 pe-2 pt-1.5 text-end text-[11px] leading-none">
                 {String(h).padStart(2, "0")}:00
               </div>
               {days.map((d) => {
                 const key = toDateKey(d);
                 const hourEvents = (eventsByDate.get(key) ?? []).filter(
-                  (ev) => !ev.all_day && new Date(ev.start_at).getHours() === h
+                  (ev) => !ev.all_day && new Date(ev.start_at).getHours() === h,
                 );
                 return (
                   <div
                     key={d.toISOString()}
-                    className="border-s border-ink-line p-0.5 space-y-0.5 cursor-pointer hover:bg-cream-deep/20"
+                    className="border-ink-line hover:bg-cream-deep/20 cursor-pointer space-y-0.5 border-s p-0.5"
                     onClick={() => onDayClick(key)}
                   >
                     {hourEvents.map((ev) => (
-                      <EventChip
-                        key={ev.id}
-                        event={ev}
-                        onClick={() => onEventClick(ev)}
-                      />
+                      <EventChip key={ev.id} event={ev} onClick={() => onEventClick(ev)} />
                     ))}
                   </div>
                 );
@@ -372,10 +365,10 @@ export function CalendarClient({
   initialMonth,
 }: Props) {
   const router = useRouter();
-  const [view, setView]    = useState<ViewMode>("month");
-  const [year, setYear]    = useState(initialYear);
-  const [month, setMonth]  = useState(initialMonth);
-  const todayRef           = new Date();
+  const [view, setView] = useState<ViewMode>("month");
+  const [year, setYear] = useState(initialYear);
+  const [month, setMonth] = useState(initialMonth);
+  const todayRef = new Date();
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
   const [dialog, setDialog] = useState<DialogState>({ open: false });
 
@@ -406,12 +399,16 @@ export function CalendarClient({
 
   // Month navigation
   function prevMonth() {
-    if (month === 0) { setMonth(11); setYear(y => y - 1); }
-    else setMonth(m => m - 1);
+    if (month === 0) {
+      setMonth(11);
+      setYear((y) => y - 1);
+    } else setMonth((m) => m - 1);
   }
   function nextMonth() {
-    if (month === 11) { setMonth(0); setYear(y => y + 1); }
-    else setMonth(m => m + 1);
+    if (month === 11) {
+      setMonth(0);
+      setYear((y) => y + 1);
+    } else setMonth((m) => m + 1);
   }
   function goToday() {
     setYear(todayRef.getFullYear());
@@ -420,8 +417,12 @@ export function CalendarClient({
   }
 
   // Week navigation
-  function prevWeek() { setWeekStart(w => addDays(w, -7)); }
-  function nextWeek() { setWeekStart(w => addDays(w, 7)); }
+  function prevWeek() {
+    setWeekStart((w) => addDays(w, -7));
+  }
+  function nextWeek() {
+    setWeekStart((w) => addDays(w, 7));
+  }
 
   const weekEndDisplay = addDays(weekStart, 6);
 
@@ -445,27 +446,27 @@ export function CalendarClient({
   return (
     <div className="flex h-full flex-col">
       {/* ── Toolbar ── */}
-      <div className="flex items-center gap-3 border-b border-ink-line bg-cream-paper px-5 py-3">
+      <div className="border-ink-line bg-cream-paper flex items-center gap-3 border-b px-5 py-3">
         <h1 className="text-display-sm text-navy me-2">לוח שנה</h1>
 
         <div className="flex items-center gap-1">
           <button
             onClick={view === "month" ? prevMonth : prevWeek}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-soft hover:bg-cream-deep transition-colors"
+            className="text-ink-soft hover:bg-cream-deep flex h-8 w-8 items-center justify-center rounded-lg transition-colors"
             aria-label="הקודם"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
           <button
             onClick={view === "month" ? nextMonth : nextWeek}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-soft hover:bg-cream-deep transition-colors"
+            className="text-ink-soft hover:bg-cream-deep flex h-8 w-8 items-center justify-center rounded-lg transition-colors"
             aria-label="הבא"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
         </div>
 
-        <span className="min-w-[160px] text-sm font-semibold text-navy">
+        <span className="text-navy min-w-[160px] text-sm font-semibold">
           {view === "month"
             ? `${MONTHS_HE[month]} ${year}`
             : `${weekStart.getDate()} ${MONTHS_HE[weekStart.getMonth()]} – ${weekEndDisplay.getDate()} ${MONTHS_HE[weekEndDisplay.getMonth()]} ${weekEndDisplay.getFullYear()}`}
@@ -473,7 +474,7 @@ export function CalendarClient({
 
         <button
           onClick={goToday}
-          className="rounded-lg border border-ink-line px-3 py-1.5 text-[13px] font-medium text-ink-soft hover:bg-cream-deep transition-colors"
+          className="border-ink-line text-ink-soft hover:bg-cream-deep rounded-lg border px-3 py-1.5 text-[13px] font-medium transition-colors"
         >
           היום
         </button>
@@ -488,19 +489,18 @@ export function CalendarClient({
             const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
             setDialog({ open: true, mode: "create", date: today });
           }}
-          className="flex items-center gap-1.5 rounded-lg bg-navy px-3 py-1.5 text-[12px] font-medium text-white hover:bg-navy/90 transition-colors"
+          className="bg-navy hover:bg-navy/90 flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-medium text-white transition-colors"
         >
           <Plus className="h-3.5 w-3.5" />
           אירוע חדש
         </button>
 
         {/* View toggle */}
-        <div className="flex items-center gap-0.5 rounded-lg border border-ink-line bg-cream-deep p-0.5">
+        <div className="border-ink-line bg-cream-deep flex items-center gap-0.5 rounded-lg border p-0.5">
           <button
             onClick={() => setView("month")}
             title="תצוגת חודש"
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-all
-              ${view === "month" ? "bg-cream-paper text-navy shadow-card" : "text-ink-soft hover:text-navy"}`}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-all ${view === "month" ? "bg-cream-paper text-navy shadow-card" : "text-ink-soft hover:text-navy"}`}
           >
             <Grid3X3 className="h-3.5 w-3.5" />
             חודש
@@ -508,8 +508,7 @@ export function CalendarClient({
           <button
             onClick={() => setView("week")}
             title="תצוגת שבוע"
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-all
-              ${view === "week" ? "bg-cream-paper text-navy shadow-card" : "text-ink-soft hover:text-navy"}`}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-all ${view === "week" ? "bg-cream-paper text-navy shadow-card" : "text-ink-soft hover:text-navy"}`}
           >
             <CalendarDays className="h-3.5 w-3.5" />
             שבוע
@@ -518,21 +517,23 @@ export function CalendarClient({
       </div>
 
       {/* ── Legend ── */}
-      <div className="flex items-center gap-4 border-b border-ink-line bg-cream-deep/50 px-5 py-1.5">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-ink-faded">מקרא:</span>
-        <span className="flex items-center gap-1 text-[11px] text-ink-soft">
-          <span className="h-2 w-2 rounded-full bg-navy" />
+      <div className="border-ink-line bg-cream-deep/50 flex items-center gap-4 border-b px-5 py-1.5">
+        <span className="text-ink-faded text-[11px] font-semibold tracking-wide uppercase">
+          מקרא:
+        </span>
+        <span className="text-ink-soft flex items-center gap-1 text-[11px]">
+          <span className="bg-navy h-2 w-2 rounded-full" />
           משימה פעילה
         </span>
-        <span className="flex items-center gap-1 text-[11px] text-ink-soft">
+        <span className="text-ink-soft flex items-center gap-1 text-[11px]">
           <span className="h-2 w-2 rounded-full bg-rose-500" />
           דחוף / דדליין
         </span>
-        <span className="flex items-center gap-1 text-[11px] text-ink-soft">
+        <span className="text-ink-soft flex items-center gap-1 text-[11px]">
           <span className="h-2 w-2 rounded-full bg-amber-500" />
           פגישה
         </span>
-        <span className="flex items-center gap-1 text-[11px] text-ink-soft">
+        <span className="text-ink-soft flex items-center gap-1 text-[11px]">
           <span className="h-2 w-2 rounded-full bg-teal-500" />
           שיחה
         </span>

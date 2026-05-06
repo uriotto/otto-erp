@@ -150,9 +150,7 @@ export function AgentButton({ contextType, contextId, contextData = {}, agents }
               </span>
               <div>
                 <p className="text-navy font-medium">{agent.name}</p>
-                {agent.description && (
-                  <p className="text-ink-faded text-xs">{agent.description}</p>
-                )}
+                {agent.description && <p className="text-ink-faded text-xs">{agent.description}</p>}
               </div>
             </button>
           ))}

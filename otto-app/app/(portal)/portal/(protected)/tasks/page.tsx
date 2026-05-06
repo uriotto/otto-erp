@@ -64,9 +64,7 @@ export default async function PortalTasksPage({
   // שליפת משימות לפי project_id של הלקוח, ללא portal_hidden
   let query = supabase
     .from("tasks")
-    .select(
-      "id, title, description, status, priority, due_date, due_at, project_id, completed_at",
-    )
+    .select("id, title, description, status, priority, due_date, due_at, project_id, completed_at")
     .in("project_id", projectIds)
     .eq("portal_hidden", false)
     .order("due_date", { ascending: true, nullsFirst: false });
@@ -127,8 +125,7 @@ export default async function PortalTasksPage({
               const isCancelled = task.status === "cancelled";
               const dueDate = task.due_date ?? (task.due_at ? task.due_at.slice(0, 10) : null);
               const due = dueDate ? new Date(dueDate + "T00:00:00") : null;
-              const isOverdue =
-                !isDone && !isCancelled && due && due.getTime() < Date.now();
+              const isOverdue = !isDone && !isCancelled && due && due.getTime() < Date.now();
               const projectName = task.project_id ? (projectMap[task.project_id] ?? null) : null;
 
               return (
@@ -151,12 +148,10 @@ export default async function PortalTasksPage({
                       {task.title}
                     </p>
                     <div className="mt-1 flex flex-wrap items-center gap-2">
-                      {projectName && (
-                        <span className="text-ink-faded text-xs">{projectName}</span>
-                      )}
+                      {projectName && <span className="text-ink-faded text-xs">{projectName}</span>}
                       {due && (
                         <span
-                          className={`inline-flex items-center gap-1 text-xs ${isOverdue ? "text-rose-500 font-medium" : "text-ink-faded"}`}
+                          className={`inline-flex items-center gap-1 text-xs ${isOverdue ? "font-medium text-rose-500" : "text-ink-faded"}`}
                         >
                           <Calendar size={10} />
                           {formatDate(dueDate)}

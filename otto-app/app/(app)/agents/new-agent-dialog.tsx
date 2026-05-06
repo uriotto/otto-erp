@@ -30,14 +30,9 @@ type Props = {
 export function NewAgentDialog({ open, onClose, agent }: Props) {
   const isEdit = !!agent;
 
-  const boundAction = isEdit
-    ? updateAgent.bind(null, agent.id)
-    : createAgent;
+  const boundAction = isEdit ? updateAgent.bind(null, agent.id) : createAgent;
 
-  const [state, dispatch, isPending] = useActionState<AgentFormState, FormData>(
-    boundAction,
-    {},
-  );
+  const [state, dispatch, isPending] = useActionState<AgentFormState, FormData>(boundAction, {});
 
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -88,7 +83,7 @@ export function NewAgentDialog({ open, onClose, agent }: Props) {
               defaultValue={agent?.name ?? ""}
               placeholder="לדוגמה: מחולל הצעת מחיר"
               dir="auto"
-              className="border-ink-line bg-cream focus:border-navy w-full rounded-xl border px-3 py-2 text-sm outline-none transition-colors"
+              className="border-ink-line bg-cream focus:border-navy w-full rounded-xl border px-3 py-2 text-sm transition-colors outline-none"
             />
             {state.fieldErrors?.name && (
               <p className="mt-1 text-xs text-red-500">{state.fieldErrors.name[0]}</p>
@@ -104,7 +99,7 @@ export function NewAgentDialog({ open, onClose, agent }: Props) {
               placeholder="מה הסוכן עושה?"
               dir="auto"
               rows={2}
-              className="border-ink-line bg-cream focus:border-navy w-full resize-none rounded-xl border px-3 py-2 text-sm outline-none transition-colors"
+              className="border-ink-line bg-cream focus:border-navy w-full resize-none rounded-xl border px-3 py-2 text-sm transition-colors outline-none"
             />
           </div>
 
@@ -121,7 +116,7 @@ export function NewAgentDialog({ open, onClose, agent }: Props) {
               defaultValue={agent?.webhook_url ?? ""}
               placeholder="https://hook.make.com/..."
               dir="ltr"
-              className="border-ink-line bg-cream focus:border-navy w-full rounded-xl border px-3 py-2 text-sm outline-none transition-colors"
+              className="border-ink-line bg-cream focus:border-navy w-full rounded-xl border px-3 py-2 text-sm transition-colors outline-none"
             />
             {state.fieldErrors?.webhook_url && (
               <p className="mt-1 text-xs text-red-500">{state.fieldErrors.webhook_url[0]}</p>
@@ -137,10 +132,7 @@ export function NewAgentDialog({ open, onClose, agent }: Props) {
               {CONTEXT_OPTIONS.map((ctx) => {
                 const isChecked = agent?.trigger_contexts.includes(ctx.value) ?? false;
                 return (
-                  <label
-                    key={ctx.value}
-                    className="flex cursor-pointer items-center gap-1.5"
-                  >
+                  <label key={ctx.value} className="flex cursor-pointer items-center gap-1.5">
                     <input
                       type="checkbox"
                       name="trigger_contexts"
@@ -154,9 +146,7 @@ export function NewAgentDialog({ open, onClose, agent }: Props) {
               })}
             </div>
             {state.fieldErrors?.trigger_contexts && (
-              <p className="mt-1 text-xs text-red-500">
-                {state.fieldErrors.trigger_contexts[0]}
-              </p>
+              <p className="mt-1 text-xs text-red-500">{state.fieldErrors.trigger_contexts[0]}</p>
             )}
           </div>
 
@@ -166,7 +156,7 @@ export function NewAgentDialog({ open, onClose, agent }: Props) {
             <select
               name="icon"
               defaultValue={agent?.icon ?? "Sparkles"}
-              className="border-ink-line bg-cream focus:border-navy w-full rounded-xl border px-3 py-2 text-sm outline-none transition-colors"
+              className="border-ink-line bg-cream focus:border-navy w-full rounded-xl border px-3 py-2 text-sm transition-colors outline-none"
             >
               {ICON_OPTIONS.map((icon) => (
                 <option key={icon} value={icon}>
@@ -177,11 +167,7 @@ export function NewAgentDialog({ open, onClose, agent }: Props) {
           </div>
 
           {isEdit && (
-            <input
-              type="hidden"
-              name="is_active"
-              value={agent?.is_active ? "true" : "false"}
-            />
+            <input type="hidden" name="is_active" value={agent?.is_active ? "true" : "false"} />
           )}
 
           <div className="flex justify-end gap-2 pt-2">

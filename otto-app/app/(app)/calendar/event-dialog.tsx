@@ -9,7 +9,16 @@ import type { Tables } from "@/lib/supabase/types";
 
 export type EventItem = Pick<
   Tables<"events">,
-  "id" | "title" | "start_at" | "end_at" | "all_day" | "type" | "customer_id" | "project_id" | "description" | "location"
+  | "id"
+  | "title"
+  | "start_at"
+  | "end_at"
+  | "all_day"
+  | "type"
+  | "customer_id"
+  | "project_id"
+  | "description"
+  | "location"
 >;
 
 type CustomerOption = { id: string; name: string };
@@ -65,12 +74,18 @@ function defaultEnd(date?: string): string {
 
 const INITIAL_STATE: EventFormState = {};
 
-export function EventDialog({ mode, initialDate, event, customers, projects, onClose, onSaved }: Props) {
+export function EventDialog({
+  mode,
+  initialDate,
+  event,
+  customers,
+  projects,
+  onClose,
+  onSaved,
+}: Props) {
   const isEdit = mode === "edit" && !!event;
 
-  const boundAction = isEdit
-    ? updateEvent.bind(null, event.id)
-    : createEvent;
+  const boundAction = isEdit ? updateEvent.bind(null, event.id) : createEvent;
 
   const [state, formAction, isPending] = useActionState(boundAction, INITIAL_STATE);
 
@@ -98,25 +113,29 @@ export function EventDialog({ mode, initialDate, event, customers, projects, onC
   }
 
   const startVal = isEdit
-    ? (allDay ? toLocalDate(event.start_at) : toLocalDatetime(event.start_at))
+    ? allDay
+      ? toLocalDate(event.start_at)
+      : toLocalDatetime(event.start_at)
     : defaultStart(initialDate);
 
   const endVal = isEdit
-    ? (allDay ? toLocalDate(event.end_at) : toLocalDatetime(event.end_at))
+    ? allDay
+      ? toLocalDate(event.end_at)
+      : toLocalDatetime(event.end_at)
     : defaultEnd(initialDate);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-lg rounded-xl bg-cream-paper shadow-xl border border-ink-line">
+      <div className="bg-cream-paper border-ink-line w-full max-w-lg rounded-xl border shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-ink-line px-5 py-4">
-          <h2 className="text-[15px] font-semibold text-navy">
+        <div className="border-ink-line flex items-center justify-between border-b px-5 py-4">
+          <h2 className="text-navy text-[15px] font-semibold">
             {isEdit ? "עריכת אירוע" : "אירוע חדש"}
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-ink-soft hover:bg-cream-deep transition-colors"
+            className="text-ink-soft hover:bg-cream-deep flex h-7 w-7 items-center justify-center rounded-md transition-colors"
             aria-label="סגור"
           >
             <X className="h-4 w-4" />
@@ -124,20 +143,20 @@ export function EventDialog({ mode, initialDate, event, customers, projects, onC
         </div>
 
         {/* Form */}
-        <form action={formAction} className="px-5 py-4 space-y-4">
+        <form action={formAction} className="space-y-4 px-5 py-4">
           {/* Hidden all_day for form submission */}
           <input type="hidden" name="all_day" value={String(allDay)} />
 
           {/* Title */}
           <div>
-            <label className="mb-1 block text-[12px] font-medium text-ink-soft">
+            <label className="text-ink-soft mb-1 block text-[12px] font-medium">
               כותרת <span className="text-rose-500">*</span>
             </label>
             <input
               name="title"
               defaultValue={event?.title ?? ""}
               required
-              className="w-full rounded-lg border border-ink-line bg-cream-deep px-3 py-2 text-[13px] text-navy placeholder:text-ink-faded focus:border-navy focus:outline-none focus:ring-1 focus:ring-navy/30"
+              className="border-ink-line bg-cream-deep text-navy placeholder:text-ink-faded focus:border-navy focus:ring-navy/30 w-full rounded-lg border px-3 py-2 text-[13px] focus:ring-1 focus:outline-none"
               placeholder="שם האירוע"
             />
             {state.fieldErrors?.title && (
@@ -151,15 +170,15 @@ export function EventDialog({ mode, initialDate, event, customers, projects, onC
               type="checkbox"
               checked={allDay}
               onChange={(e) => setAllDay(e.target.checked)}
-              className="h-4 w-4 rounded border-ink-line accent-navy"
+              className="border-ink-line accent-navy h-4 w-4 rounded"
             />
-            <span className="text-[13px] text-ink-soft">כל היום</span>
+            <span className="text-ink-soft text-[13px]">כל היום</span>
           </label>
 
           {/* Start / End */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-[12px] font-medium text-ink-soft">
+              <label className="text-ink-soft mb-1 block text-[12px] font-medium">
                 התחלה <span className="text-rose-500">*</span>
               </label>
               <input
@@ -167,12 +186,12 @@ export function EventDialog({ mode, initialDate, event, customers, projects, onC
                 type={allDay ? "date" : "datetime-local"}
                 defaultValue={startVal}
                 required
-                className="w-full rounded-lg border border-ink-line bg-cream-deep px-3 py-2 text-[13px] text-navy focus:border-navy focus:outline-none focus:ring-1 focus:ring-navy/30"
+                className="border-ink-line bg-cream-deep text-navy focus:border-navy focus:ring-navy/30 w-full rounded-lg border px-3 py-2 text-[13px] focus:ring-1 focus:outline-none"
                 dir="ltr"
               />
             </div>
             <div>
-              <label className="mb-1 block text-[12px] font-medium text-ink-soft">
+              <label className="text-ink-soft mb-1 block text-[12px] font-medium">
                 סיום <span className="text-rose-500">*</span>
               </label>
               <input
@@ -180,7 +199,7 @@ export function EventDialog({ mode, initialDate, event, customers, projects, onC
                 type={allDay ? "date" : "datetime-local"}
                 defaultValue={endVal}
                 required
-                className="w-full rounded-lg border border-ink-line bg-cream-deep px-3 py-2 text-[13px] text-navy focus:border-navy focus:outline-none focus:ring-1 focus:ring-navy/30"
+                className="border-ink-line bg-cream-deep text-navy focus:border-navy focus:ring-navy/30 w-full rounded-lg border px-3 py-2 text-[13px] focus:ring-1 focus:outline-none"
                 dir="ltr"
               />
             </div>
@@ -188,11 +207,11 @@ export function EventDialog({ mode, initialDate, event, customers, projects, onC
 
           {/* Type */}
           <div>
-            <label className="mb-1 block text-[12px] font-medium text-ink-soft">סוג</label>
+            <label className="text-ink-soft mb-1 block text-[12px] font-medium">סוג</label>
             <select
               name="type"
               defaultValue={event?.type ?? "meeting"}
-              className="w-full rounded-lg border border-ink-line bg-cream-deep px-3 py-2 text-[13px] text-navy focus:border-navy focus:outline-none focus:ring-1 focus:ring-navy/30"
+              className="border-ink-line bg-cream-deep text-navy focus:border-navy focus:ring-navy/30 w-full rounded-lg border px-3 py-2 text-[13px] focus:ring-1 focus:outline-none"
             >
               {Object.entries(EVENT_TYPE_LABELS).map(([val, label]) => (
                 <option key={val} value={val}>
@@ -204,12 +223,12 @@ export function EventDialog({ mode, initialDate, event, customers, projects, onC
 
           {/* Customer */}
           <div>
-            <label className="mb-1 block text-[12px] font-medium text-ink-soft">לקוח</label>
+            <label className="text-ink-soft mb-1 block text-[12px] font-medium">לקוח</label>
             <select
               name="customer_id"
               value={selectedCustomer}
               onChange={(e) => setSelectedCustomer(e.target.value)}
-              className="w-full rounded-lg border border-ink-line bg-cream-deep px-3 py-2 text-[13px] text-navy focus:border-navy focus:outline-none focus:ring-1 focus:ring-navy/30"
+              className="border-ink-line bg-cream-deep text-navy focus:border-navy focus:ring-navy/30 w-full rounded-lg border px-3 py-2 text-[13px] focus:ring-1 focus:outline-none"
             >
               <option value="">— ללא לקוח —</option>
               {customers.map((c) => (
@@ -222,11 +241,11 @@ export function EventDialog({ mode, initialDate, event, customers, projects, onC
 
           {/* Project */}
           <div>
-            <label className="mb-1 block text-[12px] font-medium text-ink-soft">פרויקט</label>
+            <label className="text-ink-soft mb-1 block text-[12px] font-medium">פרויקט</label>
             <select
               name="project_id"
               defaultValue={event?.project_id ?? ""}
-              className="w-full rounded-lg border border-ink-line bg-cream-deep px-3 py-2 text-[13px] text-navy focus:border-navy focus:outline-none focus:ring-1 focus:ring-navy/30"
+              className="border-ink-line bg-cream-deep text-navy focus:border-navy focus:ring-navy/30 w-full rounded-lg border px-3 py-2 text-[13px] focus:ring-1 focus:outline-none"
             >
               <option value="">— ללא פרויקט —</option>
               {filteredProjects.map((p) => (
@@ -239,30 +258,32 @@ export function EventDialog({ mode, initialDate, event, customers, projects, onC
 
           {/* Location */}
           <div>
-            <label className="mb-1 block text-[12px] font-medium text-ink-soft">מיקום</label>
+            <label className="text-ink-soft mb-1 block text-[12px] font-medium">מיקום</label>
             <input
               name="location"
               defaultValue={event?.location ?? ""}
-              className="w-full rounded-lg border border-ink-line bg-cream-deep px-3 py-2 text-[13px] text-navy placeholder:text-ink-faded focus:border-navy focus:outline-none focus:ring-1 focus:ring-navy/30"
+              className="border-ink-line bg-cream-deep text-navy placeholder:text-ink-faded focus:border-navy focus:ring-navy/30 w-full rounded-lg border px-3 py-2 text-[13px] focus:ring-1 focus:outline-none"
               placeholder="כתובת / קישור Zoom"
             />
           </div>
 
           {/* Description */}
           <div>
-            <label className="mb-1 block text-[12px] font-medium text-ink-soft">תיאור</label>
+            <label className="text-ink-soft mb-1 block text-[12px] font-medium">תיאור</label>
             <textarea
               name="description"
               defaultValue={event?.description ?? ""}
               rows={2}
-              className="w-full rounded-lg border border-ink-line bg-cream-deep px-3 py-2 text-[13px] text-navy placeholder:text-ink-faded focus:border-navy focus:outline-none focus:ring-1 focus:ring-navy/30 resize-none"
+              className="border-ink-line bg-cream-deep text-navy placeholder:text-ink-faded focus:border-navy focus:ring-navy/30 w-full resize-none rounded-lg border px-3 py-2 text-[13px] focus:ring-1 focus:outline-none"
               placeholder="פרטים נוספים"
             />
           </div>
 
           {/* Server error */}
           {state.error && (
-            <p className="rounded-md bg-rose-50 px-3 py-2 text-[12px] text-rose-600">{state.error}</p>
+            <p className="rounded-md bg-rose-50 px-3 py-2 text-[12px] text-rose-600">
+              {state.error}
+            </p>
           )}
 
           {/* Actions */}
@@ -272,7 +293,7 @@ export function EventDialog({ mode, initialDate, event, customers, projects, onC
                 type="button"
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-medium text-rose-500 hover:bg-rose-50 transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-medium text-rose-500 transition-colors hover:bg-rose-50 disabled:opacity-50"
               >
                 {isDeleting ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -289,14 +310,14 @@ export function EventDialog({ mode, initialDate, event, customers, projects, onC
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-lg border border-ink-line px-4 py-2 text-[12px] font-medium text-ink-soft hover:bg-cream-deep transition-colors"
+                className="border-ink-line text-ink-soft hover:bg-cream-deep rounded-lg border px-4 py-2 text-[12px] font-medium transition-colors"
               >
                 ביטול
               </button>
               <button
                 type="submit"
                 disabled={isPending}
-                className="flex items-center gap-1.5 rounded-lg bg-navy px-4 py-2 text-[12px] font-medium text-white hover:bg-navy/90 transition-colors disabled:opacity-60"
+                className="bg-navy hover:bg-navy/90 flex items-center gap-1.5 rounded-lg px-4 py-2 text-[12px] font-medium text-white transition-colors disabled:opacity-60"
               >
                 {isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                 {isEdit ? "שמור שינויים" : "צור אירוע"}

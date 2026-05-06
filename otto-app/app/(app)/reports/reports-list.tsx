@@ -134,7 +134,7 @@ export function ReportsList({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <BarChart2 className="text-navy" size={22} />
           <h1 className="text-navy text-display-sm font-bold">דוחות</h1>
@@ -270,7 +270,7 @@ export function ReportsList({
                     href={`/reports/${report.id}`}
                     className="border-ink-line text-navy hover:bg-cream-shadow rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors"
                   >
-                    <FileText size={12} className="inline me-1" />
+                    <FileText size={12} className="me-1 inline" />
                     צפייה
                   </Link>
                   {report.status === "pending_review" && (
@@ -280,7 +280,7 @@ export function ReportsList({
                       onClick={() => handleApprove(report.id)}
                       className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50"
                     >
-                      <CheckCircle2 size={12} className="inline me-1" />
+                      <CheckCircle2 size={12} className="me-1 inline" />
                       אשר
                     </button>
                   )}
@@ -288,7 +288,7 @@ export function ReportsList({
                     type="button"
                     disabled={pending}
                     onClick={() => handleDelete(report.id)}
-                    className="text-ink-faded hover:text-rose-600 rounded-lg p-1 transition-colors disabled:opacity-50"
+                    className="text-ink-faded rounded-lg p-1 transition-colors hover:text-rose-600 disabled:opacity-50"
                     title="מחק דוח"
                   >
                     <Trash2 size={13} />
@@ -314,16 +314,16 @@ export function ReportsList({
                     className="h-4 w-4 cursor-pointer rounded"
                   />
                 </th>
-                <th className="text-ink-soft px-4 py-3 text-start text-xs font-semibold uppercase tracking-wide">
+                <th className="text-ink-soft px-4 py-3 text-start text-xs font-semibold tracking-wide uppercase">
                   כותרת
                 </th>
-                <th className="text-ink-soft px-4 py-3 text-start text-xs font-semibold uppercase tracking-wide">
+                <th className="text-ink-soft px-4 py-3 text-start text-xs font-semibold tracking-wide uppercase">
                   לקוח
                 </th>
-                <th className="text-ink-soft px-4 py-3 text-start text-xs font-semibold uppercase tracking-wide">
+                <th className="text-ink-soft px-4 py-3 text-start text-xs font-semibold tracking-wide uppercase">
                   תקופה
                 </th>
-                <th className="text-ink-soft px-4 py-3 text-start text-xs font-semibold uppercase tracking-wide">
+                <th className="text-ink-soft px-4 py-3 text-start text-xs font-semibold tracking-wide uppercase">
                   סטטוס
                 </th>
                 <th className="px-4 py-3" />
@@ -355,9 +355,7 @@ export function ReportsList({
                     </span>
                   </td>
                   <td className="text-ink-soft px-4 py-3 text-sm">
-                    {report.customers
-                      ? report.customers.company || report.customers.name
-                      : "—"}
+                    {report.customers ? report.customers.company || report.customers.name : "—"}
                   </td>
                   <td className="text-ink-soft px-4 py-3 text-xs" dir="ltr">
                     {formatPeriod(report.period_start, report.period_end)}
@@ -385,7 +383,7 @@ export function ReportsList({
                         type="button"
                         disabled={pending}
                         onClick={() => handleDelete(report.id)}
-                        className="text-ink-faded hover:text-rose-600 p-1 transition-colors disabled:opacity-50"
+                        className="text-ink-faded p-1 transition-colors hover:text-rose-600 disabled:opacity-50"
                         title="מחק"
                       >
                         <Trash2 size={14} />

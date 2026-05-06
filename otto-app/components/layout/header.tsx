@@ -53,9 +53,9 @@ export function AppHeader({ greeting, displayName, subline, onMenuClick }: Props
         <Link
           href="/settings"
           aria-label="הגדרות"
-          className="bg-cream-paper shadow-card text-ink-soft hover:text-navy flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-all hover:shadow-md"
+          className="group bg-cream-paper shadow-card text-ink-soft hover:text-navy flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-all hover:shadow-md"
         >
-          <Settings className="h-[17px] w-[17px]" />
+          <Settings className="h-[17px] w-[17px] transition-transform duration-300 ease-out group-hover:rotate-90" />
         </Link>
       </div>
     </header>

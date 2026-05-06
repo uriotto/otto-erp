@@ -9,40 +9,21 @@ export const metadata = {
   title: "דשבורד — OTTO",
 };
 
-function getGreeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return "בוקר טוב";
-  if (hour < 17) return "צהריים טובים";
-  return "ערב טוב";
-}
-
 export default async function DashboardPage() {
   const supabase = await createClient();
-  const [{ data: profile }, { data: tenant }] = await Promise.all([
-    supabase.from("users").select("full_name, email").single(),
-    supabase.from("tenants").select("name").single(),
-  ]);
+  const { data: tenant } = await supabase.from("tenants").select("name").single();
 
-  const displayName =
-    profile?.full_name?.split(" ")[0] ?? profile?.email?.split("@")[0] ?? "";
+  const today = new Date().toLocaleDateString("he-IL", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
 
   return (
     <div className="space-y-8">
-      <div>
-        <p className="text-ink-soft mt-1 text-sm">
-          {tenant?.name ?? "OTTO"} ·{" "}
-          {new Date().toLocaleDateString("he-IL", {
-            weekday: "long",
-            day: "numeric",
-            month: "long",
-          })}
-        </p>
-        {displayName && (
-          <p className="text-navy text-base font-medium">
-            {getGreeting()}، {displayName}
-          </p>
-        )}
-      </div>
+      <p className="text-ink-faded text-sm">
+        {tenant?.name ?? "OTTO"} · {today}
+      </p>
 
       <Suspense fallback={<StatsGridSkeleton />}>
         <DashboardStats />

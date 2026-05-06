@@ -90,7 +90,10 @@ export function NewReportForm({ customers }: { customers: CustomerOption[] }) {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       {/* Back link */}
-      <Link href="/reports" className="text-ink-soft hover:text-navy flex items-center gap-1 text-sm">
+      <Link
+        href="/reports"
+        className="text-ink-soft hover:text-navy flex items-center gap-1 text-sm"
+      >
         <ArrowRight size={15} className="rtl:rotate-180" />
         חזרה לדוחות
       </Link>

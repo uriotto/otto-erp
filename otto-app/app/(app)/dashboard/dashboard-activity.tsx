@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Activity, Phone, Mail, Calendar, StickyNote, Clock, ArrowLeft } from "lucide-react";
+import { Phone, Mail, Calendar, StickyNote, Activity, Clock, ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { relativeTimeHebrew } from "@/lib/relative-time";
 
@@ -16,18 +16,18 @@ type ActivityFeedRow = {
 };
 
 function activityIcon(type: string) {
-  const size = 14;
+  const cls = "h-3.5 w-3.5 shrink-0";
   switch (type) {
     case "call":
-      return <Phone size={size} className="text-emerald-600" />;
+      return <Phone className={`${cls} text-emerald-600`} />;
     case "email":
-      return <Mail size={size} className="text-blue-600" />;
+      return <Mail className={`${cls} text-navy`} />;
     case "meeting":
-      return <Calendar size={size} className="text-orange-600" />;
+      return <Calendar className={`${cls} text-accent`} />;
     case "note":
-      return <StickyNote size={size} className="text-amber-600" />;
+      return <StickyNote className={`${cls} text-ink-soft`} />;
     default:
-      return <Activity size={size} className="text-ink-soft" />;
+      return <Activity className={`${cls} text-ink-faded`} />;
   }
 }
 
@@ -57,45 +57,46 @@ export async function DashboardActivity() {
   return (
     <div className="bg-cream-paper shadow-card rounded-2xl p-5">
       <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Activity size={14} className="text-navy" />
-          <h2 className="text-navy text-sm font-semibold">פעילות אחרונה</h2>
-        </div>
+        <h2 className="text-navy text-sm font-semibold">פעילות אחרונה</h2>
         <Link
           href="/today"
           className="text-ink-faded hover:text-navy flex items-center gap-1 text-xs transition-colors"
         >
-          הכל <ArrowLeft size={11} />
+          הכל <ArrowLeft className="h-3 w-3" />
         </Link>
       </div>
 
       {items.length === 0 ? (
         <p className="text-ink-faded py-6 text-center text-sm">אין עדיין פעילויות</p>
       ) : (
-        <ul className="divide-ink-line/70 divide-y">
-          {items.map((item) => {
+        <ul className="divide-ink-line/60 divide-y">
+          {items.map((item, i) => {
             const parent = parentFromActivity(item);
             const href = parent?.href ?? "/today";
             return (
-              <li key={item.id}>
+              <li
+                key={item.id}
+                className="animate-slide-up"
+                style={{ animationDelay: `${i * 28}ms` }}
+              >
                 <Link
                   href={href}
                   className="hover:bg-cream group -mx-2 flex items-start gap-3 rounded-lg px-2 py-2.5 transition-colors"
                 >
-                  <div className="bg-cream-deep mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full">
+                  <span className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center">
                     {activityIcon(item.type)}
-                  </div>
+                  </span>
                   <div className="min-w-0 flex-1">
                     <div className="text-navy truncate text-sm font-medium">{item.title}</div>
                     <div className="text-ink-faded mt-0.5 flex items-center gap-1.5 text-xs">
-                      {parent ? (
-                        <span className="text-ink-soft truncate">{parent.name}</span>
-                      ) : (
-                        <span className="text-ink-faded">ללא קישור</span>
+                      {parent && (
+                        <>
+                          <span className="text-ink-soft truncate">{parent.name}</span>
+                          <span>·</span>
+                        </>
                       )}
-                      <span className="text-ink-faded">·</span>
                       <span className="flex items-center gap-1">
-                        <Clock size={10} />
+                        <Clock className="h-2.5 w-2.5" />
                         {relativeTimeHebrew(item.occurred_at)}
                       </span>
                     </div>

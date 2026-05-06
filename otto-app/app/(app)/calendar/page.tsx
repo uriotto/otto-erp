@@ -13,7 +13,16 @@ export type CalendarTask = Pick<
 
 export type CalendarEvent = Pick<
   Tables<"events">,
-  "id" | "title" | "start_at" | "end_at" | "all_day" | "type" | "customer_id" | "project_id" | "description" | "location"
+  | "id"
+  | "title"
+  | "start_at"
+  | "end_at"
+  | "all_day"
+  | "type"
+  | "customer_id"
+  | "project_id"
+  | "description"
+  | "location"
 >;
 
 export default async function CalendarPage() {
@@ -36,7 +45,9 @@ export default async function CalendarPage() {
 
     supabase
       .from("events")
-      .select("id, title, start_at, end_at, all_day, type, customer_id, project_id, description, location")
+      .select(
+        "id, title, start_at, end_at, all_day, type, customer_id, project_id, description, location",
+      )
       .gte("start_at", rangeStart.toISOString())
       .lte("start_at", rangeEnd.toISOString())
       .order("start_at", { ascending: true }),
@@ -59,7 +70,9 @@ export default async function CalendarPage() {
       tasks={(tasksRes.data ?? []) as CalendarTask[]}
       events={(eventsRes.data ?? []) as CalendarEvent[]}
       customers={customersRes.data ?? []}
-      projects={(projectsRes.data ?? []) as { id: string; name: string; customer_id: string | null }[]}
+      projects={
+        (projectsRes.data ?? []) as { id: string; name: string; customer_id: string | null }[]
+      }
       initialYear={now.getFullYear()}
       initialMonth={now.getMonth()}
     />

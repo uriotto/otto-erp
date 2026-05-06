@@ -68,7 +68,10 @@ function BookingTypeForm({ initial, onSave, onCancel, isPending }: BookingTypeFo
   }
 
   return (
-    <form onSubmit={handleSubmit} className="border-ink-line space-y-4 rounded-2xl border bg-white p-5">
+    <form
+      onSubmit={handleSubmit}
+      className="border-ink-line space-y-4 rounded-2xl border bg-white p-5"
+    >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <label className="text-navy mb-1 block text-sm font-medium">שם הפגישה</label>
@@ -77,7 +80,7 @@ function BookingTypeForm({ initial, onSave, onCancel, isPending }: BookingTypeFo
             onChange={(e) => handleTitleChange(e.target.value)}
             required
             placeholder="למשל: ייעוץ ראשוני"
-            className="border-ink-line text-navy w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-navy/20"
+            className="border-ink-line text-navy focus:ring-navy/20 w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none focus:ring-2"
           />
         </div>
         <div>
@@ -91,7 +94,7 @@ function BookingTypeForm({ initial, onSave, onCancel, isPending }: BookingTypeFo
             required
             dir="ltr"
             placeholder="initial-consultation"
-            className="border-ink-line text-navy w-full rounded-lg border bg-white px-3 py-2 text-sm font-mono outline-none focus:ring-2 focus:ring-navy/20"
+            className="border-ink-line text-navy focus:ring-navy/20 w-full rounded-lg border bg-white px-3 py-2 font-mono text-sm outline-none focus:ring-2"
           />
           <p className="text-ink-faded mt-0.5 text-xs">/book/{slug || "..."}</p>
         </div>
@@ -104,7 +107,7 @@ function BookingTypeForm({ initial, onSave, onCancel, isPending }: BookingTypeFo
           onChange={(e) => setDescription(e.target.value)}
           rows={2}
           placeholder="מה ייעשה בפגישה זו?"
-          className="border-ink-line text-navy w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-navy/20"
+          className="border-ink-line text-navy focus:ring-navy/20 w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none focus:ring-2"
         />
       </div>
 
@@ -114,7 +117,7 @@ function BookingTypeForm({ initial, onSave, onCancel, isPending }: BookingTypeFo
           <select
             value={duration}
             onChange={(e) => setDuration(e.target.value)}
-            className="border-ink-line text-navy w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-navy/20"
+            className="border-ink-line text-navy focus:ring-navy/20 w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none focus:ring-2"
           >
             {[15, 30, 45, 60, 90, 120].map((m) => (
               <option key={m} value={m}>
@@ -129,7 +132,7 @@ function BookingTypeForm({ initial, onSave, onCancel, isPending }: BookingTypeFo
           <select
             value={color}
             onChange={(e) => setColor(e.target.value)}
-            className="border-ink-line text-navy w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-navy/20"
+            className="border-ink-line text-navy focus:ring-navy/20 w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none focus:ring-2"
           >
             {COLOR_OPTIONS.map((c) => (
               <option key={c.value} value={c.value}>
@@ -292,9 +295,7 @@ export function BookingTypesList({ initialTypes }: Props) {
                     /book/{bt.slug}
                   </a>
                 </div>
-                {bt.description && (
-                  <p className="text-ink-soft mt-1 text-xs">{bt.description}</p>
-                )}
+                {bt.description && <p className="text-ink-soft mt-1 text-xs">{bt.description}</p>}
               </div>
             </div>
 
@@ -308,7 +309,7 @@ export function BookingTypesList({ initialTypes }: Props) {
               </button>
               <button
                 onClick={() => handleDelete(bt.id)}
-                className="border-ink-line text-ink-soft hover:border-rose-300 hover:text-rose-600 rounded-lg border p-2 transition-colors"
+                className="border-ink-line text-ink-soft rounded-lg border p-2 transition-colors hover:border-rose-300 hover:text-rose-600"
                 title="מחיקה"
               >
                 <Trash2 size={14} />

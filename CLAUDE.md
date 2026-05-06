@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Obsidian Vault (mandatory)
+
+**At every session start and before any task:** use the `obsidian-vault-workflow` skill.
+
+- Vault location: `~/obsidian-engineering/vault/`
+- Folder indexes: `vault/Meeting Notes/_index.md`, `vault/Architecture/_index.md`, `vault/Integrations/_index.md`
+- Topic files cover all OTTO modules — read the relevant topic file before touching code
+- After completing any task: append a session log entry to the matching topic file
+
 ## Repository layout
 
 ```
