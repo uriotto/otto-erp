@@ -1,6 +1,6 @@
 import { PageHeaderSkeleton, Skeleton } from "@/components/ui/skeleton";
 
-export default function Loading() {
+export function TasksSkeleton() {
   return (
     <div>
       <PageHeaderSkeleton />
@@ -19,4 +19,8 @@ export default function Loading() {
       </div>
     </div>
   );
+}
+
+export default function Loading() {
+  return <TasksSkeleton />;
 }

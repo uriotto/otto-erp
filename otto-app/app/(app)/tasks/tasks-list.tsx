@@ -497,19 +497,19 @@ const VIEW_TABS: { mode: ViewMode; icon: React.ReactNode; label: string }[] = [
 
 function ViewToggle({ view, onChange }: { view: ViewMode; onChange: (v: ViewMode) => void }) {
   return (
-    <div className="border-ink-line bg-cream-paper inline-flex items-center rounded-lg border p-0.5">
+    <div className="border-ink-line bg-cream flex rounded-xl border p-0.5">
       {VIEW_TABS.map(({ mode, icon, label }) => (
         <button
           key={mode}
           type="button"
           onClick={() => onChange(mode)}
-          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
-            view === mode ? "bg-navy text-cream-paper" : "text-ink-soft hover:text-navy"
+          className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+            view === mode ? "bg-navy text-cream-paper shadow-sm" : "text-ink-soft hover:text-navy"
           }`}
           aria-pressed={view === mode}
         >
           {icon}
-          {label}
+          <span className="hidden sm:inline">{label}</span>
         </button>
       ))}
     </div>
