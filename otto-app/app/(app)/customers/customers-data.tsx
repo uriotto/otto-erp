@@ -10,13 +10,8 @@ export async function CustomersData({ searchParams }: Props) {
   const showInactive = inactive === "1";
 
   const supabase = await createClient();
-  const query = supabase.from("customers").select("*").order("created_at", { ascending: false });
-
-  if (!showInactive) {
-    query.eq("active", true);
-  }
-
-  const { data: customers } = await query;
+  const base = supabase.from("customers").select("*").order("created_at", { ascending: false });
+  const { data: customers } = await (showInactive ? base : base.eq("active", true));
 
   return <CustomersList customers={customers ?? []} showInactive={showInactive} />;
 }
