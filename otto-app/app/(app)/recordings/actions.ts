@@ -65,7 +65,9 @@ export async function createRecording(
   return { ok: true, id: recording.id };
 }
 
-export async function deleteRecording(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function deleteRecording(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
   const { supabase, profile } = await getTenant();
   if (!profile) return { ok: false, error: "לא מחובר" };
 
@@ -95,9 +97,7 @@ export async function getRecordingDownloadUrl(storagePath: string): Promise<stri
   const { supabase, profile } = await getTenant();
   if (!profile) return null;
 
-  const { data } = await supabase.storage
-    .from("recordings")
-    .createSignedUrl(storagePath, 3600);
+  const { data } = await supabase.storage.from("recordings").createSignedUrl(storagePath, 3600);
 
   return data?.signedUrl ?? null;
 }

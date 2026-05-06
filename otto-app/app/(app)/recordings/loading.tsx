@@ -1,6 +1,6 @@
 import { PageHeaderSkeleton, Skeleton } from "@/components/ui/skeleton";
 
-export default function Loading() {
+export function RecordingsSkeleton() {
   return (
     <div>
       <PageHeaderSkeleton />
@@ -10,10 +10,7 @@ export default function Loading() {
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div
-            key={i}
-            className="bg-cream-paper border-ink-line space-y-3 rounded-2xl border p-5"
-          >
+          <div key={i} className="bg-cream-paper border-ink-line space-y-3 rounded-2xl border p-5">
             <div className="flex items-start justify-between gap-3">
               <Skeleton className="h-5 w-2/3" />
               <Skeleton className="h-5 w-14 shrink-0 rounded-full" />
@@ -28,4 +25,8 @@ export default function Loading() {
       </div>
     </div>
   );
+}
+
+export default function Loading() {
+  return <RecordingsSkeleton />;
 }

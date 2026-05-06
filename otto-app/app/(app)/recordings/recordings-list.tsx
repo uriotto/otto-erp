@@ -176,7 +176,7 @@ export function RecordingsList({ recordings }: Props) {
               <button
                 onClick={() => handleDelete(rec.id)}
                 disabled={deletingId === rec.id || isPending}
-                className="text-ink-faded hover:text-red-500 rounded p-1.5 transition-colors disabled:opacity-30"
+                className="text-ink-faded rounded p-1.5 transition-colors hover:text-red-500 disabled:opacity-30"
                 title="מחק"
               >
                 <Trash2 size={15} />

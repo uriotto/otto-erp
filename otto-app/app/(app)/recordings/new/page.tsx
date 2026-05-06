@@ -7,11 +7,7 @@ export default async function NewRecordingPage() {
   const supabase = await createClient();
 
   const [{ data: customers }, { data: projects }] = await Promise.all([
-    supabase
-      .from("customers")
-      .select("id, name")
-      .eq("active", true)
-      .order("name"),
+    supabase.from("customers").select("id, name").eq("active", true).order("name"),
     supabase
       .from("projects")
       .select("id, name, customer_id")
@@ -19,10 +15,5 @@ export default async function NewRecordingPage() {
       .order("name"),
   ]);
 
-  return (
-    <RecorderClient
-      customers={customers ?? []}
-      projects={projects ?? []}
-    />
-  );
+  return <RecorderClient customers={customers ?? []} projects={projects ?? []} />;
 }
