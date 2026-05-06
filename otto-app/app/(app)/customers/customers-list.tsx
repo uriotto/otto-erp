@@ -616,7 +616,7 @@ function InlineStatusCell({
                 setOpen(false);
                 startTransition(() => onSave(s.value));
               }}
-              className={`flex w-full items-center gap-2 px-3 py-2 text-start text-xs transition-colors first:rounded-t-xl last:rounded-b-xl hover:bg-cream-deep ${
+              className={`hover:bg-cream-deep flex w-full items-center gap-2 px-3 py-2 text-start text-xs transition-colors first:rounded-t-xl last:rounded-b-xl ${
                 s.value === opt.value ? "font-semibold" : ""
               }`}
             >
@@ -852,7 +852,7 @@ function CustomerCard({
             value={draft.status}
             onChange={(e) => setDraft((d) => ({ ...d, status: e.target.value as CustomerStatus }))}
             onClick={(e) => e.stopPropagation()}
-            className={`w-full rounded-lg border px-3 py-2 text-sm font-medium outline-none transition-colors ${getStatusOption(draft.status).cls}`}
+            className={`w-full rounded-lg border px-3 py-2 text-sm font-medium transition-colors outline-none ${getStatusOption(draft.status).cls}`}
           >
             {STATUS_OPTIONS.map((s) => (
               <option key={s.value} value={s.value} className="bg-white text-gray-800">
@@ -977,7 +977,9 @@ function CustomerCard({
 function StatusPill({ status }: { status: string }) {
   const opt = getStatusOption(status);
   return (
-    <span className={`ms-auto shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium ${opt.cls}`}>
+    <span
+      className={`ms-auto shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium ${opt.cls}`}
+    >
       {opt.label}
     </span>
   );
