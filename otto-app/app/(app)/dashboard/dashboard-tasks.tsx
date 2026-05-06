@@ -29,19 +29,20 @@ export async function DashboardTasks() {
   startOfToday.setHours(0, 0, 0, 0);
   const todayDateStr = startOfToday.toISOString().slice(0, 10);
 
-  const { count: tasksDueToday } = await supabase
-    .from("tasks")
-    .select("*", { count: "exact", head: true })
-    .not("status", "in", '("done","cancelled")')
-    .eq("due_date", todayDateStr);
-
-  const { data: todayTasks } = await supabase
-    .from("tasks")
-    .select("id, title, due_date, customer_id, lead_id, customers(id, name), leads(id, name)")
-    .not("status", "in", '("done","cancelled")')
-    .eq("due_date", todayDateStr)
-    .order("due_date", { ascending: true })
-    .limit(5);
+  const [{ count: tasksDueToday }, { data: todayTasks }] = await Promise.all([
+    supabase
+      .from("tasks")
+      .select("*", { count: "exact", head: true })
+      .not("status", "in", '("done","cancelled")')
+      .eq("due_date", todayDateStr),
+    supabase
+      .from("tasks")
+      .select("id, title, due_date, customer_id, lead_id, customers(id, name), leads(id, name)")
+      .not("status", "in", '("done","cancelled")')
+      .eq("due_date", todayDateStr)
+      .order("due_date", { ascending: true })
+      .limit(5),
+  ]);
 
   const tasks = (todayTasks ?? []) as unknown as TaskRow[];
   const totalToday = tasksDueToday ?? 0;
