@@ -16,15 +16,17 @@ function getGreeting(): string {
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const [
+    { data: { user } },
+    { data: profile },
+  ] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase.from("users").select("full_name, email").single(),
+  ]);
 
   if (!user) {
     redirect("/login");
   }
-
-  const { data: profile } = await supabase.from("users").select("full_name, email").single();
 
   const displayName = profile?.full_name?.split(" ")[0] ?? profile?.email?.split("@")[0] ?? "אורי";
 
