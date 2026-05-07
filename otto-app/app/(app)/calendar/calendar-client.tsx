@@ -135,7 +135,7 @@ function EventChip({ event, onClick }: { event: CalendarEvent; onClick: () => vo
         e.stopPropagation();
         onClick();
       }}
-      className="flex flex-1 w-full items-center gap-1 truncate rounded bg-amber-50 px-1.5 py-0.5 text-start text-[11px] leading-tight font-medium text-amber-800 transition-colors hover:bg-amber-100"
+      className="flex w-full flex-1 items-center gap-1 truncate rounded bg-amber-50 px-1.5 py-0.5 text-start text-[11px] leading-tight font-medium text-amber-800 transition-colors hover:bg-amber-100"
     >
       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
       {startTime && (
@@ -144,6 +144,47 @@ function EventChip({ event, onClick }: { event: CalendarEvent; onClick: () => vo
         </span>
       )}
       <span className="truncate">{event.title}</span>
+    </button>
+  );
+}
+
+// ─── Event block (absolute-positioned, multi-hour) ────────────────────────────
+
+function EventBlock({
+  event,
+  onClick,
+  pixelHeight,
+}: {
+  event: CalendarEvent;
+  onClick: () => void;
+  pixelHeight: number;
+}) {
+  const dot = EVENT_TYPE_COLORS[event.type] ?? "bg-amber-500";
+  const fmt = (d: string) =>
+    new Date(d).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", hour12: false });
+  const startTime = fmt(event.start_at);
+  const endTime = fmt(event.end_at);
+  const tall = pixelHeight >= 44;
+
+  return (
+    <button
+      type="button"
+      title={`${EVENT_TYPE_LABELS[event.type] ?? "אירוע"}: ${event.title}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className="flex h-full w-full flex-col items-start overflow-hidden rounded bg-amber-100 px-1.5 py-0.5 text-start text-[11px] font-medium text-amber-800 transition-colors hover:bg-amber-200"
+    >
+      <div className="flex w-full items-center gap-1 truncate">
+        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
+        <span className="truncate font-semibold leading-tight">{event.title}</span>
+      </div>
+      {tall && (
+        <span className="mt-0.5 shrink-0 font-mono text-[10px] opacity-60" dir="ltr">
+          {startTime} – {endTime}
+        </span>
+      )}
     </button>
   );
 }
@@ -239,6 +280,7 @@ function MonthView({
 // ─── Week view ───────────────────────────────────────────────────────────────
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
+const HOUR_PX = 56; // pixel height per hour slot
 
 function WeekView({
   weekStart,
@@ -264,11 +306,12 @@ function WeekView({
   dragEnd: number | null;
 }) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const gridH = 24 * HOUR_PX;
 
   return (
     <div className="flex-1 overflow-auto">
       {/* Day headers */}
-      <div className="border-ink-line bg-cream-paper sticky top-0 z-10 grid grid-cols-[48px_repeat(7,1fr)] border-b">
+      <div className="border-ink-line bg-cream-paper sticky top-0 z-20 grid grid-cols-[48px_repeat(7,1fr)] border-b">
         <div />
         {days.map((d) => {
           const today = isToday(d);
@@ -311,56 +354,76 @@ function WeekView({
         })}
       </div>
 
-      {/* Hour rows */}
-      <div className="relative">
-        {HOURS.map((h) => {
-          const hasEvents = days.some((d) => {
-            const key = toDateKey(d);
-            const dayEvents = (eventsByDate.get(key) ?? []).filter(
-              (ev) => !ev.all_day && new Date(ev.start_at).getHours() === h,
-            );
-            return dayEvents.length > 0;
-          });
-
-          return (
+      {/* Time grid — flex layout with absolute-positioned events */}
+      <div className="flex">
+        {/* Time labels */}
+        <div className="w-12 shrink-0">
+          {HOURS.map((h) => (
             <div
               key={h}
-              className={`border-ink-line grid grid-cols-[48px_repeat(7,1fr)] border-b ${hasEvents ? "min-h-[56px]" : ""}`}
-              style={{ minHeight: hasEvents ? 56 : 40 }}
+              className="text-ink-faded flex items-start justify-end pe-2 pt-1 text-[11px] leading-none"
+              style={{ height: HOUR_PX }}
             >
-              <div className="text-ink-faded py-1 pe-2 pt-1.5 text-end text-[11px] leading-none">
-                {String(h).padStart(2, "0")}:00
-              </div>
-              {days.map((d) => {
-                const key = toDateKey(d);
-                const hourEvents = (eventsByDate.get(key) ?? []).filter(
-                  (ev) => !ev.all_day && new Date(ev.start_at).getHours() === h,
-                );
-                const isHighlighted =
-                  dragStart?.dateKey === key &&
-                  dragEnd !== null &&
-                  h >= Math.min(dragStart.hour, dragEnd) &&
-                  h <= Math.max(dragStart.hour, dragEnd);
-                return (
-                  <div
-                    key={d.toISOString()}
-                    className={`border-ink-line flex min-w-0 cursor-pointer flex-col gap-0.5 overflow-hidden border-s p-0.5 select-none ${isHighlighted ? "bg-navy/10" : "hover:bg-cream-deep/20"}`}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      onDragStart(key, h);
-                    }}
-                    onMouseEnter={() => onDragMove(h)}
-                    onMouseUp={() => onDragEnd(key, h)}
-                  >
-                    {hourEvents.map((ev) => (
-                      <EventChip key={ev.id} event={ev} onClick={() => onEventClick(ev)} />
-                    ))}
-                  </div>
-                );
-              })}
+              {String(h).padStart(2, "0")}:00
             </div>
-          );
-        })}
+          ))}
+        </div>
+
+        {/* Day columns */}
+        <div className="flex flex-1">
+          {days.map((d) => {
+            const key = toDateKey(d);
+            const timedEvents = (eventsByDate.get(key) ?? []).filter((ev) => !ev.all_day);
+            return (
+              <div
+                key={d.toISOString()}
+                className="border-ink-line relative flex-1 border-s"
+                style={{ height: gridH }}
+              >
+                {/* Hour slot backgrounds (click/drag targets) */}
+                {HOURS.map((h) => {
+                  const isHighlighted =
+                    dragStart?.dateKey === key &&
+                    dragEnd !== null &&
+                    h >= Math.min(dragStart.hour, dragEnd) &&
+                    h <= Math.max(dragStart.hour, dragEnd);
+                  return (
+                    <div
+                      key={h}
+                      className={`border-ink-line absolute w-full border-b select-none ${isHighlighted ? "bg-navy/10" : "hover:bg-cream-deep/20"}`}
+                      style={{ top: h * HOUR_PX, height: HOUR_PX }}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        onDragStart(key, h);
+                      }}
+                      onMouseEnter={() => onDragMove(h)}
+                      onMouseUp={() => onDragEnd(key, h)}
+                    />
+                  );
+                })}
+
+                {/* Timed events — absolutely positioned */}
+                {timedEvents.map((ev) => {
+                  const start = new Date(ev.start_at);
+                  const end = new Date(ev.end_at);
+                  const topFrac = start.getHours() + start.getMinutes() / 60;
+                  const endFrac = end.getHours() + end.getMinutes() / 60;
+                  const top = topFrac * HOUR_PX;
+                  const height = Math.max((endFrac - topFrac) * HOUR_PX, 20);
+                  return (
+                    <div
+                      key={ev.id}
+                      className="absolute z-10 px-0.5"
+                      style={{ top, height, left: 0, right: 0 }}
+                    >
+                      <EventBlock event={ev} onClick={() => onEventClick(ev)} pixelHeight={height} />
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -415,41 +478,74 @@ function DayView({
         </div>
       )}
 
-      {/* Hour rows */}
-      {HOURS.map((h) => {
-        const hourEvents = (eventsByDate.get(key) ?? []).filter(
-          (ev) => !ev.all_day && new Date(ev.start_at).getHours() === h,
-        );
-        const isNow = isToday(day) && new Date().getHours() === h;
-        const isHighlighted =
-          dragStart?.dateKey === key &&
-          dragEnd !== null &&
-          h >= Math.min(dragStart.hour, dragEnd) &&
-          h <= Math.max(dragStart.hour, dragEnd);
+      {/* Time grid — flex layout with absolute-positioned events */}
+      <div className="flex">
+        {/* Time labels */}
+        <div className="w-12 shrink-0">
+          {HOURS.map((h) => {
+            const isNow = isToday(day) && new Date().getHours() === h;
+            return (
+              <div
+                key={h}
+                className={`text-ink-faded flex items-start justify-end pe-2 pt-1 text-[11px] leading-none ${isNow ? "text-amber-600 font-semibold" : ""}`}
+                style={{ height: HOUR_PX }}
+              >
+                {String(h).padStart(2, "0")}:00
+              </div>
+            );
+          })}
+        </div>
 
-        return (
-          <div
-            key={h}
-            style={{ minHeight: hourEvents.length > 0 ? 56 : 40 }}
-            className={`border-ink-line flex cursor-pointer border-b select-none ${isHighlighted ? "bg-navy/10" : isNow ? "bg-amber-50/40" : "hover:bg-cream-deep/20"}`}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              onDragStart(key, h);
-            }}
-            onMouseEnter={() => onDragMove(h)}
-            onMouseUp={() => onDragEnd(key, h)}
-          >
-            <div className="text-ink-faded w-12 shrink-0 py-1 pe-2 text-end text-[11px]">
-              {String(h).padStart(2, "0")}:00
-            </div>
-            <div className="flex flex-1 flex-col gap-0.5 p-0.5">
-              {hourEvents.map((ev) => (
-                <EventChip key={ev.id} event={ev} onClick={() => onEventClick(ev)} />
-              ))}
-            </div>
-          </div>
-        );
-      })}
+        {/* Single day column */}
+        <div
+          className="border-ink-line relative flex-1 border-s"
+          style={{ height: 24 * HOUR_PX }}
+        >
+          {/* Hour slot backgrounds */}
+          {HOURS.map((h) => {
+            const isNow = isToday(day) && new Date().getHours() === h;
+            const isHighlighted =
+              dragStart?.dateKey === key &&
+              dragEnd !== null &&
+              h >= Math.min(dragStart.hour, dragEnd) &&
+              h <= Math.max(dragStart.hour, dragEnd);
+            return (
+              <div
+                key={h}
+                className={`border-ink-line absolute w-full border-b select-none ${isHighlighted ? "bg-navy/10" : isNow ? "bg-amber-50/40" : "hover:bg-cream-deep/20"}`}
+                style={{ top: h * HOUR_PX, height: HOUR_PX }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onDragStart(key, h);
+                }}
+                onMouseEnter={() => onDragMove(h)}
+                onMouseUp={() => onDragEnd(key, h)}
+              />
+            );
+          })}
+
+          {/* Timed events */}
+          {(eventsByDate.get(key) ?? [])
+            .filter((ev) => !ev.all_day)
+            .map((ev) => {
+              const start = new Date(ev.start_at);
+              const end = new Date(ev.end_at);
+              const topFrac = start.getHours() + start.getMinutes() / 60;
+              const endFrac = end.getHours() + end.getMinutes() / 60;
+              const top = topFrac * HOUR_PX;
+              const height = Math.max((endFrac - topFrac) * HOUR_PX, 20);
+              return (
+                <div
+                  key={ev.id}
+                  className="absolute z-10 px-0.5"
+                  style={{ top, height, left: 0, right: 0 }}
+                >
+                  <EventBlock event={ev} onClick={() => onEventClick(ev)} pixelHeight={height} />
+                </div>
+              );
+            })}
+        </div>
+      </div>
     </div>
   );
 }
