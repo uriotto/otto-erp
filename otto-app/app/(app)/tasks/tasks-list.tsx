@@ -34,6 +34,7 @@ import {
   bulkUpdateTaskStatus,
 } from "./actions";
 import { BulkActionBar } from "@/components/ui/bulk-action-bar";
+import { saveFilters, loadFilters } from "@/lib/persist-filters";
 
 const STATUS_LABELS: Record<string, string> = {
   todo: "לעשות",
@@ -118,21 +119,23 @@ export function TasksList({
   const toast = useToast();
 
   const [showNew, setShowNew] = useState(false);
-  const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
-  const [projectFilter, setProjectFilter] = useState<string>(
-    () => searchParams.get("project") ?? "all",
+  const [query, setQuery] = useState(() =>
+    searchParams.get("q") ?? loadFilters("tasks")?.q ?? ""
   );
-  const [statusFilter, setStatusFilter] = useState<string>(
-    () => searchParams.get("status") ?? "all",
+  const [projectFilter, setProjectFilter] = useState<string>(() =>
+    searchParams.get("project") ?? loadFilters("tasks")?.project ?? "all"
   );
-  const [priorityFilter, setPriorityFilter] = useState<string>(
-    () => searchParams.get("priority") ?? "all",
+  const [statusFilter, setStatusFilter] = useState<string>(() =>
+    searchParams.get("status") ?? loadFilters("tasks")?.status ?? "all"
   );
-  const [assigneeFilter, setAssigneeFilter] = useState<string>(
-    () => searchParams.get("assignee") ?? "all",
+  const [priorityFilter, setPriorityFilter] = useState<string>(() =>
+    searchParams.get("priority") ?? loadFilters("tasks")?.priority ?? "all"
+  );
+  const [assigneeFilter, setAssigneeFilter] = useState<string>(() =>
+    searchParams.get("assignee") ?? loadFilters("tasks")?.assignee ?? "all"
   );
   const [view, setView] = useState<ViewMode>(() => {
-    const v = searchParams.get("view");
+    const v = searchParams.get("view") ?? loadFilters("tasks")?.view;
     const modes = ["kanban", "calendar", "today", "table"] as const;
     return modes.includes(v as (typeof modes)[number]) ? (v as ViewMode) : "list";
   });
@@ -151,6 +154,22 @@ export function TasksList({
     },
     [router, pathname, searchParams],
   );
+
+  // Persist filter state to localStorage on every change
+  useEffect(() => {
+    saveFilters("tasks", { q: query, project: projectFilter, status: statusFilter, priority: priorityFilter, assignee: assigneeFilter, view });
+  }, [query, projectFilter, statusFilter, priorityFilter, assigneeFilter, view]);
+
+  // Sync URL with localStorage-restored state on fresh load
+  useEffect(() => {
+    if (!searchParams.toString()) {
+      const saved = loadFilters("tasks");
+      if (saved) {
+        updateUrl({ q: saved.q, project: saved.project, status: saved.status, priority: saved.priority, assignee: saved.assignee, view: saved.view });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const handle = setTimeout(() => {

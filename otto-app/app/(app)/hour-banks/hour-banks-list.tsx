@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   Plus,
@@ -20,6 +20,7 @@ import { BulkActionBar } from "@/components/ui/bulk-action-bar";
 import { bulkCancelHourBanks, bulkDeleteHourBanks } from "./actions";
 import { useToast } from "@/components/ui/toast";
 import { useRouter } from "next/navigation";
+import { saveFilters, loadFilters } from "@/lib/persist-filters";
 
 export type HourBankStatus = "draft" | "active" | "depleted" | "expired" | "cancelled";
 
@@ -91,10 +92,19 @@ export function HourBanksList({
   const toast = useToast();
   const [view, setView] = useStoredView<"grid" | "table">("hour-banks-view", "grid");
   const [showNew, setShowNew] = useState(false);
-  const [tab, setTab] = useState<"all" | HourBankStatus>("active");
-  const [customerFilter, setCustomerFilter] = useState<string>("all");
+  const [tab, setTab] = useState<"all" | HourBankStatus>(
+    () => (loadFilters("hour-banks")?.tab as HourBankStatus) ?? "active"
+  );
+  const [customerFilter, setCustomerFilter] = useState<string>(
+    () => loadFilters("hour-banks")?.customer ?? "all"
+  );
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkPending, startBulk] = useTransition();
+
+  // Persist filter state to localStorage on every change
+  useEffect(() => {
+    saveFilters("hour-banks", { tab, customer: customerFilter });
+  }, [tab, customerFilter]);
 
   const counts = useMemo(() => {
     const map: Record<string, number> = { all: banks.length };

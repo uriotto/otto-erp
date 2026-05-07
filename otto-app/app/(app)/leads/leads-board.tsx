@@ -29,6 +29,7 @@ import {
 import { ExportCsvButton } from "@/components/ui/export-csv-button";
 import { useToast } from "@/components/ui/toast";
 import { ViewToggle, useStoredView } from "@/components/ui/view-toggle";
+import { saveFilters, loadFilters } from "@/lib/persist-filters";
 
 type Lead = Tables<"leads">;
 
@@ -66,14 +67,22 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
   const searchParams = useSearchParams();
 
   const [showNew, setShowNew] = useState(false);
-  const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
-  const [source, setSource] = useState<string>(() => searchParams.get("source") ?? ALL_SOURCES);
-  const [statusFilter, setStatusFilter] = useState<Lead["status"] | "all">(() =>
-    parseStatusFilter(searchParams.get("status")),
+  const [query, setQuery] = useState(() =>
+    searchParams.get("q") ?? loadFilters("leads")?.q ?? ""
   );
-  const [selectedTags, setSelectedTags] = useState<string[]>(() =>
-    parseTags(searchParams.get("tags")),
+  const [source, setSource] = useState<string>(() =>
+    searchParams.get("source") ?? loadFilters("leads")?.source ?? ALL_SOURCES
   );
+  const [statusFilter, setStatusFilter] = useState<Lead["status"] | "all">(() => {
+    const fromUrl = parseStatusFilter(searchParams.get("status"));
+    if (fromUrl !== "all") return fromUrl;
+    return parseStatusFilter(loadFilters("leads")?.status ?? null);
+  });
+  const [selectedTags, setSelectedTags] = useState<string[]>(() => {
+    const fromUrl = parseTags(searchParams.get("tags"));
+    if (fromUrl.length > 0) return fromUrl;
+    return parseTags(loadFilters("leads")?.tags ?? null);
+  });
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [bulkPending, startBulk] = useTransition();
   const toast = useToast();
@@ -120,6 +129,32 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
     },
     [router, pathname, searchParams],
   );
+
+  // Persist filter state to localStorage on every change
+  useEffect(() => {
+    saveFilters("leads", {
+      q: query,
+      source: source === ALL_SOURCES ? "" : source,
+      status: statusFilter === "all" ? "" : statusFilter,
+      tags: selectedTags.join(","),
+    });
+  }, [query, source, statusFilter, selectedTags]);
+
+  // Sync URL with localStorage-restored state on fresh load
+  useEffect(() => {
+    if (!searchParams.toString()) {
+      const saved = loadFilters("leads");
+      if (saved) {
+        updateUrl({
+          q: saved.q,
+          source: saved.source,
+          status: saved.status,
+          tags: saved.tags,
+        });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Debounced URL update for the search query
   useEffect(() => {

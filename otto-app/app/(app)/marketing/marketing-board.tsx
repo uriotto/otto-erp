@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Plus, Megaphone, Calendar, Tag, Trash2, ChevronDown } from "lucide-react";
 import type { Tables } from "@/lib/supabase/types";
 import { NewContentDialog } from "./new-content-dialog";
 import { updateContentStatus, deleteContent } from "./actions";
 import { useToast } from "@/components/ui/toast";
+import { saveFilters, loadFilters } from "@/lib/persist-filters";
 
 type ContentItem = Tables<"marketing_content">;
 type Status = ContentItem["status"];
@@ -47,9 +48,16 @@ function formatDate(d: string | null) {
 
 export function MarketingBoard({ items }: { items: ContentItem[] }) {
   const [showNew, setShowNew] = useState(false);
-  const [filterPlatform, setFilterPlatform] = useState<string>("all");
+  const [filterPlatform, setFilterPlatform] = useState<string>(
+    () => loadFilters("marketing")?.platform ?? "all"
+  );
   const [isPending, startTransition] = useTransition();
   const toast = useToast();
+
+  // Persist filter state to localStorage on every change
+  useEffect(() => {
+    saveFilters("marketing", { platform: filterPlatform });
+  }, [filterPlatform]);
 
   const platforms = Array.from(new Set(items.map((i) => i.platform)));
 

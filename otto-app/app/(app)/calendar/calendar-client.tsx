@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { ChevronRight, ChevronLeft, CalendarDays, Grid3X3, Plus, Clock, List } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { CalendarTask, CalendarEvent } from "./page";
 import { EventDialog, type EventItem } from "./event-dialog";
+import { saveFilters, loadFilters } from "@/lib/persist-filters";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -178,7 +179,7 @@ function EventBlock({
     >
       <div className="flex w-full items-center gap-1 truncate">
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
-        <span className="truncate font-semibold leading-tight">{event.title}</span>
+        <span className="truncate leading-tight font-semibold">{event.title}</span>
       </div>
       {tall && (
         <span className="mt-0.5 shrink-0 font-mono text-[10px] opacity-60" dir="ltr">
@@ -416,7 +417,11 @@ function WeekView({
                       className="absolute z-10 px-0.5"
                       style={{ top, height, left: 0, right: 0 }}
                     >
-                      <EventBlock event={ev} onClick={() => onEventClick(ev)} pixelHeight={height} />
+                      <EventBlock
+                        event={ev}
+                        onClick={() => onEventClick(ev)}
+                        pixelHeight={height}
+                      />
                     </div>
                   );
                 })}
@@ -487,7 +492,7 @@ function DayView({
             return (
               <div
                 key={h}
-                className={`text-ink-faded flex items-start justify-end pe-2 pt-1 text-[11px] leading-none ${isNow ? "text-amber-600 font-semibold" : ""}`}
+                className={`text-ink-faded flex items-start justify-end pe-2 pt-1 text-[11px] leading-none ${isNow ? "font-semibold text-amber-600" : ""}`}
                 style={{ height: HOUR_PX }}
               >
                 {String(h).padStart(2, "0")}:00
@@ -497,10 +502,7 @@ function DayView({
         </div>
 
         {/* Single day column */}
-        <div
-          className="border-ink-line relative flex-1 border-s"
-          style={{ height: 24 * HOUR_PX }}
-        >
+        <div className="border-ink-line relative flex-1 border-s" style={{ height: 24 * HOUR_PX }}>
           {/* Hour slot backgrounds */}
           {HOURS.map((h) => {
             const isNow = isToday(day) && new Date().getHours() === h;
@@ -688,7 +690,9 @@ export function CalendarClient({
   initialMonth,
 }: Props) {
   const router = useRouter();
-  const [view, setView] = useState<ViewMode>("month");
+  const [view, setView] = useState<ViewMode>(
+    () => (loadFilters("calendar")?.view as ViewMode) ?? "month"
+  );
   const [year, setYear] = useState(initialYear);
   const [month, setMonth] = useState(initialMonth);
   const todayRef = new Date();
@@ -697,6 +701,11 @@ export function CalendarClient({
   const [dialog, setDialog] = useState<DialogState>({ open: false });
   const [dragStart, setDragStart] = useState<{ dateKey: string; hour: number } | null>(null);
   const [dragEnd, setDragEnd] = useState<number | null>(null);
+
+  // Persist view mode to localStorage on every change
+  useEffect(() => {
+    saveFilters("calendar", { view });
+  }, [view]);
 
   // Index tasks by due_date
   const tasksByDate = useMemo(() => {

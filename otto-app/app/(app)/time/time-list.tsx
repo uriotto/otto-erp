@@ -31,6 +31,7 @@ import {
 } from "./actions";
 import { NewTimeEntryDialog } from "./new-time-entry-dialog";
 import { BulkActionBar } from "@/components/ui/bulk-action-bar";
+import { saveFilters, loadFilters } from "@/lib/persist-filters";
 
 export type TimeEntryItem = Pick<
   Tables<"time_entries">,
@@ -127,17 +128,19 @@ export function TimeList({
   );
   const [showNew, setShowNew] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [view, setView] = useState<View>(() => (searchParams.get("view") as View) || "daily");
+  const [view, setView] = useState<View>(() =>
+    ((searchParams.get("view") as View) || (loadFilters("time")?.view as View)) ?? "daily"
+  );
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkPending, startBulk] = useTransition();
-  const [customerFilter, setCustomerFilter] = useState<string>(
-    () => searchParams.get("customer") ?? "all",
+  const [customerFilter, setCustomerFilter] = useState<string>(() =>
+    searchParams.get("customer") ?? loadFilters("time")?.customer ?? "all"
   );
-  const [projectFilter, setProjectFilter] = useState<string>(
-    () => searchParams.get("project") ?? "all",
+  const [projectFilter, setProjectFilter] = useState<string>(() =>
+    searchParams.get("project") ?? loadFilters("time")?.project ?? "all"
   );
-  const [billableFilter, setBillableFilter] = useState<string>(
-    () => searchParams.get("billable") ?? "all",
+  const [billableFilter, setBillableFilter] = useState<string>(() =>
+    searchParams.get("billable") ?? loadFilters("time")?.billable ?? "all"
   );
 
   const updateUrl = useCallback(
@@ -152,6 +155,22 @@ export function TimeList({
     },
     [router, pathname, searchParams],
   );
+
+  // Persist filter state to localStorage on every change
+  useEffect(() => {
+    saveFilters("time", { view, customer: customerFilter, project: projectFilter, billable: billableFilter });
+  }, [view, customerFilter, projectFilter, billableFilter]);
+
+  // Sync URL with localStorage-restored state on fresh load
+  useEffect(() => {
+    if (!searchParams.toString()) {
+      const saved = loadFilters("time");
+      if (saved) {
+        updateUrl({ view: saved.view, customer: saved.customer, project: saved.project, billable: saved.billable });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filtered = useMemo(() => {
     return entries.filter((e) => {

@@ -23,6 +23,7 @@ import { ViewToggle, useStoredView } from "@/components/ui/view-toggle";
 import { BulkActionBar } from "@/components/ui/bulk-action-bar";
 import { bulkDeleteProjects, bulkUpdateProjectStatus } from "./actions";
 import { useToast } from "@/components/ui/toast";
+import { saveFilters, loadFilters } from "@/lib/persist-filters";
 
 const STATUS_LABELS: Record<string, string> = {
   planning: "תכנון",
@@ -97,15 +98,17 @@ export function ProjectsList({
   const [showNew, setShowNew] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkPending, startBulk] = useTransition();
-  const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
-  const [statusFilter, setStatusFilter] = useState<string>(
-    () => searchParams.get("status") ?? "all",
+  const [query, setQuery] = useState(() =>
+    searchParams.get("q") ?? loadFilters("projects")?.q ?? ""
   );
-  const [billingFilter, setBillingFilter] = useState<string>(
-    () => searchParams.get("billing") ?? "all",
+  const [statusFilter, setStatusFilter] = useState<string>(() =>
+    searchParams.get("status") ?? loadFilters("projects")?.status ?? "all"
   );
-  const [customerFilter, setCustomerFilter] = useState<string>(
-    () => searchParams.get("customer") ?? "all",
+  const [billingFilter, setBillingFilter] = useState<string>(() =>
+    searchParams.get("billing") ?? loadFilters("projects")?.billing ?? "all"
+  );
+  const [customerFilter, setCustomerFilter] = useState<string>(() =>
+    searchParams.get("customer") ?? loadFilters("projects")?.customer ?? "all"
   );
 
   const updateUrl = useCallback(
@@ -120,6 +123,22 @@ export function ProjectsList({
     },
     [router, pathname, searchParams],
   );
+
+  // Persist filter state to localStorage on every change
+  useEffect(() => {
+    saveFilters("projects", { q: query, status: statusFilter, billing: billingFilter, customer: customerFilter });
+  }, [query, statusFilter, billingFilter, customerFilter]);
+
+  // Sync URL with localStorage-restored state on fresh load
+  useEffect(() => {
+    if (!searchParams.toString()) {
+      const saved = loadFilters("projects");
+      if (saved) {
+        updateUrl({ q: saved.q, status: saved.status, billing: saved.billing, customer: saved.customer });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const handle = setTimeout(() => {

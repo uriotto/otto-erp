@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -20,6 +20,7 @@ import { BulkActionBar, type BulkAction } from "@/components/ui/bulk-action-bar"
 import { useToast } from "@/components/ui/toast";
 import { approveReport, deleteReport } from "./actions";
 import type { ReportListItem } from "./page";
+import { saveFilters, loadFilters } from "@/lib/persist-filters";
 
 type CustomerOption = {
   id: string;
@@ -78,11 +79,29 @@ export function ReportsList({
   const [pending, startTransition] = useTransition();
   const toast = useToast();
 
+  // Restore filters from localStorage on fresh load
+  useEffect(() => {
+    if (!searchParams.toString()) {
+      const saved = loadFilters("reports");
+      if (saved?.status || saved?.type) {
+        const params = new URLSearchParams();
+        if (saved.status) params.set("status", saved.status);
+        if (saved.type) params.set("type", saved.type);
+        router.push(`/reports?${params.toString()}`);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function setFilter(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
     if (value) params.set(key, value);
     else params.delete(key);
     router.push(`/reports?${params.toString()}`);
+    saveFilters("reports", {
+      status: key === "status" ? value : (searchParams.get("status") ?? ""),
+      type: key === "type" ? value : (searchParams.get("type") ?? ""),
+    });
   }
 
   function toggleSelect(id: string) {

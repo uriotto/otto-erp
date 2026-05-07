@@ -33,6 +33,7 @@ import {
 import { Eye, EyeOff } from "lucide-react";
 import { ViewToggle, useStoredView } from "@/components/ui/view-toggle";
 import { BulkActionBar } from "@/components/ui/bulk-action-bar";
+import { saveFilters, loadFilters } from "@/lib/persist-filters";
 
 type Customer = Tables<"customers">;
 type StatusFilter = "all" | "active" | "inactive";
@@ -98,13 +99,19 @@ export function CustomersList({
   const [showNew, setShowNew] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [view, setView] = useStoredView<"grid" | "table">("customers-view", "grid");
-  const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() =>
-    parseStatus(searchParams.get("status")),
+  const [query, setQuery] = useState(() =>
+    searchParams.get("q") ?? loadFilters("customers")?.q ?? ""
   );
-  const [selectedTags, setSelectedTags] = useState<string[]>(() =>
-    parseTags(searchParams.get("tags")),
-  );
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() => {
+    const fromUrl = parseStatus(searchParams.get("status"));
+    if (fromUrl !== "all") return fromUrl;
+    return (loadFilters("customers")?.status as StatusFilter) ?? "all";
+  });
+  const [selectedTags, setSelectedTags] = useState<string[]>(() => {
+    const fromUrl = parseTags(searchParams.get("tags"));
+    if (fromUrl.length > 0) return fromUrl;
+    return (loadFilters("customers")?.tags ?? "").split(",").filter(Boolean);
+  });
 
   const updateUrl = useCallback(
     (params: Record<string, string | undefined>) => {
@@ -118,6 +125,31 @@ export function CustomersList({
     },
     [router, pathname, searchParams],
   );
+
+  // Sync URL with localStorage-restored state on fresh load
+  useEffect(() => {
+    if (!searchParams.toString()) {
+      const saved = loadFilters("customers");
+      if (saved) {
+        const params: Record<string, string | undefined> = {
+          status: saved.status,
+          q: saved.q,
+          tags: saved.tags,
+        };
+        updateUrl(params);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist filter state to localStorage on every change
+  useEffect(() => {
+    saveFilters("customers", {
+      status: statusFilter,
+      q: query,
+      tags: selectedTags.join(","),
+    });
+  }, [statusFilter, query, selectedTags]);
 
   // Debounced URL update for query
   useEffect(() => {

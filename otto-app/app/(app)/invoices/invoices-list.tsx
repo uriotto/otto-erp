@@ -18,6 +18,7 @@ import { NewInvoiceDialog } from "./new-invoice-dialog";
 import { bulkDeleteInvoices, bulkUpdateInvoiceStatus } from "./actions";
 import { BulkActionBar } from "@/components/ui/bulk-action-bar";
 import { useToast } from "@/components/ui/toast";
+import { saveFilters, loadFilters } from "@/lib/persist-filters";
 
 export type InvoiceStatusUI =
   | "draft"
@@ -196,12 +197,20 @@ export function InvoicesList({
     });
   }
 
-  const [status, setStatus] = useState<string>(searchParams.get("status") ?? "all");
-  const [customerId, setCustomerId] = useState<string>(searchParams.get("customer") ?? "all");
-  const [age, setAge] = useState<string>(searchParams.get("age") ?? "all");
-  const [type, setType] = useState<string>(searchParams.get("type") ?? "all");
+  const [status, setStatus] = useState<string>(
+    searchParams.get("status") ?? loadFilters("invoices")?.status ?? "all"
+  );
+  const [customerId, setCustomerId] = useState<string>(
+    searchParams.get("customer") ?? loadFilters("invoices")?.customer ?? "all"
+  );
+  const [age, setAge] = useState<string>(
+    searchParams.get("age") ?? loadFilters("invoices")?.age ?? "all"
+  );
+  const [type, setType] = useState<string>(
+    searchParams.get("type") ?? loadFilters("invoices")?.type ?? "all"
+  );
 
-  // Persist filters to URL
+  // Persist filters to URL and localStorage
   useEffect(() => {
     const params = new URLSearchParams();
     if (status !== "all") params.set("status", status);
@@ -210,6 +219,7 @@ export function InvoicesList({
     if (type !== "all") params.set("type", type);
     const query = params.toString();
     router.replace(query ? `/invoices?${query}` : "/invoices", { scroll: false });
+    saveFilters("invoices", { status, customer: customerId, age, type });
   }, [status, customerId, age, type, router]);
 
   const filtered = useMemo(() => {

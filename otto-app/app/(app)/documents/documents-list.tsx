@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Upload,
@@ -29,6 +29,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { relativeTimeHebrew } from "@/lib/relative-time";
 import { ViewToggle, useStoredView } from "@/components/ui/view-toggle";
 import { BulkActionBar } from "@/components/ui/bulk-action-bar";
+import { saveFilters, loadFilters } from "@/lib/persist-filters";
 
 export type DocumentItem = {
   id: string;
@@ -157,12 +158,17 @@ export function DocumentsList({
   const [showUpload, setShowUpload] = useState(false);
   const [signingDoc, setSigningDoc] = useState<DocumentItem | null>(null);
   const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null);
-  const [search, setSearch] = useState("");
-  const [filterType, setFilterType] = useState("");
-  const [filterCustomer, setFilterCustomer] = useState("");
+  const [search, setSearch] = useState(() => loadFilters("documents")?.search ?? "");
+  const [filterType, setFilterType] = useState(() => loadFilters("documents")?.type ?? "");
+  const [filterCustomer, setFilterCustomer] = useState(() => loadFilters("documents")?.customer ?? "");
   const [showFilters, setShowFilters] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkPending, startBulk] = useTransition();
+
+  // Persist filter state to localStorage on every change
+  useEffect(() => {
+    saveFilters("documents", { search, type: filterType, customer: filterCustomer });
+  }, [search, filterType, filterCustomer]);
 
   const filtered = documents.filter((d) => {
     if (filterType && d.type !== filterType) return false;
