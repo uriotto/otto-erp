@@ -105,6 +105,32 @@ export function EventDialog({
   const [guestInput, setGuestInput] = useState("");
   const [guests, setGuests] = useState<string[]>(event?.guests?.map((g) => g.email) ?? []);
 
+  const startVal = isEdit
+    ? event.all_day
+      ? toLocalDate(event.start_at)
+      : toLocalDatetime(event.start_at)
+    : defaultStart(initialDate, initialHour);
+
+  const endVal = isEdit
+    ? event.all_day
+      ? toLocalDate(event.end_at)
+      : toLocalDatetime(event.end_at)
+    : defaultEnd(initialDate, initialHour, initialEndHour);
+
+  const [startLocal, setStartLocal] = useState(startVal);
+  const [endLocal, setEndLocal] = useState(endVal);
+
+  // When toggling all-day, adjust the local value format
+  useEffect(() => {
+    if (allDay) {
+      setStartLocal((p) => p.slice(0, 10));
+      setEndLocal((p) => p.slice(0, 10));
+    } else {
+      setStartLocal((p) => (p.length === 10 ? `${p}T09:00` : p));
+      setEndLocal((p) => (p.length === 10 ? `${p}T10:00` : p));
+    }
+  }, [allDay]);
+
   useEffect(() => {
     if (state.success) {
       onSaved();
@@ -115,13 +141,11 @@ export function EventDialog({
     ? projects.filter((p) => p.customer_id === selectedCustomer)
     : projects;
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    if (allDay) return;
-    const form = e.currentTarget;
-    const startInput = form.elements.namedItem("start_at") as HTMLInputElement | null;
-    const endInput = form.elements.namedItem("end_at") as HTMLInputElement | null;
-    if (startInput?.value) startInput.value = new Date(startInput.value).toISOString();
-    if (endInput?.value) endInput.value = new Date(endInput.value).toISOString();
+  // Convert local datetime string to UTC ISO (for timed events)
+  function toUtcIso(local: string): string {
+    if (!local) return "";
+    const d = new Date(local);
+    return isNaN(d.getTime()) ? "" : d.toISOString();
   }
 
   async function handleDelete() {
@@ -132,18 +156,6 @@ export function EventDialog({
     setIsDeleting(false);
     if (!result.error) onSaved();
   }
-
-  const startVal = isEdit
-    ? allDay
-      ? toLocalDate(event.start_at)
-      : toLocalDatetime(event.start_at)
-    : defaultStart(initialDate, initialHour);
-
-  const endVal = isEdit
-    ? allDay
-      ? toLocalDate(event.end_at)
-      : toLocalDatetime(event.end_at)
-    : defaultEnd(initialDate, initialHour, initialEndHour);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -164,10 +176,12 @@ export function EventDialog({
         </div>
 
         {/* Form */}
-        <form action={formAction} onSubmit={handleSubmit} className="space-y-4 px-5 py-4">
+        <form action={formAction} className="space-y-4 px-5 py-4">
           {/* Hidden inputs for form submission */}
           <input type="hidden" name="all_day" value={String(allDay)} />
           <input type="hidden" name="create_meet" value={String(createMeet)} />
+          <input type="hidden" name="start_at" value={allDay ? startLocal : toUtcIso(startLocal)} />
+          <input type="hidden" name="end_at" value={allDay ? endLocal : toUtcIso(endLocal)} />
           {guests.map((email, i) => (
             <input key={i} type="hidden" name="guests" value={email} />
           ))}
@@ -207,9 +221,10 @@ export function EventDialog({
                 התחלה <span className="text-rose-500">*</span>
               </label>
               <input
-                name="start_at"
+                key={allDay ? "start-date" : "start-datetime"}
                 type={allDay ? "date" : "datetime-local"}
-                defaultValue={startVal}
+                value={startLocal}
+                onChange={(e) => setStartLocal(e.target.value)}
                 required
                 className="border-ink-line bg-cream-deep text-navy focus:border-navy focus:ring-navy/30 w-full rounded-lg border px-3 py-2 text-[13px] focus:ring-1 focus:outline-none"
                 dir="ltr"
@@ -220,9 +235,10 @@ export function EventDialog({
                 סיום <span className="text-rose-500">*</span>
               </label>
               <input
-                name="end_at"
+                key={allDay ? "end-date" : "end-datetime"}
                 type={allDay ? "date" : "datetime-local"}
-                defaultValue={endVal}
+                value={endLocal}
+                onChange={(e) => setEndLocal(e.target.value)}
                 required
                 className="border-ink-line bg-cream-deep text-navy focus:border-navy focus:ring-navy/30 w-full rounded-lg border px-3 py-2 text-[13px] focus:ring-1 focus:outline-none"
                 dir="ltr"
