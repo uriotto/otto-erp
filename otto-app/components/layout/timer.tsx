@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Play, Square, X } from "lucide-react";
+import { Play, Square, X, Check } from "lucide-react";
 import { useTimerStore } from "@/lib/stores/timer";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
@@ -42,19 +42,19 @@ export function Timer() {
   const notes = useTimerStore((s) => s.notes);
   const start = useTimerStore((s) => s.start);
   const stop = useTimerStore((s) => s.stop);
-  const reset = useTimerStore((s) => s.reset);
+  const updateContext = useTimerStore((s) => s.updateContext);
 
   const [mounted, setMounted] = useState(false);
-  const [showPicker, setShowPicker] = useState(false);
+  const [showAssign, setShowAssign] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [customers, setCustomers] = useState<CustomerOpt[]>([]);
   const [projects, setProjects] = useState<ProjectOpt[]>([]);
   const [tasks, setTasks] = useState<TaskOpt[]>([]);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
   const toast = useToast();
 
-  // Hydration guard
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
@@ -66,6 +66,18 @@ export function Timer() {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, [isRunning]);
+
+  // Close popup on outside click
+  useEffect(() => {
+    if (!showAssign) return;
+    function handleClick(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setShowAssign(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showAssign]);
 
   // Fetch lookups once
   const fetchedRef = useRef(false);
@@ -95,10 +107,15 @@ export function Timer() {
   }, [now, startTime]);
 
   const overWarning = isRunning && elapsed > FOUR_HOURS_MS;
-
   const customerName = customerId ? customers.find((c) => c.id === customerId)?.name : null;
 
+  const handleStartNow = () => {
+    start({ customerId: null, projectId: null, taskId: null, notes: "" });
+    setShowAssign(true);
+  };
+
   const handleStop = async () => {
+    setShowAssign(false);
     setStopping(true);
     const snapshot = stop();
     if (!snapshot) {
@@ -129,7 +146,6 @@ export function Timer() {
     }
   };
 
-  // Avoid hydration mismatch — render placeholder until mounted
   if (!mounted) {
     return (
       <div className="bg-cream-paper border-ink-line text-ink-faded hidden items-center gap-3 rounded-full border px-4 py-2.5 text-sm font-semibold lg:flex">
@@ -140,96 +156,104 @@ export function Timer() {
 
   if (isRunning) {
     return (
-      <div
-        className={`flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition-colors ${
-          overWarning
-            ? "border-rose-300 bg-rose-50 text-rose-700"
-            : "bg-cream-paper border-ink-line text-navy"
-        }`}
-      >
-        <span
-          className={`h-2 w-2 rounded-full ${
-            overWarning ? "animate-pulse bg-rose-500" : "bg-emerald-500"
+      <div ref={wrapperRef} className="relative flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => setShowAssign((v) => !v)}
+          className={`flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition-colors ${
+            overWarning
+              ? "border-rose-300 bg-rose-50 text-rose-700"
+              : "bg-cream-paper border-ink-line text-navy"
           }`}
-          aria-hidden
-        />
-        <span dir="ltr" className="font-mono tabular-nums">
-          {formatHMS(elapsed)}
-        </span>
-        <span className="text-ink-faded hidden max-w-[120px] truncate text-xs font-medium md:inline">
-          {customerName ?? "ללא לקוח"}
-        </span>
+          aria-label="פרטי טיימר"
+        >
+          <span
+            className={`h-2 w-2 rounded-full ${
+              overWarning ? "animate-pulse bg-rose-500" : "bg-emerald-500"
+            }`}
+            aria-hidden
+          />
+          <span dir="ltr" className="font-mono tabular-nums">
+            {formatHMS(elapsed)}
+          </span>
+          <span className="text-ink-faded hidden max-w-[120px] truncate text-xs font-medium md:inline">
+            {customerName ?? "ללא לקוח"}
+          </span>
+        </button>
+
         <button
           type="button"
           onClick={handleStop}
           disabled={stopping}
           aria-label="עצור טיימר"
-          className="text-cream-paper ms-1 flex h-7 w-7 items-center justify-center rounded-full bg-rose-600 transition-colors hover:bg-rose-700 disabled:opacity-60"
+          className="text-cream-paper ms-1 flex h-8 w-8 items-center justify-center rounded-full bg-rose-600 transition-colors hover:bg-rose-700 disabled:opacity-60"
         >
           {stopping ? <Spinner size={12} /> : <Square size={12} fill="currentColor" />}
         </button>
+
+        {showAssign && (
+          <TimerAssignPopup
+            customers={customers}
+            projects={projects}
+            tasks={tasks}
+            currentCustomerId={customerId}
+            currentProjectId={projectId}
+            currentTaskId={taskId}
+            currentNotes={notes}
+            onAssign={(ctx) => {
+              updateContext(ctx);
+              setShowAssign(false);
+            }}
+            onClose={() => setShowAssign(false)}
+          />
+        )}
       </div>
     );
   }
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setShowPicker(true)}
-        className="bg-cream-paper border-ink-line text-ink-soft hover:border-navy hover:text-navy flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium transition-colors"
-        aria-label="התחל טיימר"
-      >
-        <Play size={14} className="text-emerald-600" />
-        <span className="hidden md:inline">התחל טיימר</span>
-      </button>
-
-      {showPicker && (
-        <TimerPicker
-          customers={customers}
-          projects={projects}
-          tasks={tasks}
-          onClose={() => setShowPicker(false)}
-          onStart={(ctx) => {
-            start(ctx);
-            setShowPicker(false);
-          }}
-          initial={{ customerId, projectId, taskId, notes }}
-        />
-      )}
-    </>
+    <button
+      type="button"
+      onClick={handleStartNow}
+      className="bg-cream-paper border-ink-line text-ink-soft hover:border-navy hover:text-navy flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium transition-colors"
+      aria-label="התחל טיימר"
+    >
+      <Play size={14} className="text-emerald-600" />
+      <span className="hidden md:inline">התחל טיימר</span>
+    </button>
   );
 }
 
-function TimerPicker({
+function TimerAssignPopup({
   customers,
   projects,
   tasks,
+  currentCustomerId,
+  currentProjectId,
+  currentTaskId,
+  currentNotes,
+  onAssign,
   onClose,
-  onStart,
-  initial,
 }: {
   customers: CustomerOpt[];
   projects: ProjectOpt[];
   tasks: TaskOpt[];
-  onClose: () => void;
-  onStart: (ctx: {
+  currentCustomerId: string | null;
+  currentProjectId: string | null;
+  currentTaskId: string | null;
+  currentNotes: string;
+  onAssign: (ctx: {
     customerId: string | null;
     projectId: string | null;
     taskId: string | null;
     notes: string;
   }) => void;
-  initial: {
-    customerId: string | null;
-    projectId: string | null;
-    taskId: string | null;
-    notes: string;
-  };
+  onClose: () => void;
 }) {
-  const [customerId, setCustomerId] = useState(initial.customerId ?? "");
-  const [projectId, setProjectId] = useState(initial.projectId ?? "");
-  const [taskId, setTaskId] = useState(initial.taskId ?? "");
-  const [notes, setNotes] = useState(initial.notes ?? "");
+  const [customerId, setCustomerId] = useState(currentCustomerId ?? "");
+  const [projectId, setProjectId] = useState(currentProjectId ?? "");
+  const [taskId, setTaskId] = useState(currentTaskId ?? "");
+  const [notes, setNotes] = useState(currentNotes ?? "");
 
   const filteredProjects = useMemo(
     () => (customerId ? projects.filter((p) => p.customer_id === customerId) : []),
@@ -240,117 +264,100 @@ function TimerPicker({
     [tasks, projectId],
   );
 
-  const inputCls =
-    "w-full rounded-lg border bg-white px-3 py-2 text-sm transition-colors outline-none border-ink-line focus:border-navy";
-  const labelCls = "text-micro text-ink-soft mb-1 block uppercase";
+  const selectCls =
+    "w-full rounded-lg border bg-white px-3 py-1.5 text-sm transition-colors outline-none border-ink-line focus:border-navy";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-cream w-full max-w-md rounded-2xl p-6 shadow-xl">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-display-sm text-navy">התחל טיימר</h2>
-          <button
-            onClick={onClose}
-            className="text-ink-faded hover:text-navy rounded-lg p-1 transition-colors"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="space-y-3">
-          <div>
-            <label className={labelCls}>לקוח</label>
-            <select
-              value={customerId}
-              onChange={(e) => {
-                setCustomerId(e.target.value);
-                setProjectId("");
-                setTaskId("");
-              }}
-              className={inputCls}
-            >
-              <option value="">— ללא —</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className={labelCls}>פרויקט</label>
-            <select
-              value={projectId}
-              onChange={(e) => {
-                setProjectId(e.target.value);
-                setTaskId("");
-              }}
-              className={inputCls}
-              disabled={!customerId}
-            >
-              <option value="">— ללא —</option>
-              {filteredProjects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className={labelCls}>משימה</label>
-            <select
-              value={taskId}
-              onChange={(e) => setTaskId(e.target.value)}
-              className={inputCls}
-              disabled={!projectId}
-            >
-              <option value="">— ללא —</option>
-              {filteredTasks.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.title}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className={labelCls}>הערות</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              className={inputCls}
-            />
-          </div>
-        </div>
-
-        <div className="mt-5 flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="border-ink-line text-navy hover:border-navy rounded-lg border px-4 py-2 text-sm font-semibold transition-colors"
-          >
-            ביטול
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              onStart({
-                customerId: customerId || null,
-                projectId: projectId || null,
-                taskId: taskId || null,
-                notes,
-              })
-            }
-            className="bg-navy text-cream-paper hover:bg-navy-deep flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-semibold transition-colors"
-          >
-            <Play size={14} />
-            התחל
-          </button>
-        </div>
+    <div
+      className="bg-cream-paper border-ink-line absolute end-0 top-full z-50 mt-2 w-72 rounded-xl border p-4 shadow-lg"
+      style={{ boxShadow: "0 4px 24px rgba(0,31,60,0.14), 0 0 0 1px rgba(0,63,124,0.08)" }}
+    >
+      <div className="mb-3 flex items-center justify-between">
+        <span className="text-navy text-sm font-semibold">שיוך הטיימר</span>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-ink-faded hover:text-navy rounded p-0.5 transition-colors"
+          aria-label="סגור"
+        >
+          <X size={14} />
+        </button>
       </div>
+
+      <div className="space-y-2">
+        <select
+          value={customerId}
+          onChange={(e) => {
+            setCustomerId(e.target.value);
+            setProjectId("");
+            setTaskId("");
+          }}
+          className={selectCls}
+          autoFocus
+        >
+          <option value="">לקוח —</option>
+          {customers.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={projectId}
+          onChange={(e) => {
+            setProjectId(e.target.value);
+            setTaskId("");
+          }}
+          className={selectCls}
+          disabled={!customerId || filteredProjects.length === 0}
+        >
+          <option value="">פרויקט —</option>
+          {filteredProjects.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={taskId}
+          onChange={(e) => setTaskId(e.target.value)}
+          className={selectCls}
+          disabled={!projectId || filteredTasks.length === 0}
+        >
+          <option value="">משימה —</option>
+          {filteredTasks.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.title}
+            </option>
+          ))}
+        </select>
+
+        <input
+          type="text"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="הערות..."
+          className={selectCls}
+        />
+      </div>
+
+      <button
+        type="button"
+        onClick={() =>
+          onAssign({
+            customerId: customerId || null,
+            projectId: projectId || null,
+            taskId: taskId || null,
+            notes,
+          })
+        }
+        className="bg-navy text-cream-paper hover:bg-navy/90 mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-semibold transition-colors"
+      >
+        <Check size={13} />
+        שייך
+      </button>
     </div>
   );
 }
