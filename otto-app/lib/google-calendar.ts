@@ -111,24 +111,46 @@ type OttoEvent = {
   start_at: string;
   end_at: string;
   all_day: boolean;
+  attendees?: string[];
+  create_meet?: boolean;
 };
 
+function toRFC3339(ts: string): string {
+  return new Date(ts).toISOString();
+}
+
 function toGoogleEvent(ev: OttoEvent): Record<string, unknown> {
-  if (ev.all_day) {
-    return {
-      summary: ev.title,
-      description: ev.description ?? undefined,
-      location: ev.location ?? undefined,
-      start: { date: ev.start_at.slice(0, 10) },
-      end: { date: ev.end_at.slice(0, 10) },
-    };
-  }
+  const base = ev.all_day
+    ? {
+        summary: ev.title,
+        description: ev.description ?? undefined,
+        location: ev.location ?? undefined,
+        start: { date: ev.start_at.slice(0, 10) },
+        end: { date: ev.end_at.slice(0, 10) },
+      }
+    : {
+        summary: ev.title,
+        description: ev.description ?? undefined,
+        location: ev.location ?? undefined,
+        start: { dateTime: toRFC3339(ev.start_at), timeZone: "Asia/Jerusalem" },
+        end: { dateTime: toRFC3339(ev.end_at), timeZone: "Asia/Jerusalem" },
+      };
+
   return {
-    summary: ev.title,
-    description: ev.description ?? undefined,
-    location: ev.location ?? undefined,
-    start: { dateTime: ev.start_at, timeZone: "Asia/Jerusalem" },
-    end: { dateTime: ev.end_at, timeZone: "Asia/Jerusalem" },
+    ...base,
+    ...(ev.create_meet && {
+      conferenceData: {
+        createRequest: {
+          requestId: crypto.randomUUID(),
+          conferenceSolutionKey: { type: "hangoutsMeet" },
+        },
+      },
+    }),
+    ...(ev.attendees &&
+      ev.attendees.length > 0 && {
+        attendees: ev.attendees.map((email) => ({ email })),
+      }),
+    sendUpdates: ev.attendees && ev.attendees.length > 0 ? "all" : "none",
   };
 }
 
@@ -158,14 +180,22 @@ async function calendarFetch(
   });
 }
 
-export async function createGoogleEvent(tenantId: string, event: OttoEvent): Promise<string> {
-  const res = await calendarFetch(tenantId, "/events", {
+export async function createGoogleEvent(
+  tenantId: string,
+  event: OttoEvent,
+): Promise<{ googleEventId: string; meetUrl: string | null }> {
+  const query = event.create_meet ? "?conferenceDataVersion=1" : "";
+  const res = await calendarFetch(tenantId, `/events${query}`, {
     method: "POST",
     body: JSON.stringify(toGoogleEvent(event)),
   });
   if (!res.ok) throw new Error(`Google createEvent failed: ${await res.text()}`);
-  const data = (await res.json()) as GoogleCalendarEvent;
-  return data.id;
+  const data = (await res.json()) as GoogleCalendarEvent & {
+    conferenceData?: { entryPoints?: { entryPointType: string; uri: string }[] };
+  };
+  const meetUrl =
+    data.conferenceData?.entryPoints?.find((e) => e.entryPointType === "video")?.uri ?? null;
+  return { googleEventId: data.id, meetUrl };
 }
 
 export async function updateGoogleEvent(
@@ -206,39 +236,57 @@ export async function fetchIncrementalChanges(tenantId: string): Promise<{
   const token = await getAccessToken(tenantId);
   const calId = encodeURIComponent(settings?.google_calendar_id ?? "primary");
 
-  let url: string;
+  let nextUrl: string;
   if (settings?.google_sync_token) {
-    url = `${GOOGLE_CALENDAR_API}/calendars/${calId}/events?syncToken=${settings.google_sync_token}`;
+    nextUrl = `${GOOGLE_CALENDAR_API}/calendars/${calId}/events?syncToken=${settings.google_sync_token}`;
   } else {
     const since = new Date();
     since.setMonth(since.getMonth() - 3);
-    url = `${GOOGLE_CALENDAR_API}/calendars/${calId}/events?timeMin=${since.toISOString()}&singleEvents=true`;
+    nextUrl = `${GOOGLE_CALENDAR_API}/calendars/${calId}/events?timeMin=${since.toISOString()}&singleEvents=true&orderBy=updated`;
   }
 
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const allEvents: GoogleCalendarEvent[] = [];
+  let newSyncToken: string | null = null;
 
-  if (res.status === 410) {
-    // Sync token expired — clear it and return empty (next call will do full sync)
-    await supabase
-      .from("tenant_settings")
-      .update({ google_sync_token: null })
-      .eq("tenant_id", tenantId);
-    return { events: [], newSyncToken: null };
+  while (nextUrl) {
+    const res = await fetch(nextUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (res.status === 410) {
+      // Sync token expired — clear it and return empty (next call will do full sync)
+      await supabase
+        .from("tenant_settings")
+        .update({ google_sync_token: null })
+        .eq("tenant_id", tenantId);
+      return { events: [], newSyncToken: null };
+    }
+
+    if (!res.ok) throw new Error(`Google sync failed: ${await res.text()}`);
+
+    const data = (await res.json()) as {
+      items?: GoogleCalendarEvent[];
+      nextSyncToken?: string;
+      nextPageToken?: string;
+    };
+
+    allEvents.push(...(data.items ?? []));
+
+    if (data.nextSyncToken) {
+      newSyncToken = data.nextSyncToken;
+      break;
+    }
+    if (data.nextPageToken) {
+      const base = nextUrl.split("?")[0];
+      const params = new URLSearchParams(new URL(nextUrl).search);
+      params.set("pageToken", data.nextPageToken);
+      nextUrl = `${base}?${params.toString()}`;
+    } else {
+      break;
+    }
   }
 
-  if (!res.ok) throw new Error(`Google sync failed: ${await res.text()}`);
-
-  const data = (await res.json()) as {
-    items?: GoogleCalendarEvent[];
-    nextSyncToken?: string;
-  };
-
-  return {
-    events: data.items ?? [],
-    newSyncToken: data.nextSyncToken ?? null,
-  };
+  return { events: allEvents, newSyncToken };
 }
 
 // ─── Full initial import ──────────────────────────────────────────────────────
@@ -256,22 +304,42 @@ export async function importAllEvents(tenantId: string): Promise<GoogleCalendarE
   const since = new Date();
   since.setMonth(since.getMonth() - 3);
 
-  const res = await fetch(
-    `${GOOGLE_CALENDAR_API}/calendars/${calId}/events?timeMin=${since.toISOString()}&singleEvents=true&maxResults=500`,
-    { headers: { Authorization: `Bearer ${token}` } },
-  );
+  const allEvents: GoogleCalendarEvent[] = [];
+  let pageToken: string | undefined;
+  let nextSyncToken: string | undefined;
 
-  if (!res.ok) throw new Error(`Google initial import failed: ${await res.text()}`);
-  const data = (await res.json()) as { items?: GoogleCalendarEvent[]; nextSyncToken?: string };
+  do {
+    const params = new URLSearchParams({
+      timeMin: since.toISOString(),
+      singleEvents: "true",
+      maxResults: "500",
+    });
+    if (pageToken) params.set("pageToken", pageToken);
 
-  if (data.nextSyncToken) {
+    const res = await fetch(`${GOOGLE_CALENDAR_API}/calendars/${calId}/events?${params}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!res.ok) throw new Error(`Google initial import failed: ${await res.text()}`);
+    const data = (await res.json()) as {
+      items?: GoogleCalendarEvent[];
+      nextSyncToken?: string;
+      nextPageToken?: string;
+    };
+
+    allEvents.push(...(data.items ?? []));
+    nextSyncToken = data.nextSyncToken;
+    pageToken = data.nextPageToken;
+  } while (pageToken);
+
+  if (nextSyncToken) {
     await supabase
       .from("tenant_settings")
-      .update({ google_sync_token: data.nextSyncToken })
+      .update({ google_sync_token: nextSyncToken })
       .eq("tenant_id", tenantId);
   }
 
-  return data.items ?? [];
+  return allEvents;
 }
 
 // ─── Push notification channel ────────────────────────────────────────────────
