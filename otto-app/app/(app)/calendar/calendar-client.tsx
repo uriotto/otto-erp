@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import { ChevronRight, ChevronLeft, CalendarDays, Grid3X3, Plus } from "lucide-react";
+import { ChevronRight, ChevronLeft, CalendarDays, Grid3X3, Plus, Clock, List } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { CalendarTask, CalendarEvent } from "./page";
 import { EventDialog, type EventItem } from "./event-dialog";
@@ -42,7 +42,7 @@ const EVENT_TYPE_COLORS: Record<string, string> = {
   other: "bg-purple-400",
 };
 
-type ViewMode = "month" | "week";
+type ViewMode = "month" | "week" | "day" | "list";
 
 type CustomerOption = { id: string; name: string; email: string | null };
 type ProjectOption = { id: string; name: string; customer_id: string | null };
@@ -345,6 +345,190 @@ function WeekView({
   );
 }
 
+// ─── Day view ────────────────────────────────────────────────────────────────
+
+function DayView({
+  day,
+  tasksByDate,
+  eventsByDate,
+  onDayClick,
+  onEventClick,
+}: {
+  day: Date;
+  tasksByDate: Map<string, CalendarTask[]>;
+  eventsByDate: Map<string, CalendarEvent[]>;
+  onDayClick: (dateKey: string) => void;
+  onEventClick: (event: CalendarEvent) => void;
+}) {
+  const key = toDateKey(day);
+  const allDayEvents = (eventsByDate.get(key) ?? []).filter((ev) => ev.all_day);
+  const allDayTasks = tasksByDate.get(key) ?? [];
+
+  return (
+    <div className="flex-1 overflow-auto">
+      {/* All-day strip */}
+      {(allDayEvents.length > 0 || allDayTasks.length > 0) && (
+        <div
+          className="border-ink-line hover:bg-cream-deep/30 flex min-h-[36px] cursor-pointer items-start gap-1 border-b p-2"
+          onClick={() => onDayClick(key)}
+        >
+          <span className="text-ink-faded w-12 shrink-0 text-end text-[10px]">כל היום</span>
+          <div className="flex flex-1 flex-wrap gap-1">
+            {allDayEvents.map((ev) => (
+              <EventChip key={ev.id} event={ev} onClick={() => onEventClick(ev)} />
+            ))}
+            {allDayTasks.map((t) => (
+              <TaskChip key={t.id} task={t} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Hour rows */}
+      {HOURS.map((h) => {
+        const hourEvents = (eventsByDate.get(key) ?? []).filter(
+          (ev) => !ev.all_day && new Date(ev.start_at).getHours() === h,
+        );
+        const isNow = isToday(day) && new Date().getHours() === h;
+
+        return (
+          <div
+            key={h}
+            style={{ minHeight: hourEvents.length > 0 ? 56 : 40 }}
+            className={`border-ink-line hover:bg-cream-deep/20 flex cursor-pointer border-b ${isNow ? "bg-amber-50/40" : ""}`}
+            onClick={() => onDayClick(key)}
+          >
+            <div className="text-ink-faded w-12 shrink-0 py-1 pe-2 text-end text-[11px]">
+              {String(h).padStart(2, "0")}:00
+            </div>
+            <div className="flex-1 space-y-0.5 p-0.5">
+              {hourEvents.map((ev) => (
+                <EventChip key={ev.id} event={ev} onClick={() => onEventClick(ev)} />
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── List view ────────────────────────────────────────────────────────────────
+
+const EVENT_TYPE_LABELS_LIST: Record<string, string> = {
+  meeting: "פגישה",
+  call: "שיחה",
+  deadline: "דדליין",
+  other: "אחר",
+};
+
+const EVENT_TYPE_BADGE: Record<string, string> = {
+  meeting: "bg-amber-50 text-amber-700 border-amber-200",
+  call: "bg-teal-50 text-teal-700 border-teal-200",
+  deadline: "bg-rose-50 text-rose-600 border-rose-200",
+  other: "bg-cream-deep text-ink-soft border-ink-line",
+};
+
+function ListView({
+  events,
+  onEventClick,
+}: {
+  events: CalendarEvent[];
+  onEventClick: (event: CalendarEvent) => void;
+}) {
+  const sorted = [...events].sort(
+    (a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime(),
+  );
+
+  const grouped: { key: string; date: Date; items: CalendarEvent[] }[] = [];
+  for (const ev of sorted) {
+    const key = eventDateKey(ev.start_at);
+    const last = grouped[grouped.length - 1];
+    if (last?.key === key) {
+      last.items.push(ev);
+    } else {
+      grouped.push({ key, date: new Date(ev.start_at), items: [ev] });
+    }
+  }
+
+  if (grouped.length === 0) {
+    return (
+      <div className="flex flex-1 items-center justify-center py-24">
+        <p className="text-ink-faded text-[14px]">אין אירועים להצגה</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 space-y-6 overflow-auto px-5 py-4">
+      {grouped.map(({ key, date, items }) => (
+        <div key={key}>
+          <div
+            className={`mb-2 text-[12px] font-semibold ${isToday(date) ? "text-navy" : "text-ink-soft"}`}
+          >
+            {isToday(date)
+              ? "היום"
+              : `${DAYS_HE[date.getDay()]}, ${date.getDate()} ${MONTHS_HE[date.getMonth()]} ${date.getFullYear()}`}
+          </div>
+          <div className="space-y-2">
+            {items.map((ev) => {
+              const startTime = ev.all_day
+                ? "כל היום"
+                : new Date(ev.start_at).toLocaleTimeString("he-IL", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: false,
+                  });
+              const endTime = ev.all_day
+                ? null
+                : new Date(ev.end_at).toLocaleTimeString("he-IL", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: false,
+                  });
+
+              return (
+                <button
+                  key={ev.id}
+                  type="button"
+                  onClick={() => onEventClick(ev)}
+                  className="border-ink-line hover:border-navy/30 bg-cream-paper w-full rounded-xl border p-3 text-start transition-all hover:shadow-sm"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-navy truncate text-[14px] font-medium">{ev.title}</div>
+                      {ev.description && (
+                        <div className="text-ink-faded mt-0.5 truncate text-[12px]">
+                          {ev.description}
+                        </div>
+                      )}
+                    </div>
+                    <span
+                      className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] ${EVENT_TYPE_BADGE[ev.type] ?? EVENT_TYPE_BADGE.other}`}
+                    >
+                      {EVENT_TYPE_LABELS_LIST[ev.type] ?? ev.type}
+                    </span>
+                  </div>
+                  <div className="text-ink-faded mt-2 flex items-center gap-3 text-[11px]">
+                    <span dir="ltr">{endTime ? `${startTime} – ${endTime}` : startTime}</span>
+                    {ev.location && <span className="truncate">{ev.location}</span>}
+                    {ev.meeting_url && (
+                      <span className="text-navy flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        Meet
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 type Props = {
@@ -370,6 +554,7 @@ export function CalendarClient({
   const [month, setMonth] = useState(initialMonth);
   const todayRef = new Date();
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
+  const [currentDay, setCurrentDay] = useState<Date>(() => new Date());
   const [dialog, setDialog] = useState<DialogState>({ open: false });
 
   // Index tasks by due_date
@@ -414,6 +599,7 @@ export function CalendarClient({
     setYear(todayRef.getFullYear());
     setMonth(todayRef.getMonth());
     setWeekStart(startOfWeek(todayRef));
+    setCurrentDay(new Date());
   }
 
   // Week navigation
@@ -422,6 +608,25 @@ export function CalendarClient({
   }
   function nextWeek() {
     setWeekStart((w) => addDays(w, 7));
+  }
+
+  // Day navigation
+  function prevDay() {
+    setCurrentDay((d) => addDays(d, -1));
+  }
+  function nextDay() {
+    setCurrentDay((d) => addDays(d, 1));
+  }
+
+  function handlePrev() {
+    if (view === "month") prevMonth();
+    else if (view === "week") prevWeek();
+    else if (view === "day") prevDay();
+  }
+  function handleNext() {
+    if (view === "month") nextMonth();
+    else if (view === "week") nextWeek();
+    else if (view === "day") nextDay();
   }
 
   const weekEndDisplay = addDays(weekStart, 6);
@@ -449,27 +654,33 @@ export function CalendarClient({
       <div className="border-ink-line bg-cream-paper flex items-center gap-3 border-b px-5 py-3">
         <h1 className="text-display-sm text-navy me-2">לוח שנה</h1>
 
-        <div className="flex items-center gap-1">
-          <button
-            onClick={view === "month" ? prevMonth : prevWeek}
-            className="text-ink-soft hover:bg-cream-deep flex h-8 w-8 items-center justify-center rounded-lg transition-colors"
-            aria-label="הקודם"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-          <button
-            onClick={view === "month" ? nextMonth : nextWeek}
-            className="text-ink-soft hover:bg-cream-deep flex h-8 w-8 items-center justify-center rounded-lg transition-colors"
-            aria-label="הבא"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-        </div>
+        {view !== "list" && (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handlePrev}
+              className="text-ink-soft hover:bg-cream-deep flex h-8 w-8 items-center justify-center rounded-lg transition-colors"
+              aria-label="הקודם"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+            <button
+              onClick={handleNext}
+              className="text-ink-soft hover:bg-cream-deep flex h-8 w-8 items-center justify-center rounded-lg transition-colors"
+              aria-label="הבא"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+          </div>
+        )}
 
         <span className="text-navy min-w-[160px] text-sm font-semibold">
           {view === "month"
             ? `${MONTHS_HE[month]} ${year}`
-            : `${weekStart.getDate()} ${MONTHS_HE[weekStart.getMonth()]} – ${weekEndDisplay.getDate()} ${MONTHS_HE[weekEndDisplay.getMonth()]} ${weekEndDisplay.getFullYear()}`}
+            : view === "week"
+              ? `${weekStart.getDate()} ${MONTHS_HE[weekStart.getMonth()]} – ${weekEndDisplay.getDate()} ${MONTHS_HE[weekEndDisplay.getMonth()]} ${weekEndDisplay.getFullYear()}`
+              : view === "day"
+                ? `${DAYS_HE[currentDay.getDay()]}, ${currentDay.getDate()} ${MONTHS_HE[currentDay.getMonth()]} ${currentDay.getFullYear()}`
+                : "כל האירועים"}
         </span>
 
         <button
@@ -497,22 +708,24 @@ export function CalendarClient({
 
         {/* View toggle */}
         <div className="border-ink-line bg-cream-deep flex items-center gap-0.5 rounded-lg border p-0.5">
-          <button
-            onClick={() => setView("month")}
-            title="תצוגת חודש"
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-all ${view === "month" ? "bg-cream-paper text-navy shadow-card" : "text-ink-soft hover:text-navy"}`}
-          >
-            <Grid3X3 className="h-3.5 w-3.5" />
-            חודש
-          </button>
-          <button
-            onClick={() => setView("week")}
-            title="תצוגת שבוע"
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-all ${view === "week" ? "bg-cream-paper text-navy shadow-card" : "text-ink-soft hover:text-navy"}`}
-          >
-            <CalendarDays className="h-3.5 w-3.5" />
-            שבוע
-          </button>
+          {(
+            [
+              { v: "month", icon: Grid3X3, label: "חודש" },
+              { v: "week", icon: CalendarDays, label: "שבוע" },
+              { v: "day", icon: Clock, label: "יום" },
+              { v: "list", icon: List, label: "רשימה" },
+            ] as const
+          ).map(({ v, icon: Icon, label }) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              title={`תצוגת ${label}`}
+              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-all ${view === v ? "bg-cream-paper text-navy shadow-card" : "text-ink-soft hover:text-navy"}`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{label}</span>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -540,7 +753,7 @@ export function CalendarClient({
       </div>
 
       {/* ── Calendar body ── */}
-      {view === "month" ? (
+      {view === "month" && (
         <MonthView
           year={year}
           month={month}
@@ -549,7 +762,8 @@ export function CalendarClient({
           onDayClick={handleDayClick}
           onEventClick={handleEventClick}
         />
-      ) : (
+      )}
+      {view === "week" && (
         <WeekView
           weekStart={weekStart}
           tasksByDate={tasksByDate}
@@ -558,6 +772,16 @@ export function CalendarClient({
           onEventClick={handleEventClick}
         />
       )}
+      {view === "day" && (
+        <DayView
+          day={currentDay}
+          tasksByDate={tasksByDate}
+          eventsByDate={eventsByDate}
+          onDayClick={handleDayClick}
+          onEventClick={handleEventClick}
+        />
+      )}
+      {view === "list" && <ListView events={events} onEventClick={handleEventClick} />}
 
       {/* ── Event dialog ── */}
       {dialog.open && (
