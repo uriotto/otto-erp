@@ -328,6 +328,7 @@ export function TimeList({
                 <th className="text-ink-soft px-4 py-3 text-start font-medium">משימה</th>
                 <th className="text-ink-soft px-4 py-3 text-start font-medium">שעות</th>
                 <th className="text-ink-soft px-4 py-3 text-start font-medium">סוג</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">סטטוס</th>
               </tr>
             </thead>
             <tbody className="divide-ink-line/40 divide-y">
@@ -383,6 +384,9 @@ export function TimeList({
                     >
                       {e.billable ? "לחיוב" : "לא לחיוב"}
                     </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <BillingStatusBadge entry={e} />
                   </td>
                 </tr>
               ))}
@@ -624,6 +628,7 @@ function EntryRow({
               לא לחיוב
             </span>
           )}
+          <BillingStatusBadge entry={entry} />
           {noCustomer && (
             <span className="rounded-md border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">
               חסר לקוח
@@ -964,6 +969,40 @@ function EditEntryRow({
         </div>
       </form>
     </div>
+  );
+}
+
+function BillingStatusBadge({ entry }: { entry: TimeEntryItem }) {
+  if (!entry.billable) return null;
+
+  const status = entry.billing_status;
+
+  if (status === "allocated_to_bank") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-xs font-medium text-emerald-700">
+        בנק
+      </span>
+    );
+  }
+  if (status === "overage") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md border border-orange-200 bg-orange-50 px-1.5 py-0.5 text-xs font-medium text-orange-700">
+        עודף
+      </span>
+    );
+  }
+  if (status === "invoiced") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-xs font-medium text-blue-700">
+        חויב
+      </span>
+    );
+  }
+  // pending / null — billable but not yet allocated
+  return (
+    <span className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-xs font-medium text-gray-500">
+      ממתין
+    </span>
   );
 }
 
