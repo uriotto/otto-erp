@@ -4,7 +4,7 @@ import { useState, useTransition, useEffect } from "react";
 import { CalendarDays, CheckCircle, XCircle } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
-import { disconnectGoogleCalendar } from "./actions";
+import { disconnectGoogleCalendar, resyncGoogleCalendar } from "./actions";
 
 type Props = {
   isConnected: boolean;
@@ -34,6 +34,17 @@ export function GoogleCalendarCard({ isConnected, flashSuccess, flashError }: Pr
     });
   };
 
+  const handleResync = () => {
+    startTransition(async () => {
+      const res = await resyncGoogleCalendar();
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(`סנכרון הושלם — ${res.data?.events ?? 0} אירועים`);
+    });
+  };
+
   return (
     <section className="bg-cream-paper border-ink-line rounded-2xl border p-6">
       <div className="mb-5 flex items-center gap-2">
@@ -59,15 +70,26 @@ export function GoogleCalendarCard({ isConnected, flashSuccess, flashError }: Pr
         </div>
 
         {connected ? (
-          <button
-            type="button"
-            onClick={handleDisconnect}
-            disabled={pending}
-            className="border-ink-line text-navy inline-flex items-center gap-2 rounded-lg border bg-white px-4 py-2 text-sm font-semibold transition-colors hover:border-red-400 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {pending ? <Spinner size={14} /> : null}
-            נתק
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleResync}
+              disabled={pending}
+              className="border-ink-line text-navy inline-flex items-center gap-2 rounded-lg border bg-white px-4 py-2 text-sm font-semibold transition-colors hover:border-blue-400 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {pending ? <Spinner size={14} /> : null}
+              סנכרן עכשיו
+            </button>
+            <button
+              type="button"
+              onClick={handleDisconnect}
+              disabled={pending}
+              className="border-ink-line text-navy inline-flex items-center gap-2 rounded-lg border bg-white px-4 py-2 text-sm font-semibold transition-colors hover:border-red-400 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {pending ? <Spinner size={14} /> : null}
+              נתק
+            </button>
+          </div>
         ) : (
           <a
             href="/api/auth/google-calendar"

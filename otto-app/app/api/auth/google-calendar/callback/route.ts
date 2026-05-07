@@ -89,13 +89,7 @@ export async function GET(request: NextRequest) {
     console.error("Google push channel registration failed:", err);
   }
 
-  // Initial import of existing Google Calendar events
-  try {
-    const googleEvents = await importAllEvents(tenantId);
-    await upsertGoogleEventsToOtto(tenantId, googleEvents);
-  } catch (err) {
-    console.error("Google initial import failed:", err);
-  }
+  // Initial import is done via "סנכרן עכשיו" button in settings (too slow for OAuth callback)
 
   return NextResponse.redirect(`${appUrl}/settings?google_connected=1`);
 }

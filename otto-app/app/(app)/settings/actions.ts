@@ -461,6 +461,35 @@ export async function updateTenant(
   return { success: true };
 }
 
+export async function resyncGoogleCalendar(): Promise<ActionResult<{ events: number }>> {
+  const result = await getCurrentTenant();
+  if ("error" in result) return { error: result.error };
+  const { tenantId } = result;
+
+  const { cancelPushChannel, registerPushChannel, importAllEvents, upsertGoogleEventsToOtto } =
+    await import("@/lib/google-calendar");
+
+  try {
+    // Re-register push channel to ensure it's fresh
+    try {
+      await cancelPushChannel(tenantId);
+    } catch {
+      // Ignore errors — channel may already be gone
+    }
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
+    await registerPushChannel(tenantId, `${appUrl}/api/calendar/sync`);
+
+    // Re-import all events — this paginated version saves the sync token properly
+    const googleEvents = await importAllEvents(tenantId);
+    await upsertGoogleEventsToOtto(tenantId, googleEvents);
+
+    revalidatePath("/calendar");
+    return { data: { events: googleEvents.length } };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "סנכרון נכשל" };
+  }
+}
+
 export async function disconnectGoogleCalendar(): Promise<ActionResult> {
   const result = await getCurrentTenant();
   if ("error" in result) return { error: result.error };
