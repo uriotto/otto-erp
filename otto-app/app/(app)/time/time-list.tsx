@@ -27,6 +27,7 @@ import {
   allocateEntryToBank,
   markEntryAsInvoiced,
   resetEntryToPending,
+  createHourlyInvoice,
 } from "./actions";
 import { NewTimeEntryDialog } from "./new-time-entry-dialog";
 import { BulkActionBar } from "@/components/ui/bulk-action-bar";
@@ -49,7 +50,10 @@ export type TimeEntryItem = Pick<
   task_name: string | null;
 };
 
-export type CustomerOpt = Pick<Tables<"customers">, "id" | "name">;
+export type CustomerOpt = Pick<
+  Tables<"customers">,
+  "id" | "name" | "billing_model_default" | "hourly_rate_override"
+>;
 export type ProjectOpt = Pick<Tables<"projects">, "id" | "name" | "customer_id">;
 export type TaskOpt = Pick<Tables<"tasks">, "id" | "title" | "project_id">;
 
@@ -99,18 +103,28 @@ export function TimeList({
   projects,
   tasks,
   customersWithActiveBank,
+  defaultHourlyRate,
 }: {
   entries: TimeEntryItem[];
   customers: CustomerOpt[];
   projects: ProjectOpt[];
   tasks: TaskOpt[];
   customersWithActiveBank: Set<string>;
+  defaultHourlyRate: number;
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
   const toast = useToast();
+  const customerBillingModel = useMemo(
+    () => new Map(customers.map((c) => [c.id, c.billing_model_default])),
+    [customers],
+  );
+  const customerHourlyRate = useMemo(
+    () => new Map(customers.map((c) => [c.id, c.hourly_rate_override ?? defaultHourlyRate])),
+    [customers, defaultHourlyRate],
+  );
   const [showNew, setShowNew] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [view, setView] = useState<View>(() => (searchParams.get("view") as View) || "daily");
@@ -312,6 +326,13 @@ export function TimeList({
         </select>
       </div>
 
+      <HourlyInvoiceBar
+        entries={filtered}
+        customerBillingModel={customerBillingModel}
+        customerHourlyRate={customerHourlyRate}
+        customers={customers}
+      />
+
       {filtered.length === 0 ? (
         <EmptyState onNew={() => setShowNew(true)} />
       ) : view === "table" ? (
@@ -391,7 +412,10 @@ export function TimeList({
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <BillingStatusBadge entry={e} />
+                    <BillingStatusBadge
+                      entry={e}
+                      billingModel={e.customer_id ? customerBillingModel.get(e.customer_id) : null}
+                    />
                   </td>
                 </tr>
               ))}
@@ -421,6 +445,7 @@ export function TimeList({
                     editing={editingId === e.id}
                     onToggleEdit={() => setEditingId((id) => (id === e.id ? null : e.id))}
                     customersWithActiveBank={customersWithActiveBank}
+                    billingModel={e.customer_id ? customerBillingModel.get(e.customer_id) : null}
                   />
                 ))}
               </div>
@@ -563,6 +588,7 @@ function EntryRow({
   editing,
   onToggleEdit,
   customersWithActiveBank,
+  billingModel,
 }: {
   entry: TimeEntryItem;
   customers: CustomerOpt[];
@@ -571,6 +597,7 @@ function EntryRow({
   editing: boolean;
   onToggleEdit: () => void;
   customersWithActiveBank: Set<string>;
+  billingModel?: string | null;
 }) {
   const [assigning, setAssigning] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -604,6 +631,7 @@ function EntryRow({
         tasks={tasks}
         onClose={onToggleEdit}
         customersWithActiveBank={customersWithActiveBank}
+        billingModel={billingModel}
       />
     );
   }
@@ -637,7 +665,7 @@ function EntryRow({
               לא לחיוב
             </span>
           )}
-          <BillingStatusBadge entry={entry} />
+          <BillingStatusBadge entry={entry} billingModel={billingModel} />
           {noCustomer && (
             <span className="rounded-md border border-amber-300 bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">
               חסר לקוח
@@ -719,6 +747,7 @@ function EditEntryRow({
   tasks,
   onClose,
   customersWithActiveBank,
+  billingModel,
 }: {
   entry: TimeEntryItem;
   customers: CustomerOpt[];
@@ -726,6 +755,7 @@ function EditEntryRow({
   tasks: TaskOpt[];
   onClose: () => void;
   customersWithActiveBank: Set<string>;
+  billingModel?: string | null;
 }) {
   const [date, setDate] = useState(dateStr(entry.start_time));
   const [startT, setStartT] = useState(timeStr(entry.start_time));
@@ -991,6 +1021,99 @@ function EditEntryRow({
   );
 }
 
+function HourlyInvoiceBar({
+  entries,
+  customerBillingModel,
+  customerHourlyRate,
+  customers,
+}: {
+  entries: TimeEntryItem[];
+  customerBillingModel: Map<string, string | null | undefined>;
+  customerHourlyRate: Map<string, number>;
+  customers: CustomerOpt[];
+}) {
+  const router = useRouter();
+  const toast = useToast();
+  const [pending, startTransition] = useTransition();
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+
+  const hourlyCustomersWithPending = useMemo(() => {
+    const map = new Map<string, { name: string; minutes: number; rate: number }>();
+    for (const e of entries) {
+      if (!e.customer_id) continue;
+      if (!e.billable) continue;
+      if (
+        e.billing_status !== "pending" &&
+        e.billing_status !== "overage" &&
+        e.billing_status !== null
+      )
+        continue;
+      const model = customerBillingModel.get(e.customer_id);
+      if (model !== "hourly") continue;
+      const existing = map.get(e.customer_id);
+      const name = customers.find((c) => c.id === e.customer_id)?.name ?? "לקוח";
+      const rate = customerHourlyRate.get(e.customer_id) ?? 0;
+      map.set(e.customer_id, {
+        name,
+        minutes: (existing?.minutes ?? 0) + (e.duration_minutes ?? 0),
+        rate,
+      });
+    }
+    return Array.from(map.entries());
+  }, [entries, customerBillingModel, customerHourlyRate, customers]);
+
+  if (hourlyCustomersWithPending.length === 0) return null;
+
+  function handleInvoice(customerId: string) {
+    setLoadingId(customerId);
+    startTransition(async () => {
+      const res = await createHourlyInvoice(customerId);
+      setLoadingId(null);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      const hours = res.hours ?? 0;
+      const amount = res.amount ?? 0;
+      toast.success(
+        `חויבו ${hours.toFixed(1)} שעות${amount > 0 ? ` = ₪${amount.toLocaleString("he-IL")}` : ""}`,
+      );
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
+      <div className="mb-2 text-xs font-semibold text-amber-800">לקוחות עם שעות ממתינות לחיוב</div>
+      <div className="flex flex-wrap gap-2">
+        {hourlyCustomersWithPending.map(([customerId, { name, minutes, rate }]) => {
+          const hours = Math.round((minutes / 60) * 10) / 10;
+          const amount = Math.round((minutes / 60) * rate);
+          return (
+            <div
+              key={customerId}
+              className="flex items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-2"
+            >
+              <span className="text-sm font-medium text-amber-900">{name}</span>
+              <span className="text-xs text-amber-700" dir="ltr">
+                {hours}h {rate > 0 ? `= ₪${amount.toLocaleString("he-IL")}` : ""}
+              </span>
+              <button
+                type="button"
+                onClick={() => handleInvoice(customerId)}
+                disabled={pending}
+                className="rounded-md bg-amber-600 px-2 py-1 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+              >
+                {loadingId === customerId ? <Spinner size={12} /> : "הפק חשבונית"}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function BillingStatusActions({
   entry,
   hasActiveBank,
@@ -1090,7 +1213,13 @@ function BillingStatusActions({
   );
 }
 
-function BillingStatusBadge({ entry }: { entry: TimeEntryItem }) {
+function BillingStatusBadge({
+  entry,
+  billingModel,
+}: {
+  entry: TimeEntryItem;
+  billingModel?: string | null;
+}) {
   if (!entry.billable) return null;
 
   const status = entry.billing_status;
@@ -1116,7 +1245,22 @@ function BillingStatusBadge({ entry }: { entry: TimeEntryItem }) {
       </span>
     );
   }
-  // pending / null — billable but not yet allocated
+
+  // pending / null
+  if (billingModel === "hourly") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-700">
+        ממתין לחשבונית
+      </span>
+    );
+  }
+  if (billingModel === "hour_bank") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-xs font-medium text-gray-500">
+        ממתין לבנק
+      </span>
+    );
+  }
   return (
     <span className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-xs font-medium text-gray-500">
       ממתין

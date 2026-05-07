@@ -8,252 +8,6 @@ export type Database = {
   };
   public: {
     Tables: {
-      booking_types: {
-        Row: {
-          id: string;
-          tenant_id: string;
-          slug: string;
-          title: string;
-          description: string | null;
-          duration_minutes: number;
-          is_active: boolean;
-          color: string;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          tenant_id: string;
-          slug: string;
-          title: string;
-          description?: string | null;
-          duration_minutes?: number;
-          is_active?: boolean;
-          color?: string;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          tenant_id?: string;
-          slug?: string;
-          title?: string;
-          description?: string | null;
-          duration_minutes?: number;
-          is_active?: boolean;
-          color?: string;
-          created_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "booking_types_tenant_id_fkey";
-            columns: ["tenant_id"];
-            isOneToOne: false;
-            referencedRelation: "tenants";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
-      booking_slots: {
-        Row: {
-          id: string;
-          tenant_id: string;
-          booking_type_id: string;
-          start_at: string;
-          end_at: string;
-          guest_name: string;
-          guest_email: string;
-          guest_phone: string | null;
-          notes: string | null;
-          status: string;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          tenant_id: string;
-          booking_type_id: string;
-          start_at: string;
-          end_at: string;
-          guest_name: string;
-          guest_email: string;
-          guest_phone?: string | null;
-          notes?: string | null;
-          status?: string;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          tenant_id?: string;
-          booking_type_id?: string;
-          start_at?: string;
-          end_at?: string;
-          guest_name?: string;
-          guest_email?: string;
-          guest_phone?: string | null;
-          notes?: string | null;
-          status?: string;
-          created_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "booking_slots_tenant_id_fkey";
-            columns: ["tenant_id"];
-            isOneToOne: false;
-            referencedRelation: "tenants";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "booking_slots_booking_type_id_fkey";
-            columns: ["booking_type_id"];
-            isOneToOne: false;
-            referencedRelation: "booking_types";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
-      agent_invocations: {
-        Row: {
-          id: string;
-          tenant_id: string;
-          agent_id: string;
-          context_type: string;
-          context_id: string;
-          status: string;
-          result_html: string | null;
-          error: string | null;
-          created_at: string;
-          completed_at: string | null;
-        };
-        Insert: {
-          id?: string;
-          tenant_id: string;
-          agent_id: string;
-          context_type: string;
-          context_id: string;
-          status?: string;
-          result_html?: string | null;
-          error?: string | null;
-          created_at?: string;
-          completed_at?: string | null;
-        };
-        Update: {
-          id?: string;
-          tenant_id?: string;
-          agent_id?: string;
-          context_type?: string;
-          context_id?: string;
-          status?: string;
-          result_html?: string | null;
-          error?: string | null;
-          created_at?: string;
-          completed_at?: string | null;
-        };
-        Relationships: [];
-      };
-      external_agents: {
-        Row: {
-          id: string;
-          tenant_id: string;
-          name: string;
-          description: string | null;
-          webhook_url: string;
-          trigger_contexts: string[];
-          icon: string;
-          is_active: boolean;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          tenant_id: string;
-          name: string;
-          description?: string | null;
-          webhook_url: string;
-          trigger_contexts?: string[];
-          icon?: string;
-          is_active?: boolean;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          tenant_id?: string;
-          name?: string;
-          description?: string | null;
-          webhook_url?: string;
-          trigger_contexts?: string[];
-          icon?: string;
-          is_active?: boolean;
-          created_at?: string;
-        };
-        Relationships: [];
-      };
-      events: {
-        Row: {
-          id: string;
-          tenant_id: string;
-          customer_id: string | null;
-          project_id: string | null;
-          title: string;
-          description: string | null;
-          start_at: string;
-          end_at: string;
-          all_day: boolean;
-          location: string | null;
-          type: string;
-          google_event_id: string | null;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          tenant_id: string;
-          customer_id?: string | null;
-          project_id?: string | null;
-          title: string;
-          description?: string | null;
-          start_at: string;
-          end_at: string;
-          all_day?: boolean;
-          location?: string | null;
-          type?: string;
-          google_event_id?: string | null;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          tenant_id?: string;
-          customer_id?: string | null;
-          project_id?: string | null;
-          title?: string;
-          description?: string | null;
-          start_at?: string;
-          end_at?: string;
-          all_day?: boolean;
-          location?: string | null;
-          type?: string;
-          google_event_id?: string | null;
-          created_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "events_tenant_id_fkey";
-            columns: ["tenant_id"];
-            isOneToOne: false;
-            referencedRelation: "tenants";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "events_customer_id_fkey";
-            columns: ["customer_id"];
-            isOneToOne: false;
-            referencedRelation: "customers";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "events_project_id_fkey";
-            columns: ["project_id"];
-            isOneToOne: false;
-            referencedRelation: "projects";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
       activities: {
         Row: {
           body: string | null;
@@ -331,6 +85,161 @@ export type Database = {
           },
         ];
       };
+      agent_invocations: {
+        Row: {
+          agent_id: string;
+          completed_at: string | null;
+          context_id: string;
+          context_type: string;
+          created_at: string;
+          error: string | null;
+          id: string;
+          result_html: string | null;
+          status: string;
+          tenant_id: string;
+        };
+        Insert: {
+          agent_id: string;
+          completed_at?: string | null;
+          context_id: string;
+          context_type: string;
+          created_at?: string;
+          error?: string | null;
+          id?: string;
+          result_html?: string | null;
+          status?: string;
+          tenant_id: string;
+        };
+        Update: {
+          agent_id?: string;
+          completed_at?: string | null;
+          context_id?: string;
+          context_type?: string;
+          created_at?: string;
+          error?: string | null;
+          id?: string;
+          result_html?: string | null;
+          status?: string;
+          tenant_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "agent_invocations_agent_id_fkey";
+            columns: ["agent_id"];
+            isOneToOne: false;
+            referencedRelation: "external_agents";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "agent_invocations_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      booking_slots: {
+        Row: {
+          booking_type_id: string;
+          created_at: string;
+          end_at: string;
+          guest_email: string;
+          guest_name: string;
+          guest_phone: string | null;
+          id: string;
+          notes: string | null;
+          start_at: string;
+          status: string;
+          tenant_id: string;
+        };
+        Insert: {
+          booking_type_id: string;
+          created_at?: string;
+          end_at: string;
+          guest_email: string;
+          guest_name: string;
+          guest_phone?: string | null;
+          id?: string;
+          notes?: string | null;
+          start_at: string;
+          status?: string;
+          tenant_id: string;
+        };
+        Update: {
+          booking_type_id?: string;
+          created_at?: string;
+          end_at?: string;
+          guest_email?: string;
+          guest_name?: string;
+          guest_phone?: string | null;
+          id?: string;
+          notes?: string | null;
+          start_at?: string;
+          status?: string;
+          tenant_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "booking_slots_booking_type_id_fkey";
+            columns: ["booking_type_id"];
+            isOneToOne: false;
+            referencedRelation: "booking_types";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "booking_slots_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      booking_types: {
+        Row: {
+          color: string;
+          created_at: string;
+          description: string | null;
+          duration_minutes: number;
+          id: string;
+          is_active: boolean;
+          slug: string;
+          tenant_id: string;
+          title: string;
+        };
+        Insert: {
+          color?: string;
+          created_at?: string;
+          description?: string | null;
+          duration_minutes?: number;
+          id?: string;
+          is_active?: boolean;
+          slug: string;
+          tenant_id: string;
+          title: string;
+        };
+        Update: {
+          color?: string;
+          created_at?: string;
+          description?: string | null;
+          duration_minutes?: number;
+          id?: string;
+          is_active?: boolean;
+          slug?: string;
+          tenant_id?: string;
+          title?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "booking_types_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       customer_credentials: {
         Row: {
           created_at: string;
@@ -391,6 +300,7 @@ export type Database = {
           address: string | null;
           billing_model_default: string | null;
           company: string | null;
+          company_registration_number: string | null;
           created_at: string;
           email: string | null;
           hourly_rate_override: number | null;
@@ -412,6 +322,7 @@ export type Database = {
           address?: string | null;
           billing_model_default?: string | null;
           company?: string | null;
+          company_registration_number?: string | null;
           created_at?: string;
           email?: string | null;
           hourly_rate_override?: number | null;
@@ -433,6 +344,7 @@ export type Database = {
           address?: string | null;
           billing_model_default?: string | null;
           company?: string | null;
+          company_registration_number?: string | null;
           created_at?: string;
           email?: string | null;
           hourly_rate_override?: number | null;
@@ -566,65 +478,75 @@ export type Database = {
           },
         ];
       };
-      reports: {
+      events: {
         Row: {
-          id: string;
-          tenant_id: string;
-          customer_id: string | null;
-          type: string;
-          period_start: string;
-          period_end: string;
-          title: string;
-          summary: string | null;
-          status: string;
-          visible_to_client: boolean;
-          data: Record<string, unknown> | null;
+          all_day: boolean;
           created_at: string;
-          approved_at: string | null;
+          customer_id: string | null;
+          description: string | null;
+          end_at: string;
+          google_event_id: string | null;
+          id: string;
+          location: string | null;
+          project_id: string | null;
+          start_at: string;
+          tenant_id: string;
+          title: string;
+          type: string;
+          updated_at: string | null;
         };
         Insert: {
-          id?: string;
-          tenant_id: string;
-          customer_id?: string | null;
-          type?: string;
-          period_start: string;
-          period_end: string;
-          title: string;
-          summary?: string | null;
-          status?: string;
-          visible_to_client?: boolean;
-          data?: Record<string, unknown> | null;
+          all_day?: boolean;
           created_at?: string;
-          approved_at?: string | null;
+          customer_id?: string | null;
+          description?: string | null;
+          end_at: string;
+          google_event_id?: string | null;
+          id?: string;
+          location?: string | null;
+          project_id?: string | null;
+          start_at: string;
+          tenant_id: string;
+          title: string;
+          type?: string;
+          updated_at?: string | null;
         };
         Update: {
-          id?: string;
-          tenant_id?: string;
-          customer_id?: string | null;
-          type?: string;
-          period_start?: string;
-          period_end?: string;
-          title?: string;
-          summary?: string | null;
-          status?: string;
-          visible_to_client?: boolean;
-          data?: Record<string, unknown> | null;
+          all_day?: boolean;
           created_at?: string;
-          approved_at?: string | null;
+          customer_id?: string | null;
+          description?: string | null;
+          end_at?: string;
+          google_event_id?: string | null;
+          id?: string;
+          location?: string | null;
+          project_id?: string | null;
+          start_at?: string;
+          tenant_id?: string;
+          title?: string;
+          type?: string;
+          updated_at?: string | null;
         };
         Relationships: [
           {
-            foreignKeyName: "reports_tenant_id_fkey";
-            columns: ["tenant_id"];
-            isOneToOne: false;
-            referencedRelation: "tenants";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "reports_customer_id_fkey";
+            foreignKeyName: "events_customer_id_fkey";
             columns: ["customer_id"];
             isOneToOne: false;
             referencedRelation: "customers";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "events_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "events_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
             referencedColumns: ["id"];
           },
         ];
@@ -719,6 +641,50 @@ export type Database = {
           },
           {
             foreignKeyName: "expenses_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      external_agents: {
+        Row: {
+          created_at: string;
+          description: string | null;
+          icon: string;
+          id: string;
+          is_active: boolean;
+          name: string;
+          tenant_id: string;
+          trigger_contexts: string[];
+          webhook_url: string;
+        };
+        Insert: {
+          created_at?: string;
+          description?: string | null;
+          icon?: string;
+          id?: string;
+          is_active?: boolean;
+          name: string;
+          tenant_id: string;
+          trigger_contexts?: string[];
+          webhook_url: string;
+        };
+        Update: {
+          created_at?: string;
+          description?: string | null;
+          icon?: string;
+          id?: string;
+          is_active?: boolean;
+          name?: string;
+          tenant_id?: string;
+          trigger_contexts?: string[];
+          webhook_url?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "external_agents_tenant_id_fkey";
             columns: ["tenant_id"];
             isOneToOne: false;
             referencedRelation: "tenants";
@@ -1413,76 +1379,6 @@ export type Database = {
           },
         ];
       };
-      recordings: {
-        Row: {
-          id: string;
-          tenant_id: string;
-          customer_id: string | null;
-          project_id: string | null;
-          title: string;
-          duration_seconds: number | null;
-          storage_path: string | null;
-          file_size: number | null;
-          status: string;
-          transcript: string | null;
-          summary: string | null;
-          recorded_at: string;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          tenant_id: string;
-          customer_id?: string | null;
-          project_id?: string | null;
-          title: string;
-          duration_seconds?: number | null;
-          storage_path?: string | null;
-          file_size?: number | null;
-          status?: string;
-          transcript?: string | null;
-          summary?: string | null;
-          recorded_at?: string;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          tenant_id?: string;
-          customer_id?: string | null;
-          project_id?: string | null;
-          title?: string;
-          duration_seconds?: number | null;
-          storage_path?: string | null;
-          file_size?: number | null;
-          status?: string;
-          transcript?: string | null;
-          summary?: string | null;
-          recorded_at?: string;
-          created_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "recordings_customer_id_fkey";
-            columns: ["customer_id"];
-            isOneToOne: false;
-            referencedRelation: "customers";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "recordings_project_id_fkey";
-            columns: ["project_id"];
-            isOneToOne: false;
-            referencedRelation: "projects";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "recordings_tenant_id_fkey";
-            columns: ["tenant_id"];
-            isOneToOne: false;
-            referencedRelation: "tenants";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
       projects: {
         Row: {
           billing_model: Database["public"]["Enums"]["project_billing_model"];
@@ -1682,6 +1578,139 @@ export type Database = {
           },
         ];
       };
+      recordings: {
+        Row: {
+          created_at: string;
+          customer_id: string | null;
+          duration_seconds: number | null;
+          file_size: number | null;
+          id: string;
+          project_id: string | null;
+          recorded_at: string;
+          status: string;
+          storage_path: string | null;
+          summary: string | null;
+          tenant_id: string;
+          title: string;
+          transcript: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          customer_id?: string | null;
+          duration_seconds?: number | null;
+          file_size?: number | null;
+          id?: string;
+          project_id?: string | null;
+          recorded_at?: string;
+          status?: string;
+          storage_path?: string | null;
+          summary?: string | null;
+          tenant_id: string;
+          title: string;
+          transcript?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          customer_id?: string | null;
+          duration_seconds?: number | null;
+          file_size?: number | null;
+          id?: string;
+          project_id?: string | null;
+          recorded_at?: string;
+          status?: string;
+          storage_path?: string | null;
+          summary?: string | null;
+          tenant_id?: string;
+          title?: string;
+          transcript?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "recordings_customer_id_fkey";
+            columns: ["customer_id"];
+            isOneToOne: false;
+            referencedRelation: "customers";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "recordings_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "recordings_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      reports: {
+        Row: {
+          approved_at: string | null;
+          created_at: string;
+          customer_id: string | null;
+          data: Json | null;
+          id: string;
+          period_end: string;
+          period_start: string;
+          status: string;
+          summary: string | null;
+          tenant_id: string;
+          title: string;
+          type: string;
+          visible_to_client: boolean;
+        };
+        Insert: {
+          approved_at?: string | null;
+          created_at?: string;
+          customer_id?: string | null;
+          data?: Json | null;
+          id?: string;
+          period_end: string;
+          period_start: string;
+          status?: string;
+          summary?: string | null;
+          tenant_id: string;
+          title: string;
+          type?: string;
+          visible_to_client?: boolean;
+        };
+        Update: {
+          approved_at?: string | null;
+          created_at?: string;
+          customer_id?: string | null;
+          data?: Json | null;
+          id?: string;
+          period_end?: string;
+          period_start?: string;
+          status?: string;
+          summary?: string | null;
+          tenant_id?: string;
+          title?: string;
+          type?: string;
+          visible_to_client?: boolean;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "reports_customer_id_fkey";
+            columns: ["customer_id"];
+            isOneToOne: false;
+            referencedRelation: "customers";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "reports_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       tasks: {
         Row: {
           assigned_to: string | null;
@@ -1815,6 +1844,13 @@ export type Database = {
           default_hour_bank_expiry_months: number;
           default_hour_bank_rate: number;
           default_hourly_rate: number;
+          google_access_token: string | null;
+          google_calendar_id: string | null;
+          google_channel_id: string | null;
+          google_channel_resource_id: string | null;
+          google_refresh_token: string | null;
+          google_sync_token: string | null;
+          google_token_expiry: string | null;
           make_webhook_url: string | null;
           tenant_id: string;
           updated_at: string;
@@ -1826,6 +1862,13 @@ export type Database = {
           default_hour_bank_expiry_months?: number;
           default_hour_bank_rate?: number;
           default_hourly_rate?: number;
+          google_access_token?: string | null;
+          google_calendar_id?: string | null;
+          google_channel_id?: string | null;
+          google_channel_resource_id?: string | null;
+          google_refresh_token?: string | null;
+          google_sync_token?: string | null;
+          google_token_expiry?: string | null;
           make_webhook_url?: string | null;
           tenant_id: string;
           updated_at?: string;
@@ -1837,6 +1880,13 @@ export type Database = {
           default_hour_bank_expiry_months?: number;
           default_hour_bank_rate?: number;
           default_hourly_rate?: number;
+          google_access_token?: string | null;
+          google_calendar_id?: string | null;
+          google_channel_id?: string | null;
+          google_channel_resource_id?: string | null;
+          google_refresh_token?: string | null;
+          google_sync_token?: string | null;
+          google_token_expiry?: string | null;
           make_webhook_url?: string | null;
           tenant_id?: string;
           updated_at?: string;
@@ -2271,6 +2321,10 @@ export type Database = {
           entry_id: string;
           status: Database["public"]["Enums"]["time_entry_billing_status"];
         }[];
+      };
+      backfill_pending_entries_to_bank: {
+        Args: { p_bank_id: string };
+        Returns: number;
       };
       check_bank_alerts: { Args: { p_bank_id: string }; Returns: undefined };
       convert_lead_to_customer: { Args: { p_lead_id: string }; Returns: string };

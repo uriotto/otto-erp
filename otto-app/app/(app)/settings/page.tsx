@@ -9,12 +9,18 @@ import { ExportCard } from "./export-card";
 import { DangerZoneCard } from "./danger-zone-card";
 import { BillingCard } from "./billing-card";
 import { IntegrationsCard } from "./integrations-card";
+import { GoogleCalendarCard } from "./google-calendar-card";
 import { getBillingSettings, listTagsUsage } from "./actions";
 
 export const metadata = { title: "הגדרות — OTTO" };
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ google_connected?: string; google_error?: string }>;
+}) {
   const supabase = await createClient();
+  const params = await searchParams;
 
   const {
     data: { user },
@@ -40,6 +46,16 @@ export default async function SettingsPage() {
 
   const billingResult = profile.role === "admin" ? await getBillingSettings() : null;
   const billing = billingResult?.data ?? null;
+
+  const googleConnected =
+    profile.role === "admin"
+      ? await supabase
+          .from("tenant_settings")
+          .select("google_refresh_token")
+          .eq("tenant_id", profile.tenant_id)
+          .single()
+          .then(({ data }) => !!data?.google_refresh_token)
+      : false;
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -70,6 +86,24 @@ export default async function SettingsPage() {
 
         {profile.role === "admin" && billing && (
           <IntegrationsCard initialUrl={billing.make_webhook_url} />
+        )}
+
+        {profile.role === "admin" && (
+          <GoogleCalendarCard
+            isConnected={googleConnected}
+            flashSuccess={
+              params.google_connected === "1" ? "Google Calendar חובר בהצלחה" : undefined
+            }
+            flashError={
+              params.google_error
+                ? params.google_error === "access_denied"
+                  ? "הגישה נדחתה על ידי Google"
+                  : params.google_error === "no_refresh_token"
+                    ? "נסה/י שוב — Google לא החזיר refresh token"
+                    : "שגיאה בחיבור Google Calendar"
+                : undefined
+            }
+          />
         )}
 
         <TagsCard initialTags={tags} />

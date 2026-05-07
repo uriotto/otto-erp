@@ -222,7 +222,7 @@ export async function generateMonthlyReport(
       period_end: periodEnd,
       title: `דוח חודשי — ${customer.name} — ${MONTH_NAMES[month - 1]} ${year}`,
       status: "pending_review",
-      data: reportData as unknown as Record<string, unknown>,
+      data: reportData as unknown as import("@/lib/supabase/types").Json,
     })
     .select("id")
     .single();

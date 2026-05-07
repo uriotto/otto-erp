@@ -50,8 +50,9 @@ export function NewCustomerDialog({ onClose }: { onClose: () => void }) {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="חברה" name="company" />
-            <Field label="אתר" name="website" type="url" error={state.fieldErrors?.website?.[0]} />
+            <Field label="ח.פ / ע.מ" name="company_registration_number" />
           </div>
+          <Field label="אתר" name="website" type="url" error={state.fieldErrors?.website?.[0]} />
           <Field label="כתובת" name="address" />
 
           <div>

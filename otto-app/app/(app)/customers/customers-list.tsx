@@ -17,6 +17,7 @@ import {
   Trash2,
   Pencil,
   ChevronDown,
+  MessageCircle,
 } from "lucide-react";
 import type { Tables } from "@/lib/supabase/types";
 import { NewCustomerDialog } from "./new-customer-dialog";
@@ -46,6 +47,10 @@ type CustomerStatus = (typeof STATUS_OPTIONS)[number]["value"];
 
 function getStatusOption(status: string | null) {
   return STATUS_OPTIONS.find((s) => s.value === status) ?? STATUS_OPTIONS[0];
+}
+
+function toWaNumber(phone: string): string {
+  return phone.replace(/\D/g, "");
 }
 
 const BILLING_LABELS: Record<string, string> = {
@@ -379,6 +384,7 @@ export function CustomersList({
                 <th className="text-ink-soft px-4 py-3 text-start font-medium">שם</th>
                 <th className="text-ink-soft px-4 py-3 text-start font-medium">חברה</th>
                 <th className="text-ink-soft px-4 py-3 text-start font-medium">אימייל</th>
+                <th className="text-ink-soft px-4 py-3 text-start font-medium">טלפון</th>
                 <th className="text-ink-soft px-4 py-3 text-start font-medium">מודל חיוב</th>
                 <th className="text-ink-soft px-4 py-3 text-start font-medium">סטטוס</th>
                 <th className="text-ink-soft px-4 py-3 text-start font-medium">תגיות</th>
@@ -676,6 +682,33 @@ function TableRow({
       <td className="text-ink-soft px-4 py-3">
         <InlineEditCell value={c.email ?? ""} onSave={(v) => save("email", v)} type="email" />
       </td>
+      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+        {c.phone ? (
+          <div className="flex items-center gap-1">
+            <span className="text-ink-soft text-sm" dir="ltr">
+              {c.phone}
+            </span>
+            <a
+              href={`tel:${c.phone}`}
+              className="text-ink-faded hover:text-navy rounded p-1 transition-colors"
+              title="חייג"
+            >
+              <Phone size={13} />
+            </a>
+            <a
+              href={`https://wa.me/${toWaNumber(c.phone)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded p-1 text-green-600 transition-colors hover:text-green-700"
+              title="וואטסאפ"
+            >
+              <MessageCircle size={13} />
+            </a>
+          </div>
+        ) : (
+          <span className="text-ink-faded text-xs">—</span>
+        )}
+      </td>
       <td className="px-4 py-3">
         <InlineBillingCell
           value={c.billing_model_default}
@@ -937,7 +970,14 @@ function CustomerCard({
               </div>
             )}
           </div>
-          <StatusPill status={c.status} />
+          <InlineStatusCell
+            status={c.status}
+            onSave={async (val) => {
+              const result = await quickUpdateCustomer(c.id, { status: val });
+              if (result.error) toast.error(result.error);
+              else onSaved();
+            }}
+          />
         </div>
 
         <div className="space-y-1">
@@ -948,9 +988,30 @@ function CustomerCard({
             </div>
           )}
           {c.phone && (
-            <div className="text-ink-soft flex items-center gap-2 text-xs">
-              <Phone size={12} />
-              {c.phone}
+            <div
+              className="text-ink-soft flex items-center gap-1.5 text-xs"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Phone size={12} className="shrink-0" />
+              <span dir="ltr" className="flex-1">
+                {c.phone}
+              </span>
+              <a
+                href={`tel:${c.phone}`}
+                className="text-ink-faded hover:text-navy rounded p-0.5 transition-colors"
+                title="חייג"
+              >
+                <Phone size={11} />
+              </a>
+              <a
+                href={`https://wa.me/${toWaNumber(c.phone)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded p-0.5 text-green-600 transition-colors hover:text-green-700"
+                title="וואטסאפ"
+              >
+                <MessageCircle size={11} />
+              </a>
             </div>
           )}
         </div>

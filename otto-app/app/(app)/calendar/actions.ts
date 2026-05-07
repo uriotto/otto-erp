@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { createGoogleEvent, updateGoogleEvent, deleteGoogleEvent } from "@/lib/google-calendar";
 
 const EVENT_TYPES = ["meeting", "call", "deadline", "other"] as const;
 
@@ -82,6 +83,21 @@ export async function createEvent(
 
   if (error) return { error: error.message };
 
+  // Push to Google Calendar (fire-and-forget)
+  try {
+    const googleEventId = await createGoogleEvent(profile.tenant_id, {
+      title: d.title,
+      description: nullIfEmpty(d.description),
+      location: nullIfEmpty(d.location),
+      start_at: d.start_at,
+      end_at: d.end_at,
+      all_day: d.all_day,
+    });
+    await supabase.from("events").update({ google_event_id: googleEventId }).eq("id", ev.id);
+  } catch (err) {
+    console.error("Google Calendar createEvent failed:", err);
+  }
+
   revalidatePath("/calendar");
   return { success: true, eventId: ev.id };
 }
@@ -106,6 +122,13 @@ export async function updateEvent(
 
   const d = parsed.data;
 
+  const { data: existing } = await supabase
+    .from("events")
+    .select("google_event_id")
+    .eq("id", id)
+    .eq("tenant_id", profile.tenant_id)
+    .single();
+
   const { error } = await supabase
     .from("events")
     .update({
@@ -124,6 +147,22 @@ export async function updateEvent(
 
   if (error) return { error: error.message };
 
+  // Push update to Google Calendar (fire-and-forget)
+  if (existing?.google_event_id) {
+    try {
+      await updateGoogleEvent(profile.tenant_id, existing.google_event_id, {
+        title: d.title,
+        description: nullIfEmpty(d.description),
+        location: nullIfEmpty(d.location),
+        start_at: d.start_at,
+        end_at: d.end_at,
+        all_day: d.all_day,
+      });
+    } catch (err) {
+      console.error("Google Calendar updateEvent failed:", err);
+    }
+  }
+
   revalidatePath("/calendar");
   return { success: true };
 }
@@ -132,6 +171,14 @@ export async function deleteEvent(id: string): Promise<{ error?: string }> {
   const { supabase, profile } = await getTenant();
   if (!profile) return { error: "לא מחובר" };
 
+  // Fetch google_event_id before deleting
+  const { data: existing } = await supabase
+    .from("events")
+    .select("google_event_id")
+    .eq("id", id)
+    .eq("tenant_id", profile.tenant_id)
+    .single();
+
   const { error } = await supabase
     .from("events")
     .delete()
@@ -139,6 +186,15 @@ export async function deleteEvent(id: string): Promise<{ error?: string }> {
     .eq("tenant_id", profile.tenant_id);
 
   if (error) return { error: error.message };
+
+  // Delete from Google Calendar (fire-and-forget)
+  if (existing?.google_event_id) {
+    try {
+      await deleteGoogleEvent(profile.tenant_id, existing.google_event_id);
+    } catch (err) {
+      console.error("Google Calendar deleteEvent failed:", err);
+    }
+  }
 
   revalidatePath("/calendar");
   return {};

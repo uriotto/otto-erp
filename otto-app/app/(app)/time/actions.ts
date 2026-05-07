@@ -301,9 +301,7 @@ export async function bulkDeleteTimeEntries(
   return { deleted: count ?? ids.length };
 }
 
-export async function allocateEntryToBank(
-  entryId: string,
-): Promise<{ error?: string }> {
+export async function allocateEntryToBank(entryId: string): Promise<{ error?: string }> {
   const { supabase, profile } = await getTenant();
   if (!profile) return { error: "לא מחובר" };
 
@@ -317,9 +315,7 @@ export async function allocateEntryToBank(
   return {};
 }
 
-export async function markEntryAsInvoiced(
-  entryId: string,
-): Promise<{ error?: string }> {
+export async function markEntryAsInvoiced(entryId: string): Promise<{ error?: string }> {
   const { supabase, profile } = await getTenant();
   if (!profile) return { error: "לא מחובר" };
 
@@ -335,9 +331,7 @@ export async function markEntryAsInvoiced(
   return {};
 }
 
-export async function resetEntryToPending(
-  entryId: string,
-): Promise<{ error?: string }> {
+export async function resetEntryToPending(entryId: string): Promise<{ error?: string }> {
   const { supabase, profile } = await getTenant();
   if (!profile) return { error: "לא מחובר" };
 
@@ -351,6 +345,56 @@ export async function resetEntryToPending(
 
   revalidatePath("/time");
   return {};
+}
+
+export async function createHourlyInvoice(
+  customerId: string,
+): Promise<{ error?: string; hours?: number; amount?: number; count?: number }> {
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { error: "לא מחובר" };
+
+  const { data: customer } = await supabase
+    .from("customers")
+    .select("hourly_rate_override")
+    .eq("id", customerId)
+    .eq("tenant_id", profile.tenant_id)
+    .maybeSingle();
+
+  const { data: settings } = await supabase
+    .from("tenant_settings")
+    .select("default_hourly_rate")
+    .maybeSingle();
+
+  const hourlyRate = customer?.hourly_rate_override ?? settings?.default_hourly_rate ?? 0;
+
+  const { data: entries, error: fetchError } = await supabase
+    .from("time_entries")
+    .select("id, duration_minutes")
+    .eq("customer_id", customerId)
+    .eq("tenant_id", profile.tenant_id)
+    .eq("billable", true)
+    .in("billing_status", ["pending", "overage"]);
+
+  if (fetchError) return { error: fetchError.message };
+  if (!entries || entries.length === 0) return { error: "אין שעות ממתינות לחיוב" };
+
+  const totalMinutes = entries.reduce((sum, e) => sum + (e.duration_minutes ?? 0), 0);
+  const ids = entries.map((e) => e.id);
+
+  const { error: updateError } = await supabase
+    .from("time_entries")
+    .update({ billing_status: "invoiced" })
+    .in("id", ids)
+    .eq("tenant_id", profile.tenant_id);
+
+  if (updateError) return { error: updateError.message };
+
+  revalidatePath("/time");
+  revalidatePath(`/customers/${customerId}`);
+
+  const hours = Math.round((totalMinutes / 60) * 100) / 100;
+  const amount = Math.round(hours * hourlyRate);
+  return { hours, amount, count: entries.length };
 }
 
 export async function bulkToggleBillable(

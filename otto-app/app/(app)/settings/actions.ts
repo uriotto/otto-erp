@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { cancelPushChannel } from "@/lib/google-calendar";
 
 type ActionResult<T = unknown> = { error?: string; data?: T };
 
@@ -458,4 +459,35 @@ export async function updateTenant(
   revalidatePath("/settings");
   revalidatePath("/", "layout");
   return { success: true };
+}
+
+export async function disconnectGoogleCalendar(): Promise<ActionResult> {
+  const result = await getCurrentTenant();
+  if ("error" in result) return { error: result.error };
+  const { supabase, tenantId, role } = result;
+
+  if (role !== "admin") return { error: "רק מנהלים יכולים לנתק אינטגרציות" };
+
+  try {
+    await cancelPushChannel(tenantId);
+  } catch (err) {
+    console.error("Google push channel cancel failed:", err);
+  }
+
+  const { error } = await supabase
+    .from("tenant_settings")
+    .update({
+      google_refresh_token: null,
+      google_access_token: null,
+      google_token_expiry: null,
+      google_sync_token: null,
+      google_channel_id: null,
+      google_channel_resource_id: null,
+    })
+    .eq("tenant_id", tenantId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/settings");
+  return { data: true };
 }
