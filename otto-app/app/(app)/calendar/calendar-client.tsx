@@ -135,7 +135,7 @@ function EventChip({ event, onClick }: { event: CalendarEvent; onClick: () => vo
         e.stopPropagation();
         onClick();
       }}
-      className="flex w-full items-center gap-1 truncate rounded bg-amber-50 px-1.5 py-0.5 text-start text-[11px] leading-tight font-medium text-amber-800 transition-colors hover:bg-amber-100"
+      className="flex flex-1 w-full items-center gap-1 truncate rounded bg-amber-50 px-1.5 py-0.5 text-start text-[11px] leading-tight font-medium text-amber-800 transition-colors hover:bg-amber-100"
     >
       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
       {startTime && (
@@ -344,7 +344,7 @@ function WeekView({
                 return (
                   <div
                     key={d.toISOString()}
-                    className={`border-ink-line min-w-0 cursor-pointer space-y-0.5 overflow-hidden border-s p-0.5 select-none ${isHighlighted ? "bg-navy/10" : "hover:bg-cream-deep/20"}`}
+                    className={`border-ink-line flex min-w-0 cursor-pointer flex-col gap-0.5 overflow-hidden border-s p-0.5 select-none ${isHighlighted ? "bg-navy/10" : "hover:bg-cream-deep/20"}`}
                     onMouseDown={(e) => {
                       e.preventDefault();
                       onDragStart(key, h);
@@ -442,7 +442,7 @@ function DayView({
             <div className="text-ink-faded w-12 shrink-0 py-1 pe-2 text-end text-[11px]">
               {String(h).padStart(2, "0")}:00
             </div>
-            <div className="flex-1 space-y-0.5 p-0.5">
+            <div className="flex flex-1 flex-col gap-0.5 p-0.5">
               {hourEvents.map((ev) => (
                 <EventChip key={ev.id} event={ev} onClick={() => onEventClick(ev)} />
               ))}
