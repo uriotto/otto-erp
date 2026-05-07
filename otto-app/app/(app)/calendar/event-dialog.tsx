@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { X, Trash2, Loader2 } from "lucide-react";
+import { X, Trash2, Loader2, Video } from "lucide-react";
 import { createEvent, updateEvent, deleteEvent, type EventFormState } from "./actions";
 import type { Tables } from "@/lib/supabase/types";
 
@@ -19,9 +19,12 @@ export type EventItem = Pick<
   | "project_id"
   | "description"
   | "location"
->;
+  | "meeting_url"
+> & {
+  guests?: { email: string; name: string | null }[];
+};
 
-type CustomerOption = { id: string; name: string };
+type CustomerOption = { id: string; name: string; email: string | null };
 type ProjectOption = { id: string; name: string; customer_id: string | null };
 
 type Props = {
@@ -92,6 +95,9 @@ export function EventDialog({
   const [allDay, setAllDay] = useState(event?.all_day ?? false);
   const [selectedCustomer, setSelectedCustomer] = useState(event?.customer_id ?? "");
   const [isDeleting, setIsDeleting] = useState(false);
+  const [createMeet, setCreateMeet] = useState(false);
+  const [guestInput, setGuestInput] = useState("");
+  const [guests, setGuests] = useState<string[]>(event?.guests?.map((g) => g.email) ?? []);
 
   useEffect(() => {
     if (state.success) {
@@ -144,8 +150,12 @@ export function EventDialog({
 
         {/* Form */}
         <form action={formAction} className="space-y-4 px-5 py-4">
-          {/* Hidden all_day for form submission */}
+          {/* Hidden inputs for form submission */}
           <input type="hidden" name="all_day" value={String(allDay)} />
+          <input type="hidden" name="create_meet" value={String(createMeet)} />
+          {guests.map((email, i) => (
+            <input key={i} type="hidden" name="guests" value={email} />
+          ))}
 
           {/* Title */}
           <div>
@@ -265,6 +275,111 @@ export function EventDialog({
               className="border-ink-line bg-cream-deep text-navy placeholder:text-ink-faded focus:border-navy focus:ring-navy/30 w-full rounded-lg border px-3 py-2 text-[13px] focus:ring-1 focus:outline-none"
               placeholder="כתובת / קישור Zoom"
             />
+          </div>
+
+          {/* Google Meet */}
+          {event?.meeting_url ? (
+            <div>
+              <label className="text-ink-soft mb-1 block text-[12px] font-medium">
+                קישור Google Meet
+              </label>
+              <a
+                href={event.meeting_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-navy flex items-center gap-1.5 text-[13px] underline"
+                dir="ltr"
+              >
+                <Video className="h-3.5 w-3.5 shrink-0" />
+                {event.meeting_url}
+              </a>
+            </div>
+          ) : (
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={createMeet}
+                onChange={(e) => setCreateMeet(e.target.checked)}
+                className="border-ink-line accent-navy h-4 w-4 rounded"
+              />
+              <span className="text-ink-soft text-[13px]">הוסף קישור Google Meet</span>
+            </label>
+          )}
+
+          {/* Guests */}
+          <div>
+            <label className="text-ink-soft mb-1 block text-[12px] font-medium">אורחים</label>
+
+            {/* Customer email shortcut */}
+            {(() => {
+              const customer = customers.find((c) => c.id === selectedCustomer);
+              if (!customer?.email || guests.includes(customer.email)) return null;
+              return (
+                <button
+                  type="button"
+                  onClick={() => setGuests((prev) => [...prev, customer.email!])}
+                  className="text-navy mb-2 text-[12px] underline hover:opacity-70"
+                >
+                  + הוסף {customer.name}
+                </button>
+              );
+            })()}
+
+            {/* Guest list */}
+            {guests.length > 0 && (
+              <div className="mb-2 space-y-1">
+                {guests.map((email) => (
+                  <div
+                    key={email}
+                    className="border-ink-line bg-cream-deep flex items-center justify-between rounded-md border px-2 py-1"
+                  >
+                    <span className="text-navy text-[12px]" dir="ltr">
+                      {email}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setGuests((prev) => prev.filter((e) => e !== email))}
+                      className="text-ink-soft ms-2 hover:text-rose-500"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add input */}
+            <div className="flex gap-2">
+              <input
+                type="email"
+                value={guestInput}
+                onChange={(e) => setGuestInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (guestInput && !guests.includes(guestInput)) {
+                      setGuests((prev) => [...prev, guestInput]);
+                      setGuestInput("");
+                    }
+                  }
+                }}
+                placeholder="אימייל אורח"
+                className="border-ink-line bg-cream-deep text-navy placeholder:text-ink-faded focus:border-navy focus:ring-navy/30 w-full rounded-lg border px-3 py-2 text-[13px] focus:ring-1 focus:outline-none"
+                dir="ltr"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (guestInput && !guests.includes(guestInput)) {
+                    setGuests((prev) => [...prev, guestInput]);
+                    setGuestInput("");
+                  }
+                }}
+                className="border-ink-line text-ink-soft hover:bg-cream-deep rounded-lg border px-3 py-2 text-[12px] font-medium transition-colors"
+              >
+                +
+              </button>
+            </div>
           </div>
 
           {/* Description */}

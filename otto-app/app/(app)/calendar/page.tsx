@@ -23,7 +23,10 @@ export type CalendarEvent = Pick<
   | "project_id"
   | "description"
   | "location"
->;
+  | "meeting_url"
+> & {
+  guests?: { email: string; name: string | null }[];
+};
 
 export default async function CalendarPage() {
   const supabase = await createClient();
@@ -54,7 +57,7 @@ export default async function CalendarPage() {
 
     supabase
       .from("customers")
-      .select("id, name")
+      .select("id, name, email")
       .eq("active", true)
       .order("name", { ascending: true }),
 

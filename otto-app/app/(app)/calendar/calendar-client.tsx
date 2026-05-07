@@ -44,7 +44,7 @@ const EVENT_TYPE_COLORS: Record<string, string> = {
 
 type ViewMode = "month" | "week";
 
-type CustomerOption = { id: string; name: string };
+type CustomerOption = { id: string; name: string; email: string | null };
 type ProjectOption = { id: string; name: string; customer_id: string | null };
 
 type DialogState =
