@@ -49,13 +49,14 @@ type ProjectOption = { id: string; name: string; customer_id: string | null };
 
 type DialogState =
   | { open: false }
-  | { open: true; mode: "create"; date: string }
+  | { open: true; mode: "create"; date: string; hour?: number; endHour?: number }
   | { open: true; mode: "edit"; event: EventItem };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function toDateKey(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 function startOfWeek(d: Date): Date {
@@ -245,12 +246,22 @@ function WeekView({
   eventsByDate,
   onDayClick,
   onEventClick,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+  dragStart,
+  dragEnd,
 }: {
   weekStart: Date;
   tasksByDate: Map<string, CalendarTask[]>;
   eventsByDate: Map<string, CalendarEvent[]>;
-  onDayClick: (dateKey: string) => void;
+  onDayClick: (dateKey: string, hour?: number) => void;
   onEventClick: (event: CalendarEvent) => void;
+  onDragStart: (dateKey: string, hour: number) => void;
+  onDragMove: (hour: number) => void;
+  onDragEnd: (dateKey: string, hour: number) => void;
+  dragStart: { dateKey: string; hour: number } | null;
+  dragEnd: number | null;
 }) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
@@ -286,7 +297,7 @@ function WeekView({
           return (
             <div
               key={key}
-              className="border-ink-line hover:bg-cream-deep/30 min-h-[32px] cursor-pointer space-y-0.5 border-s p-1"
+              className="border-ink-line hover:bg-cream-deep/30 min-h-[32px] min-w-0 cursor-pointer space-y-0.5 overflow-hidden border-s p-1"
               onClick={() => onDayClick(key)}
             >
               {events.map((ev) => (
@@ -325,11 +336,21 @@ function WeekView({
                 const hourEvents = (eventsByDate.get(key) ?? []).filter(
                   (ev) => !ev.all_day && new Date(ev.start_at).getHours() === h,
                 );
+                const isHighlighted =
+                  dragStart?.dateKey === key &&
+                  dragEnd !== null &&
+                  h >= Math.min(dragStart.hour, dragEnd) &&
+                  h <= Math.max(dragStart.hour, dragEnd);
                 return (
                   <div
                     key={d.toISOString()}
-                    className="border-ink-line hover:bg-cream-deep/20 cursor-pointer space-y-0.5 border-s p-0.5"
-                    onClick={() => onDayClick(key)}
+                    className={`border-ink-line min-w-0 cursor-pointer space-y-0.5 overflow-hidden border-s p-0.5 select-none ${isHighlighted ? "bg-navy/10" : "hover:bg-cream-deep/20"}`}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      onDragStart(key, h);
+                    }}
+                    onMouseEnter={() => onDragMove(h)}
+                    onMouseUp={() => onDragEnd(key, h)}
                   >
                     {hourEvents.map((ev) => (
                       <EventChip key={ev.id} event={ev} onClick={() => onEventClick(ev)} />
@@ -353,12 +374,22 @@ function DayView({
   eventsByDate,
   onDayClick,
   onEventClick,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+  dragStart,
+  dragEnd,
 }: {
   day: Date;
   tasksByDate: Map<string, CalendarTask[]>;
   eventsByDate: Map<string, CalendarEvent[]>;
-  onDayClick: (dateKey: string) => void;
+  onDayClick: (dateKey: string, hour?: number) => void;
   onEventClick: (event: CalendarEvent) => void;
+  onDragStart: (dateKey: string, hour: number) => void;
+  onDragMove: (hour: number) => void;
+  onDragEnd: (dateKey: string, hour: number) => void;
+  dragStart: { dateKey: string; hour: number } | null;
+  dragEnd: number | null;
 }) {
   const key = toDateKey(day);
   const allDayEvents = (eventsByDate.get(key) ?? []).filter((ev) => ev.all_day);
@@ -390,13 +421,23 @@ function DayView({
           (ev) => !ev.all_day && new Date(ev.start_at).getHours() === h,
         );
         const isNow = isToday(day) && new Date().getHours() === h;
+        const isHighlighted =
+          dragStart?.dateKey === key &&
+          dragEnd !== null &&
+          h >= Math.min(dragStart.hour, dragEnd) &&
+          h <= Math.max(dragStart.hour, dragEnd);
 
         return (
           <div
             key={h}
             style={{ minHeight: hourEvents.length > 0 ? 56 : 40 }}
-            className={`border-ink-line hover:bg-cream-deep/20 flex cursor-pointer border-b ${isNow ? "bg-amber-50/40" : ""}`}
-            onClick={() => onDayClick(key)}
+            className={`border-ink-line flex cursor-pointer border-b select-none ${isHighlighted ? "bg-navy/10" : isNow ? "bg-amber-50/40" : "hover:bg-cream-deep/20"}`}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              onDragStart(key, h);
+            }}
+            onMouseEnter={() => onDragMove(h)}
+            onMouseUp={() => onDragEnd(key, h)}
           >
             <div className="text-ink-faded w-12 shrink-0 py-1 pe-2 text-end text-[11px]">
               {String(h).padStart(2, "0")}:00
@@ -460,71 +501,73 @@ function ListView({
   }
 
   return (
-    <div className="flex-1 space-y-6 overflow-auto px-5 py-4">
-      {grouped.map(({ key, date, items }) => (
-        <div key={key}>
-          <div
-            className={`mb-2 text-[12px] font-semibold ${isToday(date) ? "text-navy" : "text-ink-soft"}`}
-          >
-            {isToday(date)
-              ? "היום"
-              : `${DAYS_HE[date.getDay()]}, ${date.getDate()} ${MONTHS_HE[date.getMonth()]} ${date.getFullYear()}`}
-          </div>
-          <div className="space-y-2">
-            {items.map((ev) => {
-              const startTime = ev.all_day
-                ? "כל היום"
-                : new Date(ev.start_at).toLocaleTimeString("he-IL", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    hour12: false,
-                  });
-              const endTime = ev.all_day
-                ? null
-                : new Date(ev.end_at).toLocaleTimeString("he-IL", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    hour12: false,
-                  });
+    <div className="flex-1 overflow-auto">
+      <div className="mx-auto w-full max-w-3xl space-y-6 px-5 py-4">
+        {grouped.map(({ key, date, items }) => (
+          <div key={key}>
+            <div
+              className={`mb-2 text-[12px] font-semibold ${isToday(date) ? "text-navy" : "text-ink-soft"}`}
+            >
+              {isToday(date)
+                ? "היום"
+                : `${DAYS_HE[date.getDay()]}, ${date.getDate()} ${MONTHS_HE[date.getMonth()]} ${date.getFullYear()}`}
+            </div>
+            <div className="space-y-2">
+              {items.map((ev) => {
+                const startTime = ev.all_day
+                  ? "כל היום"
+                  : new Date(ev.start_at).toLocaleTimeString("he-IL", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: false,
+                    });
+                const endTime = ev.all_day
+                  ? null
+                  : new Date(ev.end_at).toLocaleTimeString("he-IL", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: false,
+                    });
 
-              return (
-                <button
-                  key={ev.id}
-                  type="button"
-                  onClick={() => onEventClick(ev)}
-                  className="border-ink-line hover:border-navy/30 bg-cream-paper w-full rounded-xl border p-3 text-start transition-all hover:shadow-sm"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="text-navy truncate text-[14px] font-medium">{ev.title}</div>
-                      {ev.description && (
-                        <div className="text-ink-faded mt-0.5 truncate text-[12px]">
-                          {ev.description}
-                        </div>
+                return (
+                  <button
+                    key={ev.id}
+                    type="button"
+                    onClick={() => onEventClick(ev)}
+                    className="border-ink-line hover:border-navy/30 bg-cream-paper w-full rounded-xl border p-3 text-start transition-all hover:shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="text-navy truncate text-[14px] font-medium">{ev.title}</div>
+                        {ev.description && (
+                          <div className="text-ink-faded mt-0.5 truncate text-[12px]">
+                            {ev.description}
+                          </div>
+                        )}
+                      </div>
+                      <span
+                        className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] ${EVENT_TYPE_BADGE[ev.type] ?? EVENT_TYPE_BADGE.other}`}
+                      >
+                        {EVENT_TYPE_LABELS_LIST[ev.type] ?? ev.type}
+                      </span>
+                    </div>
+                    <div className="text-ink-faded mt-2 flex items-center gap-3 text-[11px]">
+                      <span dir="ltr">{endTime ? `${startTime} – ${endTime}` : startTime}</span>
+                      {ev.location && <span className="truncate">{ev.location}</span>}
+                      {ev.meeting_url && (
+                        <span className="text-navy flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          Meet
+                        </span>
                       )}
                     </div>
-                    <span
-                      className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] ${EVENT_TYPE_BADGE[ev.type] ?? EVENT_TYPE_BADGE.other}`}
-                    >
-                      {EVENT_TYPE_LABELS_LIST[ev.type] ?? ev.type}
-                    </span>
-                  </div>
-                  <div className="text-ink-faded mt-2 flex items-center gap-3 text-[11px]">
-                    <span dir="ltr">{endTime ? `${startTime} – ${endTime}` : startTime}</span>
-                    {ev.location && <span className="truncate">{ev.location}</span>}
-                    {ev.meeting_url && (
-                      <span className="text-navy flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        Meet
-                      </span>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
@@ -556,6 +599,8 @@ export function CalendarClient({
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
   const [currentDay, setCurrentDay] = useState<Date>(() => new Date());
   const [dialog, setDialog] = useState<DialogState>({ open: false });
+  const [dragStart, setDragStart] = useState<{ dateKey: string; hour: number } | null>(null);
+  const [dragEnd, setDragEnd] = useState<number | null>(null);
 
   // Index tasks by due_date
   const tasksByDate = useMemo(() => {
@@ -631,9 +676,30 @@ export function CalendarClient({
 
   const weekEndDisplay = addDays(weekStart, 6);
 
-  const handleDayClick = useCallback((dateKey: string) => {
-    setDialog({ open: true, mode: "create", date: dateKey });
+  const handleTimeSlotClick = useCallback((dateKey: string, hour?: number) => {
+    setDialog({ open: true, mode: "create", date: dateKey, hour });
   }, []);
+
+  const handleDragStart = useCallback((dateKey: string, hour: number) => {
+    setDragStart({ dateKey, hour });
+    setDragEnd(hour);
+  }, []);
+
+  const handleDragMove = useCallback((hour: number) => {
+    setDragEnd(hour);
+  }, []);
+
+  const handleDragEnd = useCallback(
+    (dateKey: string, hour: number) => {
+      if (!dragStart) return;
+      const startHour = Math.min(dragStart.hour, hour);
+      const endHour = Math.max(dragStart.hour, hour) + 1;
+      setDragStart(null);
+      setDragEnd(null);
+      setDialog({ open: true, mode: "create", date: dragStart.dateKey, hour: startHour, endHour });
+    },
+    [dragStart],
+  );
 
   const handleEventClick = useCallback((ev: CalendarEvent) => {
     setDialog({ open: true, mode: "edit", event: ev });
@@ -759,7 +825,7 @@ export function CalendarClient({
           month={month}
           tasksByDate={tasksByDate}
           eventsByDate={eventsByDate}
-          onDayClick={handleDayClick}
+          onDayClick={handleTimeSlotClick}
           onEventClick={handleEventClick}
         />
       )}
@@ -768,8 +834,13 @@ export function CalendarClient({
           weekStart={weekStart}
           tasksByDate={tasksByDate}
           eventsByDate={eventsByDate}
-          onDayClick={handleDayClick}
+          onDayClick={handleTimeSlotClick}
           onEventClick={handleEventClick}
+          onDragStart={handleDragStart}
+          onDragMove={handleDragMove}
+          onDragEnd={handleDragEnd}
+          dragStart={dragStart}
+          dragEnd={dragEnd}
         />
       )}
       {view === "day" && (
@@ -777,8 +848,13 @@ export function CalendarClient({
           day={currentDay}
           tasksByDate={tasksByDate}
           eventsByDate={eventsByDate}
-          onDayClick={handleDayClick}
+          onDayClick={handleTimeSlotClick}
           onEventClick={handleEventClick}
+          onDragStart={handleDragStart}
+          onDragMove={handleDragMove}
+          onDragEnd={handleDragEnd}
+          dragStart={dragStart}
+          dragEnd={dragEnd}
         />
       )}
       {view === "list" && <ListView events={events} onEventClick={handleEventClick} />}
@@ -788,6 +864,8 @@ export function CalendarClient({
         <EventDialog
           mode={dialog.mode}
           initialDate={dialog.mode === "create" ? dialog.date : undefined}
+          initialHour={dialog.mode === "create" ? dialog.hour : undefined}
+          initialEndHour={dialog.mode === "create" ? dialog.endHour : undefined}
           event={dialog.mode === "edit" ? dialog.event : undefined}
           customers={customers}
           projects={projects}
