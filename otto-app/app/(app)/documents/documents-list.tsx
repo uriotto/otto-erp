@@ -160,7 +160,9 @@ export function DocumentsList({
   const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null);
   const [search, setSearch] = useState(() => loadFilters("documents")?.search ?? "");
   const [filterType, setFilterType] = useState(() => loadFilters("documents")?.type ?? "");
-  const [filterCustomer, setFilterCustomer] = useState(() => loadFilters("documents")?.customer ?? "");
+  const [filterCustomer, setFilterCustomer] = useState(
+    () => loadFilters("documents")?.customer ?? "",
+  );
   const [showFilters, setShowFilters] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkPending, startBulk] = useTransition();

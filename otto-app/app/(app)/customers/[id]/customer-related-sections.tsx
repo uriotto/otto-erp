@@ -2,7 +2,19 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Plus, FolderOpen, Clock, ExternalLink, FileText } from "lucide-react";
+import {
+  Plus,
+  FolderOpen,
+  Clock,
+  ExternalLink,
+  FileText,
+  Phone,
+  MessageCircle,
+  Pencil,
+} from "lucide-react";
+import { deleteContact } from "@/app/(app)/contacts/actions";
+import { ContactDialog } from "@/app/(app)/contacts/contact-dialog";
+import { useToast } from "@/components/ui/toast";
 import type { Tables } from "@/lib/supabase/types";
 import { NewProjectDialog } from "@/app/(app)/projects/new-project-dialog";
 import { NewHourBankDialog } from "@/app/(app)/hour-banks/new-hour-bank-dialog";
@@ -332,6 +344,130 @@ export function CustomerQuotesSection({
             setShowNew(false);
             router.refresh();
           }}
+        />
+      )}
+    </section>
+  );
+}
+
+type ContactItem = {
+  id: string;
+  name: string;
+  role: string | null;
+  email: string | null;
+  phone: string | null;
+  notes: string | null;
+  customer_id: string | null;
+};
+
+function formatWhatsApp(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.startsWith("0")) return "972" + digits.slice(1);
+  return digits;
+}
+
+export function CustomerContactsSection({
+  customerId,
+  contacts,
+  allCustomers,
+}: {
+  customerId: string;
+  contacts: ContactItem[];
+  allCustomers: { id: string; name: string }[];
+}) {
+  const [showNew, setShowNew] = useState(false);
+  const [editingContact, setEditingContact] = useState<ContactItem | null>(null);
+  const toast = useToast();
+
+  async function handleDelete(contact: ContactItem) {
+    if (!confirm(`למחוק את ${contact.name}?`)) return;
+    const result = await deleteContact(contact.id);
+    if (result.error) toast.error(result.error);
+    else toast.success("נמחק");
+  }
+
+  return (
+    <section className="bg-cream-paper border-ink-line rounded-2xl border p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-navy text-sm font-semibold">
+          אנשי קשר
+          {contacts.length > 0 && (
+            <span className="text-ink-faded ms-1.5 font-normal">({contacts.length})</span>
+          )}
+        </h2>
+        <button
+          type="button"
+          onClick={() => setShowNew(true)}
+          className="text-ink-soft hover:text-navy flex items-center gap-1 text-xs transition-colors"
+        >
+          <Plus size={13} />
+          איש קשר חדש
+        </button>
+      </div>
+
+      {contacts.length === 0 ? (
+        <div className="text-ink-faded py-4 text-center text-xs">אין אנשי קשר עדיין</div>
+      ) : (
+        <ul className="divide-ink-line/60 divide-y">
+          {contacts.map((c) => (
+            <li key={c.id} className="py-2.5">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-navy text-sm font-medium">{c.name}</p>
+                  {c.role && <p className="text-ink-faded text-xs">{c.role}</p>}
+                  {c.email && (
+                    <a href={`mailto:${c.email}`} className="text-ink-soft hover:text-navy text-xs">
+                      {c.email}
+                    </a>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  {c.phone && (
+                    <>
+                      <a
+                        href={`tel:${c.phone}`}
+                        className="text-ink-faded hover:text-navy rounded p-1 transition-colors"
+                        title="התקשר"
+                      >
+                        <Phone size={13} />
+                      </a>
+                      <a
+                        href={`https://wa.me/${formatWhatsApp(c.phone)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-ink-faded rounded p-1 transition-colors hover:text-green-600"
+                        title="WhatsApp"
+                      >
+                        <MessageCircle size={13} />
+                      </a>
+                    </>
+                  )}
+                  <button
+                    onClick={() => setEditingContact(c)}
+                    className="text-ink-faded hover:text-navy rounded p-1 transition-colors"
+                  >
+                    <Pencil size={12} />
+                  </button>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {showNew && (
+        <ContactDialog
+          customers={allCustomers}
+          lockedCustomerId={customerId}
+          onClose={() => setShowNew(false)}
+        />
+      )}
+      {editingContact && (
+        <ContactDialog
+          contact={editingContact}
+          customers={allCustomers}
+          lockedCustomerId={customerId}
+          onClose={() => setEditingContact(null)}
         />
       )}
     </section>

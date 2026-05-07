@@ -119,20 +119,18 @@ export function TasksList({
   const toast = useToast();
 
   const [showNew, setShowNew] = useState(false);
-  const [query, setQuery] = useState(() =>
-    searchParams.get("q") ?? loadFilters("tasks")?.q ?? ""
+  const [query, setQuery] = useState(() => searchParams.get("q") ?? loadFilters("tasks")?.q ?? "");
+  const [projectFilter, setProjectFilter] = useState<string>(
+    () => searchParams.get("project") ?? loadFilters("tasks")?.project ?? "all",
   );
-  const [projectFilter, setProjectFilter] = useState<string>(() =>
-    searchParams.get("project") ?? loadFilters("tasks")?.project ?? "all"
+  const [statusFilter, setStatusFilter] = useState<string>(
+    () => searchParams.get("status") ?? loadFilters("tasks")?.status ?? "all",
   );
-  const [statusFilter, setStatusFilter] = useState<string>(() =>
-    searchParams.get("status") ?? loadFilters("tasks")?.status ?? "all"
+  const [priorityFilter, setPriorityFilter] = useState<string>(
+    () => searchParams.get("priority") ?? loadFilters("tasks")?.priority ?? "all",
   );
-  const [priorityFilter, setPriorityFilter] = useState<string>(() =>
-    searchParams.get("priority") ?? loadFilters("tasks")?.priority ?? "all"
-  );
-  const [assigneeFilter, setAssigneeFilter] = useState<string>(() =>
-    searchParams.get("assignee") ?? loadFilters("tasks")?.assignee ?? "all"
+  const [assigneeFilter, setAssigneeFilter] = useState<string>(
+    () => searchParams.get("assignee") ?? loadFilters("tasks")?.assignee ?? "all",
   );
   const [view, setView] = useState<ViewMode>(() => {
     const v = searchParams.get("view") ?? loadFilters("tasks")?.view;
@@ -157,7 +155,14 @@ export function TasksList({
 
   // Persist filter state to localStorage on every change
   useEffect(() => {
-    saveFilters("tasks", { q: query, project: projectFilter, status: statusFilter, priority: priorityFilter, assignee: assigneeFilter, view });
+    saveFilters("tasks", {
+      q: query,
+      project: projectFilter,
+      status: statusFilter,
+      priority: priorityFilter,
+      assignee: assigneeFilter,
+      view,
+    });
   }, [query, projectFilter, statusFilter, priorityFilter, assigneeFilter, view]);
 
   // Sync URL with localStorage-restored state on fresh load
@@ -165,7 +170,14 @@ export function TasksList({
     if (!searchParams.toString()) {
       const saved = loadFilters("tasks");
       if (saved) {
-        updateUrl({ q: saved.q, project: saved.project, status: saved.status, priority: saved.priority, assignee: saved.assignee, view: saved.view });
+        updateUrl({
+          q: saved.q,
+          project: saved.project,
+          status: saved.status,
+          priority: saved.priority,
+          assignee: saved.assignee,
+          view: saved.view,
+        });
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

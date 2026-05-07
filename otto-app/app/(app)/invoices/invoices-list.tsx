@@ -198,16 +198,16 @@ export function InvoicesList({
   }
 
   const [status, setStatus] = useState<string>(
-    searchParams.get("status") ?? loadFilters("invoices")?.status ?? "all"
+    searchParams.get("status") ?? loadFilters("invoices")?.status ?? "all",
   );
   const [customerId, setCustomerId] = useState<string>(
-    searchParams.get("customer") ?? loadFilters("invoices")?.customer ?? "all"
+    searchParams.get("customer") ?? loadFilters("invoices")?.customer ?? "all",
   );
   const [age, setAge] = useState<string>(
-    searchParams.get("age") ?? loadFilters("invoices")?.age ?? "all"
+    searchParams.get("age") ?? loadFilters("invoices")?.age ?? "all",
   );
   const [type, setType] = useState<string>(
-    searchParams.get("type") ?? loadFilters("invoices")?.type ?? "all"
+    searchParams.get("type") ?? loadFilters("invoices")?.type ?? "all",
   );
 
   // Persist filters to URL and localStorage

@@ -4,7 +4,7 @@ export function saveFilters(key: string, params: Record<string, string>): void {
   if (!isBrowser()) return;
   try {
     const clean = Object.fromEntries(
-      Object.entries(params).filter(([, v]) => v && v !== "all" && v !== "")
+      Object.entries(params).filter(([, v]) => v && v !== "all" && v !== ""),
     );
     if (Object.keys(clean).length > 0) {
       localStorage.setItem(`otto:filters:${key}`, JSON.stringify(clean));

@@ -67,11 +67,9 @@ export function LeadsBoard({ leads }: { leads: Lead[] }) {
   const searchParams = useSearchParams();
 
   const [showNew, setShowNew] = useState(false);
-  const [query, setQuery] = useState(() =>
-    searchParams.get("q") ?? loadFilters("leads")?.q ?? ""
-  );
-  const [source, setSource] = useState<string>(() =>
-    searchParams.get("source") ?? loadFilters("leads")?.source ?? ALL_SOURCES
+  const [query, setQuery] = useState(() => searchParams.get("q") ?? loadFilters("leads")?.q ?? "");
+  const [source, setSource] = useState<string>(
+    () => searchParams.get("source") ?? loadFilters("leads")?.source ?? ALL_SOURCES,
   );
   const [statusFilter, setStatusFilter] = useState<Lead["status"] | "all">(() => {
     const fromUrl = parseStatusFilter(searchParams.get("status"));

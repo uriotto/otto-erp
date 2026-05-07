@@ -49,7 +49,7 @@ function formatDate(d: string | null) {
 export function MarketingBoard({ items }: { items: ContentItem[] }) {
   const [showNew, setShowNew] = useState(false);
   const [filterPlatform, setFilterPlatform] = useState<string>(
-    () => loadFilters("marketing")?.platform ?? "all"
+    () => loadFilters("marketing")?.platform ?? "all",
   );
   const [isPending, startTransition] = useTransition();
   const toast = useToast();

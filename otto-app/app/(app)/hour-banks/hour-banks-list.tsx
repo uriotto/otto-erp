@@ -93,10 +93,10 @@ export function HourBanksList({
   const [view, setView] = useStoredView<"grid" | "table">("hour-banks-view", "grid");
   const [showNew, setShowNew] = useState(false);
   const [tab, setTab] = useState<"all" | HourBankStatus>(
-    () => (loadFilters("hour-banks")?.tab as HourBankStatus) ?? "active"
+    () => (loadFilters("hour-banks")?.tab as HourBankStatus) ?? "active",
   );
   const [customerFilter, setCustomerFilter] = useState<string>(
-    () => loadFilters("hour-banks")?.customer ?? "all"
+    () => loadFilters("hour-banks")?.customer ?? "all",
   );
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkPending, startBulk] = useTransition();

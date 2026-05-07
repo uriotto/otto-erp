@@ -110,6 +110,39 @@ Critical logic lives entirely in Postgres:
 
 `lib/make-webhook.ts` fires a POST to the tenant's configured webhook URL (stored in `tenant_settings.make_webhook_url`) for events like `hour_bank.renewed` and `hour_bank.created`.
 
+### Google Calendar integration
+
+`lib/google-calendar.ts` — full OAuth + sync library. Key exports:
+
+- `getAccessToken(tenantId)` — reads `tenant_settings`, refreshes token if expiring in <5 min
+- `createGoogleEvent / updateGoogleEvent / deleteGoogleEvent` — outbound sync called from `calendar/actions.ts` (fire-and-forget, errors logged but never surface to user)
+- `fetchIncrementalChanges(tenantId)` — used by the push webhook to pull incremental updates
+- `registerPushChannel / cancelPushChannel` — 7-day Google push channel lifecycle
+- `upsertGoogleEventsToOtto(tenantId, changes)` — writes inbound Google events to the `events` table; uses `last-modified wins` conflict resolution
+
+**OAuth flow:** `app/api/auth/google-calendar/route.ts` → Google → `app/api/auth/google-calendar/callback/route.ts` — stores encrypted tokens in `tenant_settings` and calls `registerPushChannel`.
+
+**Inbound push webhook:** `app/api/calendar/sync/route.ts` — receives `POST` from Google; validates `X-Goog-Channel-ID` against DB before processing. This route is in `isPublicApi` in middleware (Google has no session cookie).
+
+**Token storage:** encrypted with AES-256 using `ENCRYPTION_KEY`. Fields: `google_refresh_token`, `google_access_token`, `google_token_expiry`, `google_calendar_id`, `google_sync_token`, `google_channel_id`, `google_channel_resource_id` on `tenant_settings`.
+
+### Webhook routes and middleware whitelist
+
+External webhooks (Zoom, Google, etc.) arrive without a session cookie — middleware will redirect them to `/login` (307) unless whitelisted. To add a new external webhook:
+
+1. Create the route under `app/api/`
+2. Add `pathname.startsWith("/api/your-route")` to the `isPublicApi` check in `lib/supabase/middleware.ts`
+3. Validate the request inside the handler (signature, channel ID, etc.) — never trust unvalidated webhook payloads
+
+### Calendar view layout
+
+The week and day views in `app/(app)/calendar/calendar-client.tsx` use **absolute positioning** for timed events:
+
+- `HOUR_PX = 56` — pixel height of each hour slot (fixed, not dynamic)
+- Each day column is `position: relative` with `height: 24 * HOUR_PX`
+- Events are absolutely placed: `top = (startH + startMin/60) * HOUR_PX`, `height = durationH * HOUR_PX`
+- `EventBlock` component renders timed events (fills height, shows time range); `EventChip` is for month-view and all-day slots only
+
 ## Key conventions
 
 - **RTL everywhere**: use `ms-*`/`me-*`, `ps-*`/`pe-*`, `text-start`/`text-end` — never `ml-*`/`mr-*`
@@ -126,6 +159,11 @@ NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY      # required for write operations on public routes (signing)
 ENCRYPTION_KEY                 # 32-byte hex — used for credentials vault AES-256
+
+# Google Calendar integration
+GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET
+NEXT_PUBLIC_APP_URL            # e.g. https://app.otto-ai.co.il — used as OAuth redirect base and webhook base
 ```
 
 ## Existing detailed instructions

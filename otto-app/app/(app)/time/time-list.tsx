@@ -128,19 +128,19 @@ export function TimeList({
   );
   const [showNew, setShowNew] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [view, setView] = useState<View>(() =>
-    ((searchParams.get("view") as View) || (loadFilters("time")?.view as View)) ?? "daily"
+  const [view, setView] = useState<View>(
+    () => ((searchParams.get("view") as View) || (loadFilters("time")?.view as View)) ?? "daily",
   );
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkPending, startBulk] = useTransition();
-  const [customerFilter, setCustomerFilter] = useState<string>(() =>
-    searchParams.get("customer") ?? loadFilters("time")?.customer ?? "all"
+  const [customerFilter, setCustomerFilter] = useState<string>(
+    () => searchParams.get("customer") ?? loadFilters("time")?.customer ?? "all",
   );
-  const [projectFilter, setProjectFilter] = useState<string>(() =>
-    searchParams.get("project") ?? loadFilters("time")?.project ?? "all"
+  const [projectFilter, setProjectFilter] = useState<string>(
+    () => searchParams.get("project") ?? loadFilters("time")?.project ?? "all",
   );
-  const [billableFilter, setBillableFilter] = useState<string>(() =>
-    searchParams.get("billable") ?? loadFilters("time")?.billable ?? "all"
+  const [billableFilter, setBillableFilter] = useState<string>(
+    () => searchParams.get("billable") ?? loadFilters("time")?.billable ?? "all",
   );
 
   const updateUrl = useCallback(
@@ -158,7 +158,12 @@ export function TimeList({
 
   // Persist filter state to localStorage on every change
   useEffect(() => {
-    saveFilters("time", { view, customer: customerFilter, project: projectFilter, billable: billableFilter });
+    saveFilters("time", {
+      view,
+      customer: customerFilter,
+      project: projectFilter,
+      billable: billableFilter,
+    });
   }, [view, customerFilter, projectFilter, billableFilter]);
 
   // Sync URL with localStorage-restored state on fresh load
@@ -166,7 +171,12 @@ export function TimeList({
     if (!searchParams.toString()) {
       const saved = loadFilters("time");
       if (saved) {
-        updateUrl({ view: saved.view, customer: saved.customer, project: saved.project, billable: saved.billable });
+        updateUrl({
+          view: saved.view,
+          customer: saved.customer,
+          project: saved.project,
+          billable: saved.billable,
+        });
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -3,6 +3,7 @@ import {
   Clock,
   PlusCircle,
   Users,
+  BookUser,
   FolderKanban,
   CheckSquare,
   Timer,
@@ -44,6 +45,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "עבודה",
     items: [
       { label: "לקוחות", href: "/customers", icon: Users },
+      { label: "אנשי קשר", href: "/contacts", icon: BookUser },
       { label: "פרויקטים", href: "/projects", icon: FolderKanban },
       { label: "משימות", href: "/tasks", icon: CheckSquare },
       { label: "לוח שנה", href: "/calendar", icon: CalendarDays },

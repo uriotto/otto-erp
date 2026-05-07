@@ -10,6 +10,7 @@ import {
   CustomerProjectsSection,
   CustomerHourBanksSection,
   CustomerQuotesSection,
+  CustomerContactsSection,
 } from "./customer-related-sections";
 import { RecentTracker } from "@/components/search/recent-tracker";
 import { BreadcrumbLabel } from "@/components/layout/breadcrumb-label";
@@ -46,6 +47,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
     { data: tenantSettings },
     { data: quotes },
     { data: credentials },
+    { data: contacts },
   ] = await Promise.all([
     supabase
       .from("projects")
@@ -78,6 +80,11 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
       .select("id, label, credential_type, username, url, notes")
       .eq("customer_id", id)
       .order("created_at", { ascending: true }),
+    supabase
+      .from("contacts")
+      .select("id, name, role, email, phone, notes, customer_id")
+      .eq("customer_id", id)
+      .order("name"),
   ]);
 
   const initials = customer.name
@@ -219,6 +226,17 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             id: p.id,
             name: p.name,
             customer_id: p.customer_id,
+          }))}
+        />
+      </div>
+
+      <div className="mt-4">
+        <CustomerContactsSection
+          customerId={customer.id}
+          contacts={contacts ?? []}
+          allCustomers={(allCustomers ?? []).map((c) => ({
+            id: c.id,
+            name: c.name,
           }))}
         />
       </div>

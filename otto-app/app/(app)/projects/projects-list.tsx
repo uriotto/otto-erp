@@ -98,17 +98,17 @@ export function ProjectsList({
   const [showNew, setShowNew] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkPending, startBulk] = useTransition();
-  const [query, setQuery] = useState(() =>
-    searchParams.get("q") ?? loadFilters("projects")?.q ?? ""
+  const [query, setQuery] = useState(
+    () => searchParams.get("q") ?? loadFilters("projects")?.q ?? "",
   );
-  const [statusFilter, setStatusFilter] = useState<string>(() =>
-    searchParams.get("status") ?? loadFilters("projects")?.status ?? "all"
+  const [statusFilter, setStatusFilter] = useState<string>(
+    () => searchParams.get("status") ?? loadFilters("projects")?.status ?? "all",
   );
-  const [billingFilter, setBillingFilter] = useState<string>(() =>
-    searchParams.get("billing") ?? loadFilters("projects")?.billing ?? "all"
+  const [billingFilter, setBillingFilter] = useState<string>(
+    () => searchParams.get("billing") ?? loadFilters("projects")?.billing ?? "all",
   );
-  const [customerFilter, setCustomerFilter] = useState<string>(() =>
-    searchParams.get("customer") ?? loadFilters("projects")?.customer ?? "all"
+  const [customerFilter, setCustomerFilter] = useState<string>(
+    () => searchParams.get("customer") ?? loadFilters("projects")?.customer ?? "all",
   );
 
   const updateUrl = useCallback(
@@ -126,7 +126,12 @@ export function ProjectsList({
 
   // Persist filter state to localStorage on every change
   useEffect(() => {
-    saveFilters("projects", { q: query, status: statusFilter, billing: billingFilter, customer: customerFilter });
+    saveFilters("projects", {
+      q: query,
+      status: statusFilter,
+      billing: billingFilter,
+      customer: customerFilter,
+    });
   }, [query, statusFilter, billingFilter, customerFilter]);
 
   // Sync URL with localStorage-restored state on fresh load
@@ -134,7 +139,12 @@ export function ProjectsList({
     if (!searchParams.toString()) {
       const saved = loadFilters("projects");
       if (saved) {
-        updateUrl({ q: saved.q, status: saved.status, billing: saved.billing, customer: saved.customer });
+        updateUrl({
+          q: saved.q,
+          status: saved.status,
+          billing: saved.billing,
+          customer: saved.customer,
+        });
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

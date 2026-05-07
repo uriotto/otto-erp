@@ -691,7 +691,7 @@ export function CalendarClient({
 }: Props) {
   const router = useRouter();
   const [view, setView] = useState<ViewMode>(
-    () => (loadFilters("calendar")?.view as ViewMode) ?? "month"
+    () => (loadFilters("calendar")?.view as ViewMode) ?? "month",
   );
   const [year, setYear] = useState(initialYear);
   const [month, setMonth] = useState(initialMonth);

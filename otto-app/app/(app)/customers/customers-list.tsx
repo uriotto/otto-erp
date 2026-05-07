@@ -99,8 +99,8 @@ export function CustomersList({
   const [showNew, setShowNew] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [view, setView] = useStoredView<"grid" | "table">("customers-view", "grid");
-  const [query, setQuery] = useState(() =>
-    searchParams.get("q") ?? loadFilters("customers")?.q ?? ""
+  const [query, setQuery] = useState(
+    () => searchParams.get("q") ?? loadFilters("customers")?.q ?? "",
   );
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(() => {
     const fromUrl = parseStatus(searchParams.get("status"));
