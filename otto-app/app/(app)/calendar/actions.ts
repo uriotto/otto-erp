@@ -17,6 +17,8 @@ const EventSchema = z.object({
   type: z.enum(EVENT_TYPES).default("meeting"),
   customer_id: z.string().uuid().optional().or(z.literal("")),
   project_id: z.string().uuid().optional().or(z.literal("")),
+  create_meet: z.boolean().default(false),
+  guests: z.array(z.string().email()).default([]),
 });
 
 export type EventFormState = {
@@ -52,6 +54,8 @@ export async function createEvent(
   const raw = {
     ...Object.fromEntries(formData.entries()),
     all_day: formData.get("all_day") === "true",
+    create_meet: formData.get("create_meet") === "true",
+    guests: formData.getAll("guests").filter(Boolean),
   };
 
   const parsed = EventSchema.safeParse(raw);
@@ -85,17 +89,36 @@ export async function createEvent(
 
   // Push to Google Calendar (fire-and-forget)
   try {
-    const googleEventId = await createGoogleEvent(profile.tenant_id, {
+    const result = await createGoogleEvent(profile.tenant_id, {
       title: d.title,
       description: nullIfEmpty(d.description),
       location: nullIfEmpty(d.location),
       start_at: d.start_at,
       end_at: d.end_at,
       all_day: d.all_day,
+      create_meet: d.create_meet,
+      attendees: d.guests,
     });
-    await supabase.from("events").update({ google_event_id: googleEventId }).eq("id", ev.id);
+    await supabase
+      .from("events")
+      .update({ google_event_id: result.googleEventId, meeting_url: result.meetUrl })
+      .eq("id", ev.id);
   } catch (err) {
-    console.error("Google Calendar createEvent failed:", err);
+    console.error(
+      "Google Calendar createEvent failed:",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+
+  // Save guests
+  if (d.guests.length > 0) {
+    await supabase.from("event_guests").insert(
+      d.guests.map((email) => ({
+        event_id: ev.id,
+        tenant_id: profile.tenant_id,
+        email,
+      })),
+    );
   }
 
   revalidatePath("/calendar");
@@ -110,6 +133,8 @@ export async function updateEvent(
   const raw = {
     ...Object.fromEntries(formData.entries()),
     all_day: formData.get("all_day") === "true",
+    create_meet: formData.get("create_meet") === "true",
+    guests: formData.getAll("guests").filter(Boolean),
   };
 
   const parsed = EventSchema.safeParse(raw);
@@ -157,10 +182,26 @@ export async function updateEvent(
         start_at: d.start_at,
         end_at: d.end_at,
         all_day: d.all_day,
+        attendees: d.guests,
       });
     } catch (err) {
-      console.error("Google Calendar updateEvent failed:", err);
+      console.error(
+        "Google Calendar updateEvent failed:",
+        err instanceof Error ? err.message : String(err),
+      );
     }
+  }
+
+  // Replace guests
+  await supabase.from("event_guests").delete().eq("event_id", id);
+  if (d.guests.length > 0) {
+    await supabase.from("event_guests").insert(
+      d.guests.map((email) => ({
+        event_id: id,
+        tenant_id: profile.tenant_id,
+        email,
+      })),
+    );
   }
 
   revalidatePath("/calendar");
