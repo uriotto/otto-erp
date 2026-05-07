@@ -30,6 +30,8 @@ type ProjectOption = { id: string; name: string; customer_id: string | null };
 type Props = {
   mode: "create" | "edit";
   initialDate?: string; // YYYY-MM-DD
+  initialHour?: number;
+  initialEndHour?: number;
   event?: EventItem;
   customers: CustomerOption[];
   projects: ProjectOption[];
@@ -59,18 +61,20 @@ function toLocalDate(isoStr: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-function defaultStart(date?: string): string {
-  if (date) return `${date}T09:00`;
-  const now = new Date();
+function defaultStart(date?: string, hour?: number): string {
+  const h = hour ?? 9;
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T09:00`;
+  if (date) return `${date}T${pad(h)}:00`;
+  const now = new Date();
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(h)}:00`;
 }
 
-function defaultEnd(date?: string): string {
-  if (date) return `${date}T10:00`;
-  const now = new Date();
+function defaultEnd(date?: string, hour?: number, endHour?: number): string {
+  const h = endHour ?? (hour ?? 9) + 1;
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T10:00`;
+  if (date) return `${date}T${pad(h)}:00`;
+  const now = new Date();
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(h)}:00`;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -80,6 +84,8 @@ const INITIAL_STATE: EventFormState = {};
 export function EventDialog({
   mode,
   initialDate,
+  initialHour,
+  initialEndHour,
   event,
   customers,
   projects,
@@ -109,6 +115,15 @@ export function EventDialog({
     ? projects.filter((p) => p.customer_id === selectedCustomer)
     : projects;
 
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    if (allDay) return;
+    const form = e.currentTarget;
+    const startInput = form.elements.namedItem("start_at") as HTMLInputElement | null;
+    const endInput = form.elements.namedItem("end_at") as HTMLInputElement | null;
+    if (startInput?.value) startInput.value = new Date(startInput.value).toISOString();
+    if (endInput?.value) endInput.value = new Date(endInput.value).toISOString();
+  }
+
   async function handleDelete() {
     if (!event) return;
     if (!confirm("למחוק את האירוע?")) return;
@@ -122,13 +137,13 @@ export function EventDialog({
     ? allDay
       ? toLocalDate(event.start_at)
       : toLocalDatetime(event.start_at)
-    : defaultStart(initialDate);
+    : defaultStart(initialDate, initialHour);
 
   const endVal = isEdit
     ? allDay
       ? toLocalDate(event.end_at)
       : toLocalDatetime(event.end_at)
-    : defaultEnd(initialDate);
+    : defaultEnd(initialDate, initialHour, initialEndHour);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -149,7 +164,7 @@ export function EventDialog({
         </div>
 
         {/* Form */}
-        <form action={formAction} className="space-y-4 px-5 py-4">
+        <form action={formAction} onSubmit={handleSubmit} className="space-y-4 px-5 py-4">
           {/* Hidden inputs for form submission */}
           <input type="hidden" name="all_day" value={String(allDay)} />
           <input type="hidden" name="create_meet" value={String(createMeet)} />
