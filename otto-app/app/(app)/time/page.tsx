@@ -10,7 +10,7 @@ export default async function TimePage() {
   since.setDate(since.getDate() - 30);
   const sinceISO = since.toISOString();
 
-  const [{ data: entries }, { data: customers }, { data: projects }, { data: tasks }] =
+  const [{ data: entries }, { data: customers }, { data: projects }, { data: tasks }, { data: activeBanks }] =
     await Promise.all([
       supabase
         .from("time_entries")
@@ -26,11 +26,18 @@ export default async function TimePage() {
         .is("deleted_at", null)
         .order("name"),
       supabase.from("tasks").select("id, title, project_id").order("title"),
+      supabase
+        .from("hour_banks")
+        .select("customer_id")
+        .eq("status", "active"),
     ]);
 
   const customerMap = new Map((customers ?? []).map((c) => [c.id, c.name]));
   const projectMap = new Map((projects ?? []).map((p) => [p.id, p.name]));
   const taskMap = new Map((tasks ?? []).map((t) => [t.id, t.title]));
+  const customersWithActiveBank = new Set(
+    (activeBanks ?? []).map((b) => b.customer_id).filter(Boolean) as string[],
+  );
 
   const items: TimeEntryItem[] = (entries ?? []).map((e) => ({
     ...e,
@@ -45,6 +52,7 @@ export default async function TimePage() {
       customers={customers ?? []}
       projects={projects ?? []}
       tasks={tasks ?? []}
+      customersWithActiveBank={customersWithActiveBank}
     />
   );
 }

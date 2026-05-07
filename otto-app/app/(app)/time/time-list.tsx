@@ -98,11 +98,13 @@ export function TimeList({
   customers,
   projects,
   tasks,
+  customersWithActiveBank,
 }: {
   entries: TimeEntryItem[];
   customers: CustomerOpt[];
   projects: ProjectOpt[];
   tasks: TaskOpt[];
+  customersWithActiveBank: Set<string>;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -418,6 +420,7 @@ export function TimeList({
                     tasks={tasks}
                     editing={editingId === e.id}
                     onToggleEdit={() => setEditingId((id) => (id === e.id ? null : e.id))}
+                    customersWithActiveBank={customersWithActiveBank}
                   />
                 ))}
               </div>
@@ -559,6 +562,7 @@ function EntryRow({
   tasks,
   editing,
   onToggleEdit,
+  customersWithActiveBank,
 }: {
   entry: TimeEntryItem;
   customers: CustomerOpt[];
@@ -566,6 +570,7 @@ function EntryRow({
   tasks: TaskOpt[];
   editing: boolean;
   onToggleEdit: () => void;
+  customersWithActiveBank: Set<string>;
 }) {
   const [assigning, setAssigning] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -598,6 +603,7 @@ function EntryRow({
         projects={projects}
         tasks={tasks}
         onClose={onToggleEdit}
+        customersWithActiveBank={customersWithActiveBank}
       />
     );
   }
@@ -712,12 +718,14 @@ function EditEntryRow({
   projects,
   tasks,
   onClose,
+  customersWithActiveBank,
 }: {
   entry: TimeEntryItem;
   customers: CustomerOpt[];
   projects: ProjectOpt[];
   tasks: TaskOpt[];
   onClose: () => void;
+  customersWithActiveBank: Set<string>;
 }) {
   const [date, setDate] = useState(dateStr(entry.start_time));
   const [startT, setStartT] = useState(timeStr(entry.start_time));
@@ -942,7 +950,13 @@ function EditEntryRow({
           לחיוב
         </label>
 
-        {billable && <BillingStatusActions entry={entry} onDone={() => { onClose(); }} />}
+        {billable && (
+          <BillingStatusActions
+            entry={entry}
+            hasActiveBank={!!entry.customer_id && customersWithActiveBank.has(entry.customer_id)}
+            onDone={onClose}
+          />
+        )}
 
         <div className="flex items-center justify-between pt-1">
           <button
@@ -977,7 +991,15 @@ function EditEntryRow({
   );
 }
 
-function BillingStatusActions({ entry, onDone }: { entry: TimeEntryItem; onDone: () => void }) {
+function BillingStatusActions({
+  entry,
+  hasActiveBank,
+  onDone,
+}: {
+  entry: TimeEntryItem;
+  hasActiveBank: boolean;
+  onDone: () => void;
+}) {
   const [pending, startTransition] = useTransition();
   const router = useRouter();
   const toast = useToast();
@@ -986,7 +1008,10 @@ function BillingStatusActions({ entry, onDone }: { entry: TimeEntryItem; onDone:
   function handleAllocate() {
     startTransition(async () => {
       const res = await allocateEntryToBank(entry.id);
-      if (res.error) { toast.error(res.error); return; }
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
       toast.success("השעה שויכה לבנק");
       onDone();
       router.refresh();
@@ -996,7 +1021,10 @@ function BillingStatusActions({ entry, onDone }: { entry: TimeEntryItem; onDone:
   function handleInvoice() {
     startTransition(async () => {
       const res = await markEntryAsInvoiced(entry.id);
-      if (res.error) { toast.error(res.error); return; }
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
       toast.success("סומן כחיוב נפרד");
       onDone();
       router.refresh();
@@ -1006,7 +1034,10 @@ function BillingStatusActions({ entry, onDone }: { entry: TimeEntryItem; onDone:
   function handleReset() {
     startTransition(async () => {
       const res = await resetEntryToPending(entry.id);
-      if (res.error) { toast.error(res.error); return; }
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
       toast.success("אופס לממתין");
       onDone();
       router.refresh();
@@ -1014,11 +1045,7 @@ function BillingStatusActions({ entry, onDone }: { entry: TimeEntryItem; onDone:
   }
 
   if (status === "allocated_to_bank") {
-    return (
-      <div className="text-ink-faded text-xs">
-        שויך לבנק שעות — לשינוי, ערוך את הרשומה
-      </div>
-    );
+    return <div className="text-ink-faded text-xs">שויך לבנק שעות — לשינוי, ערוך את הרשומה</div>;
   }
 
   if (status === "invoiced") {
@@ -1041,15 +1068,16 @@ function BillingStatusActions({ entry, onDone }: { entry: TimeEntryItem; onDone:
   return (
     <div className="flex flex-wrap items-center gap-2">
       <span className="text-ink-faded text-xs">סטטוס חיוב:</span>
-      <button
-        type="button"
-        onClick={handleAllocate}
-        disabled={pending || !entry.customer_id}
-        className="border-ink-line hover:border-navy text-navy rounded-md border px-2 py-0.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40"
-        title={!entry.customer_id ? "נדרש לקוח לשיוך לבנק" : undefined}
-      >
-        שייך לבנק
-      </button>
+      {hasActiveBank && (
+        <button
+          type="button"
+          onClick={handleAllocate}
+          disabled={pending}
+          className="border-ink-line hover:border-navy text-navy rounded-md border px-2 py-0.5 text-xs font-medium disabled:opacity-40"
+        >
+          שייך לבנק
+        </button>
+      )}
       <button
         type="button"
         onClick={handleInvoice}
