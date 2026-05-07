@@ -24,6 +24,9 @@ import {
   updateTimeEntry,
   bulkDeleteTimeEntries,
   bulkToggleBillable,
+  allocateEntryToBank,
+  markEntryAsInvoiced,
+  resetEntryToPending,
 } from "./actions";
 import { NewTimeEntryDialog } from "./new-time-entry-dialog";
 import { BulkActionBar } from "@/components/ui/bulk-action-bar";
@@ -939,6 +942,8 @@ function EditEntryRow({
           לחיוב
         </label>
 
+        {billable && <BillingStatusActions entry={entry} onDone={() => { onClose(); }} />}
+
         <div className="flex items-center justify-between pt-1">
           <button
             type="button"
@@ -968,6 +973,91 @@ function EditEntryRow({
           </div>
         </div>
       </form>
+    </div>
+  );
+}
+
+function BillingStatusActions({ entry, onDone }: { entry: TimeEntryItem; onDone: () => void }) {
+  const [pending, startTransition] = useTransition();
+  const router = useRouter();
+  const toast = useToast();
+  const status = entry.billing_status;
+
+  function handleAllocate() {
+    startTransition(async () => {
+      const res = await allocateEntryToBank(entry.id);
+      if (res.error) { toast.error(res.error); return; }
+      toast.success("השעה שויכה לבנק");
+      onDone();
+      router.refresh();
+    });
+  }
+
+  function handleInvoice() {
+    startTransition(async () => {
+      const res = await markEntryAsInvoiced(entry.id);
+      if (res.error) { toast.error(res.error); return; }
+      toast.success("סומן כחיוב נפרד");
+      onDone();
+      router.refresh();
+    });
+  }
+
+  function handleReset() {
+    startTransition(async () => {
+      const res = await resetEntryToPending(entry.id);
+      if (res.error) { toast.error(res.error); return; }
+      toast.success("אופס לממתין");
+      onDone();
+      router.refresh();
+    });
+  }
+
+  if (status === "allocated_to_bank") {
+    return (
+      <div className="text-ink-faded text-xs">
+        שויך לבנק שעות — לשינוי, ערוך את הרשומה
+      </div>
+    );
+  }
+
+  if (status === "invoiced") {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="text-ink-soft text-xs">סטטוס: חיוב נפרד</span>
+        <button
+          type="button"
+          onClick={handleReset}
+          disabled={pending}
+          className="text-ink-faded hover:text-navy text-xs underline disabled:opacity-50"
+        >
+          אפס לממתין
+        </button>
+      </div>
+    );
+  }
+
+  // pending / overage / null — show action buttons
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-ink-faded text-xs">סטטוס חיוב:</span>
+      <button
+        type="button"
+        onClick={handleAllocate}
+        disabled={pending || !entry.customer_id}
+        className="border-ink-line hover:border-navy text-navy rounded-md border px-2 py-0.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40"
+        title={!entry.customer_id ? "נדרש לקוח לשיוך לבנק" : undefined}
+      >
+        שייך לבנק
+      </button>
+      <button
+        type="button"
+        onClick={handleInvoice}
+        disabled={pending}
+        className="border-ink-line hover:border-navy text-navy rounded-md border px-2 py-0.5 text-xs font-medium disabled:opacity-40"
+      >
+        חיוב נפרד
+      </button>
     </div>
   );
 }

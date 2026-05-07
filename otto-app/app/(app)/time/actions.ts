@@ -301,6 +301,58 @@ export async function bulkDeleteTimeEntries(
   return { deleted: count ?? ids.length };
 }
 
+export async function allocateEntryToBank(
+  entryId: string,
+): Promise<{ error?: string }> {
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { error: "לא מחובר" };
+
+  const { error } = await supabase.rpc("allocate_time_entry_to_bank", {
+    p_entry_id: entryId,
+  });
+  if (error) return { error: error.message };
+
+  revalidatePath("/time");
+  revalidatePath("/hour-banks");
+  return {};
+}
+
+export async function markEntryAsInvoiced(
+  entryId: string,
+): Promise<{ error?: string }> {
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { error: "לא מחובר" };
+
+  const { error } = await supabase
+    .from("time_entries")
+    .update({ billing_status: "invoiced" })
+    .eq("id", entryId)
+    .eq("tenant_id", profile.tenant_id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/time");
+  return {};
+}
+
+export async function resetEntryToPending(
+  entryId: string,
+): Promise<{ error?: string }> {
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { error: "לא מחובר" };
+
+  const { error } = await supabase
+    .from("time_entries")
+    .update({ billing_status: "pending", consumed_from_bank_id: null, is_overage: false })
+    .eq("id", entryId)
+    .eq("tenant_id", profile.tenant_id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/time");
+  return {};
+}
+
 export async function bulkToggleBillable(
   ids: string[],
   billable: boolean,
