@@ -478,6 +478,48 @@ export type Database = {
           },
         ];
       };
+      event_guests: {
+        Row: {
+          created_at: string;
+          email: string;
+          event_id: string;
+          id: string;
+          name: string | null;
+          tenant_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          email: string;
+          event_id: string;
+          id?: string;
+          name?: string | null;
+          tenant_id: string;
+        };
+        Update: {
+          created_at?: string;
+          email?: string;
+          event_id?: string;
+          id?: string;
+          name?: string | null;
+          tenant_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "event_guests_event_id_fkey";
+            columns: ["event_id"];
+            isOneToOne: false;
+            referencedRelation: "events";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "event_guests_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       events: {
         Row: {
           all_day: boolean;
@@ -488,6 +530,7 @@ export type Database = {
           google_event_id: string | null;
           id: string;
           location: string | null;
+          meeting_url: string | null;
           project_id: string | null;
           start_at: string;
           tenant_id: string;
@@ -504,6 +547,7 @@ export type Database = {
           google_event_id?: string | null;
           id?: string;
           location?: string | null;
+          meeting_url?: string | null;
           project_id?: string | null;
           start_at: string;
           tenant_id: string;
@@ -520,6 +564,7 @@ export type Database = {
           google_event_id?: string | null;
           id?: string;
           location?: string | null;
+          meeting_url?: string | null;
           project_id?: string | null;
           start_at?: string;
           tenant_id?: string;
