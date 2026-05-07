@@ -167,6 +167,10 @@ export async function createHourBank(
 
   if (error) return { error: error.message };
 
+  // Retroactively allocate existing pending entries for this customer to the new bank
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (supabase as any).rpc("backfill_pending_entries_to_bank", { p_bank_id: bank.id });
+
   // Auto-create an advance invoice draft linked to this bank
   await createAdvanceInvoiceForBank({
     supabase,
@@ -676,4 +680,16 @@ export async function bulkDeleteHourBanks(
   if (error) return { deleted: 0, error: error.message };
   revalidatePath("/hour-banks");
   return { deleted: count ?? deletableIds.length, skipped: ids.length - deletableIds.length };
+}
+
+export async function backfillPendingEntries(bankId: string) {
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { error: "לא מחובר" };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any).rpc("backfill_pending_entries_to_bank", {
+    p_bank_id: bankId,
+  });
+  if (error) return { error: error.message as string };
+  revalidatePath(`/hour-banks/${bankId}`);
+  return { allocated: (data as number) ?? 0 };
 }

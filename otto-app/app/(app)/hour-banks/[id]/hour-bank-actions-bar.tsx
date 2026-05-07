@@ -2,10 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Edit2, Ban } from "lucide-react";
+import { Edit2, Ban, RefreshCw } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
-import { cancelHourBank } from "../actions";
+import { cancelHourBank, backfillPendingEntries } from "../actions";
 import { EditHourBankDialog } from "./edit-hour-bank-dialog";
 
 export type EditableBank = {
@@ -22,8 +22,22 @@ export type EditableBank = {
 export function HourBankActionsBar({ bank }: { bank: EditableBank }) {
   const [showEdit, setShowEdit] = useState(false);
   const [pending, startTransition] = useTransition();
+  const [backfilling, startBackfill] = useTransition();
   const router = useRouter();
   const toast = useToast();
+
+  function handleBackfill() {
+    startBackfill(async () => {
+      const result = await backfillPendingEntries(bank.id);
+      if (result?.error) {
+        toast.error(result.error);
+        return;
+      }
+      const count = result.allocated ?? 0;
+      toast.success(count > 0 ? `שוייכו ${count} רשומות שעות לבנק` : "אין שעות ממתינות לשיוך");
+      router.refresh();
+    });
+  }
 
   function handleCancel() {
     if (!confirm("לבטל את בנק השעות הזה? לא ניתן לשחזר.")) return;
@@ -51,6 +65,17 @@ export function HourBankActionsBar({ bank }: { bank: EditableBank }) {
           <Edit2 size={13} />
           ערוך
         </button>
+        {bank.status === "active" && (
+          <button
+            type="button"
+            onClick={handleBackfill}
+            disabled={backfilling}
+            className="border-ink-line text-ink-soft hover:border-navy hover:text-navy flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50"
+          >
+            {backfilling ? <Spinner size={13} /> : <RefreshCw size={13} />}
+            שייך שעות ממתינות
+          </button>
+        )}
         {canCancel && (
           <button
             type="button"
