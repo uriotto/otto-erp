@@ -100,6 +100,7 @@ export function ContactsList({
   const [contacts, setContacts] = useState(initialContacts);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setContacts(initialContacts);
   }, [initialContacts]);
 
@@ -164,8 +165,8 @@ export function ContactsList({
           {search || customerFilter !== "all" ? "לא נמצאו אנשי קשר" : "אין אנשי קשר עדיין"}
         </div>
       ) : (
-        <div className="border-ink-line overflow-hidden rounded-2xl border">
-          <table className="w-full text-sm">
+        <div className="border-ink-line overflow-x-auto rounded-2xl border">
+          <table className="w-full min-w-[700px] text-sm">
             <thead className="bg-cream-deep/40">
               <tr>
                 <th className="text-ink-faded text-micro px-4 py-3 text-start font-medium uppercase">

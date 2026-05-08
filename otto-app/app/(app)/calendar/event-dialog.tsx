@@ -121,12 +121,17 @@ export function EventDialog({
   const [endLocal, setEndLocal] = useState(endVal);
 
   // When toggling all-day, adjust the local value format
+   
   useEffect(() => {
     if (allDay) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStartLocal((p) => p.slice(0, 10));
+       
       setEndLocal((p) => p.slice(0, 10));
     } else {
+       
       setStartLocal((p) => (p.length === 10 ? `${p}T09:00` : p));
+       
       setEndLocal((p) => (p.length === 10 ? `${p}T10:00` : p));
     }
   }, [allDay]);
@@ -158,7 +163,7 @@ export function EventDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4">
       <div className="bg-cream-paper border-ink-line w-full max-w-lg rounded-xl border shadow-xl">
         {/* Header */}
         <div className="border-ink-line flex items-center justify-between border-b px-5 py-4">

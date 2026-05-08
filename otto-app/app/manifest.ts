@@ -7,11 +7,11 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "OTTO — automate your success",
     lang: "he",
     dir: "rtl",
-    start_url: "/dashboard",
+    start_url: "/today",
     scope: "/",
     display: "standalone",
     orientation: "portrait",
-    background_color: "#ffffff",
+    background_color: "#faf8f3",
     theme_color: "#003f7c",
     icons: [
       {

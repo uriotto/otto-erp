@@ -128,7 +128,7 @@ export function NewQuoteDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
       <div className="bg-navy/40 fixed inset-0" onClick={onClose} />
       <div className="bg-cream-paper relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl p-6 shadow-xl">
         <div className="mb-5 flex items-center justify-between">

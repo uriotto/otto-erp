@@ -220,12 +220,13 @@ function MonthView({
     <div className="flex-1 overflow-auto">
       {/* Day headers */}
       <div className="border-ink-line grid grid-cols-7 border-b">
-        {DAYS_HE.map((d) => (
+        {DAYS_HE.map((d, i) => (
           <div
             key={d}
             className="text-ink-soft py-2 text-center text-[11px] font-semibold tracking-wide uppercase"
           >
-            {d}
+            <span className="hidden lg:inline">{d}</span>
+            <span className="lg:hidden">{DAYS_HE_SHORT[i]}</span>
           </div>
         ))}
       </div>
@@ -243,21 +244,36 @@ function MonthView({
           return (
             <div
               key={i}
-              className={`border-ink-line group min-h-[90px] cursor-pointer border-e border-b p-1.5 ${!inMonth ? "bg-cream-deep/50" : "bg-cream-paper hover:bg-cream-deep/30"} ${today ? "ring-navy/30 ring-1 ring-inset" : ""}`}
+              className={`border-ink-line group cursor-pointer border-e border-b p-1 lg:min-h-[90px] lg:p-1.5 ${!inMonth ? "bg-cream-deep/50" : "bg-cream-paper hover:bg-cream-deep/30"} ${today ? "ring-navy/30 ring-1 ring-inset" : ""}`}
               onClick={() => onDayClick(key)}
             >
               {/* Date number */}
-              <div className="mb-1 flex items-center justify-between">
+              <div className="mb-0.5 flex items-center justify-between lg:mb-1">
                 <span
-                  className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-semibold ${today ? "bg-navy text-white" : inMonth ? "text-navy" : "text-ink-faded"}`}
+                  className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold lg:h-6 lg:w-6 lg:text-[12px] ${today ? "bg-navy text-white" : inMonth ? "text-navy" : "text-ink-faded"}`}
                 >
                   {cell.getDate()}
                 </span>
-                <Plus className="text-ink-faded h-3 w-3 opacity-0 transition-opacity group-hover:opacity-60" />
+                <Plus className="text-ink-faded hidden h-3 w-3 opacity-0 transition-opacity group-hover:opacity-60 lg:block" />
               </div>
 
-              {/* Events first (amber), then tasks */}
-              <div className="space-y-0.5">
+              {/* Mobile: dots only */}
+              {total > 0 && (
+                <div className="flex flex-wrap gap-0.5 lg:hidden">
+                  {events.slice(0, 3).map((ev) => (
+                    <span key={ev.id} className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                  ))}
+                  {tasks.slice(0, 3 - Math.min(events.length, 3)).map((t) => (
+                    <span key={t.id} className="bg-navy h-1.5 w-1.5 rounded-full" />
+                  ))}
+                  {total > 3 && (
+                    <span className="text-ink-faded text-[8px] font-medium">+{total - 3}</span>
+                  )}
+                </div>
+              )}
+
+              {/* Desktop: chips */}
+              <div className="hidden space-y-0.5 lg:block">
                 {events.slice(0, 2).map((ev) => (
                   <EventChip key={ev.id} event={ev} onClick={() => onEventClick(ev)} />
                 ))}
@@ -822,8 +838,8 @@ export function CalendarClient({
   return (
     <div className="flex h-full flex-col">
       {/* ── Toolbar ── */}
-      <div className="border-ink-line bg-cream-paper flex items-center gap-3 border-b px-5 py-3">
-        <h1 className="text-display-sm text-navy me-2">לוח שנה</h1>
+      <div className="border-ink-line bg-cream-paper flex flex-wrap items-center gap-2 border-b px-3 py-2 lg:gap-3 lg:px-5 lg:py-3">
+        <h1 className="text-display-sm text-navy me-2 hidden lg:block">לוח שנה</h1>
 
         {view !== "list" && (
           <div className="flex items-center gap-1">
@@ -844,7 +860,7 @@ export function CalendarClient({
           </div>
         )}
 
-        <span className="text-navy min-w-[160px] text-sm font-semibold">
+        <span className="text-navy flex-1 text-sm font-semibold">
           {view === "month"
             ? `${MONTHS_HE[month]} ${year}`
             : view === "week"
@@ -856,12 +872,10 @@ export function CalendarClient({
 
         <button
           onClick={goToday}
-          className="border-ink-line text-ink-soft hover:bg-cream-deep rounded-lg border px-3 py-1.5 text-[13px] font-medium transition-colors"
+          className="border-ink-line text-ink-soft hover:bg-cream-deep rounded-lg border px-2.5 py-1.5 text-[12px] font-medium transition-colors"
         >
           היום
         </button>
-
-        <div className="flex-1" />
 
         {/* New event button */}
         <button
@@ -871,27 +885,27 @@ export function CalendarClient({
             const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
             setDialog({ open: true, mode: "create", date: today });
           }}
-          className="bg-navy hover:bg-navy/90 flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-medium text-white transition-colors"
+          className="bg-navy hover:bg-navy/90 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-medium text-white transition-colors"
         >
           <Plus className="h-3.5 w-3.5" />
-          אירוע חדש
+          <span className="hidden sm:inline">אירוע חדש</span>
         </button>
 
         {/* View toggle */}
         <div className="border-ink-line bg-cream-deep flex items-center gap-0.5 rounded-lg border p-0.5">
           {(
             [
-              { v: "month", icon: Grid3X3, label: "חודש" },
-              { v: "week", icon: CalendarDays, label: "שבוע" },
-              { v: "day", icon: Clock, label: "יום" },
-              { v: "list", icon: List, label: "רשימה" },
+              { v: "month", icon: Grid3X3, label: "חודש", mobileHidden: false },
+              { v: "week", icon: CalendarDays, label: "שבוע", mobileHidden: true },
+              { v: "day", icon: Clock, label: "יום", mobileHidden: false },
+              { v: "list", icon: List, label: "רשימה", mobileHidden: false },
             ] as const
-          ).map(({ v, icon: Icon, label }) => (
+          ).map(({ v, icon: Icon, label, mobileHidden }) => (
             <button
               key={v}
               onClick={() => setView(v)}
               title={`תצוגת ${label}`}
-              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-all ${view === v ? "bg-cream-paper text-navy shadow-card" : "text-ink-soft hover:text-navy"}`}
+              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-all ${mobileHidden ? "hidden lg:flex" : "flex"} ${view === v ? "bg-cream-paper text-navy shadow-card" : "text-ink-soft hover:text-navy"}`}
             >
               <Icon className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">{label}</span>
@@ -922,6 +936,20 @@ export function CalendarClient({
           שיחה
         </span>
       </div>
+
+      {/* ── Mobile fallback for week view ── */}
+      {view === "week" && (
+        <div className="bg-cream-deep border-ink-line flex flex-col items-center justify-center gap-3 border-b px-6 py-10 text-center lg:hidden">
+          <CalendarDays className="text-ink-faded h-10 w-10" />
+          <p className="text-ink-soft text-sm font-medium">תצוגת שבוע זמינה בדסקטופ בלבד</p>
+          <button
+            onClick={() => setView("day")}
+            className="bg-navy text-cream-paper rounded-lg px-4 py-2 text-sm font-semibold"
+          >
+            עבור לתצוגת יום
+          </button>
+        </div>
+      )}
 
       {/* ── Calendar body ── */}
       {view === "month" && (

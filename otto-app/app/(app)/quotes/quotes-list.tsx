@@ -180,8 +180,8 @@ export function QuotesList({
           </button>
         </div>
       ) : (
-        <div className="bg-cream-paper border-ink-line overflow-hidden rounded-2xl border">
-          <table className="w-full text-sm">
+        <div className="bg-cream-paper border-ink-line overflow-x-auto rounded-2xl border">
+          <table className="w-full min-w-[700px] text-sm">
             <thead>
               <tr className="border-ink-line/60 border-b">
                 <th className="w-10 px-4 py-3">

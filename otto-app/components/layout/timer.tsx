@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Play, Square, X, Check } from "lucide-react";
+import { Play, Square, X, Check, RotateCcw, ChevronDown } from "lucide-react";
 import { useTimerStore } from "@/lib/stores/timer";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
@@ -43,15 +43,19 @@ export function Timer() {
   const start = useTimerStore((s) => s.start);
   const stop = useTimerStore((s) => s.stop);
   const updateContext = useTimerStore((s) => s.updateContext);
+  const reset = useTimerStore((s) => s.reset);
+  const recentRuns = useTimerStore((s) => s.recentRuns);
 
   const [mounted, setMounted] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
+  const [showRecent, setShowRecent] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [customers, setCustomers] = useState<CustomerOpt[]>([]);
   const [projects, setProjects] = useState<ProjectOpt[]>([]);
   const [tasks, setTasks] = useState<TaskOpt[]>([]);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const recentRef = useRef<HTMLDivElement>(null);
 
   const toast = useToast();
 
@@ -78,6 +82,18 @@ export function Timer() {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [showAssign]);
+
+  // Close recent runs dropdown on outside click
+  useEffect(() => {
+    if (!showRecent) return;
+    function handleClick(e: MouseEvent) {
+      if (recentRef.current && !recentRef.current.contains(e.target as Node)) {
+        setShowRecent(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showRecent]);
 
   // Fetch lookups once
   const fetchedRef = useRef(false);
@@ -112,6 +128,17 @@ export function Timer() {
   const handleStartNow = () => {
     start({ customerId: null, projectId: null, taskId: null, notes: "" });
     setShowAssign(true);
+    setShowRecent(false);
+  };
+
+  const handleLoadRecent = (run: (typeof recentRuns)[0]) => {
+    start({
+      customerId: run.customerId,
+      projectId: run.projectId,
+      taskId: run.taskId,
+      notes: run.notes ?? "",
+    });
+    setShowRecent(false);
   };
 
   const handleStop = async () => {
@@ -191,6 +218,19 @@ export function Timer() {
           {stopping ? <Spinner size={12} /> : <Square size={12} fill="currentColor" />}
         </button>
 
+        <button
+          type="button"
+          onClick={() => {
+            if (confirm("לבטל את הטיימר ללא שמירה?")) reset();
+          }}
+          disabled={stopping}
+          aria-label="בטל טיימר"
+          title="בטל ללא שמירה"
+          className="text-ink-faded ms-0.5 flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:opacity-60"
+        >
+          <X size={13} />
+        </button>
+
         {showAssign && (
           <TimerAssignPopup
             customers={customers}
@@ -212,15 +252,67 @@ export function Timer() {
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleStartNow}
-      className="bg-cream-paper border-ink-line text-ink-soft hover:border-navy hover:text-navy flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium transition-colors"
-      aria-label="התחל טיימר"
-    >
-      <Play size={14} className="text-emerald-600" />
-      <span className="hidden md:inline">התחל טיימר</span>
-    </button>
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        onClick={handleStartNow}
+        className="bg-cream-paper border-ink-line text-ink-soft hover:border-navy hover:text-navy flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium transition-colors"
+        aria-label="התחל טיימר"
+      >
+        <Play size={14} className="text-emerald-600" />
+        <span className="hidden md:inline">התחל טיימר</span>
+      </button>
+
+      {recentRuns.length > 0 && (
+        <div ref={recentRef} className="relative">
+          <button
+            type="button"
+            onClick={() => setShowRecent((v) => !v)}
+            className="bg-cream-paper border-ink-line text-ink-soft hover:border-navy hover:text-navy relative flex items-center gap-1 rounded-full border px-2 py-2 text-sm font-medium transition-colors"
+            aria-label="הרצות אחרונות"
+            title="המשך מהפעם האחרונה"
+          >
+            <RotateCcw size={13} />
+            <ChevronDown size={11} />
+            <span className="bg-navy text-cream-paper absolute -end-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full text-[10px] leading-none font-bold">
+              {recentRuns.length > 9 ? "9+" : recentRuns.length}
+            </span>
+          </button>
+
+          {showRecent && (
+            <div
+              className="bg-cream-paper border-ink-line absolute end-0 top-full z-50 mt-2 w-64 rounded-xl border shadow-lg"
+              style={{ boxShadow: "0 4px 24px rgba(0,31,60,0.14), 0 0 0 1px rgba(0,63,124,0.08)" }}
+            >
+              <div className="border-ink-line border-b px-3 py-2">
+                <span className="text-ink-faded text-xs font-medium">המשך מהפעם האחרונה</span>
+              </div>
+              <div className="space-y-0.5 p-1.5">
+                {recentRuns.slice(0, 5).map((run) => (
+                  <button
+                    key={run.id}
+                    type="button"
+                    onClick={() => handleLoadRecent(run)}
+                    className="hover:bg-cream-deep flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-start text-sm transition-colors"
+                  >
+                    <RotateCcw size={12} className="text-ink-faded shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-navy truncate text-xs font-medium">
+                        {run.customerName ?? "ללא לקוח"}
+                        {run.projectName ? ` · ${run.projectName}` : ""}
+                      </p>
+                      {run.notes && (
+                        <p className="text-ink-faded truncate text-[11px]">{run.notes}</p>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
