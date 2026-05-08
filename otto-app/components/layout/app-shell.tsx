@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Sidebar } from "./sidebar";
 import { AppHeader } from "./header";
 import { Breadcrumbs } from "./breadcrumbs";
+import { BottomNav } from "./bottom-nav";
 
 type Props = {
   greeting: string;
@@ -36,7 +37,7 @@ export function AppShell({ greeting, displayName, subline, children }: Props) {
         </>
       )}
 
-      <main className="bg-cream min-h-screen px-6 py-8 pb-16 md:px-10 lg:max-w-[1400px] lg:px-12 lg:pb-20">
+      <main className="bg-cream min-h-screen px-6 py-8 pb-24 md:px-10 lg:max-w-[1400px] lg:px-12 lg:pb-20">
         <AppHeader
           greeting={greeting}
           displayName={displayName}
@@ -46,6 +47,8 @@ export function AppShell({ greeting, displayName, subline, children }: Props) {
         <Breadcrumbs />
         {children}
       </main>
+
+      <BottomNav onMenuClick={() => setMobileOpen(true)} />
     </div>
   );
 }

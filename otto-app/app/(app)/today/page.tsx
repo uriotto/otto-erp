@@ -5,6 +5,7 @@ import type { ParentSearchItem } from "@/components/activities/parent-picker";
 import { TodayActivityRow } from "./today-activity-row";
 import { TodayTaskRow, type TodayTaskItem } from "./today-task-row";
 import { TodayNewButton } from "./today-new-button";
+import { TodayTimerSection } from "./today-timer-section";
 
 export const metadata = { title: "היום — OTTO" };
 
@@ -109,6 +110,8 @@ export default async function TodayPage() {
 
   return (
     <div className="space-y-6">
+      <TodayTimerSection />
+
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-navy text-base font-semibold">{dateLabel}</p>

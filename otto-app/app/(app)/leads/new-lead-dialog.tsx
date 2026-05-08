@@ -24,8 +24,8 @@ export function NewLeadDialog({ onClose }: { onClose: () => void }) {
   }, [state, toast, onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-cream w-full max-w-lg rounded-2xl p-6 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4">
+      <div className="bg-cream w-full max-w-lg rounded-t-2xl p-6 shadow-xl sm:rounded-2xl">
         <div className="mb-5 flex items-center justify-between">
           <h2 className="text-display-sm text-navy">ליד חדש</h2>
           <button

@@ -18,18 +18,30 @@ type Props = {
 export function AppHeader({ greeting, displayName, subline, onMenuClick }: Props) {
   return (
     <header className="border-ink-line mb-8 flex flex-col gap-4 border-b pb-6 md:flex-row md:items-start md:justify-between">
-      <div className="flex items-start gap-3">
-        {onMenuClick && (
-          <button
-            type="button"
-            onClick={onMenuClick}
-            className="bg-cream-paper shadow-card text-ink-soft hover:text-navy flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-all hover:shadow-md lg:hidden"
-            aria-label="פתח תפריט"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
-        )}
+      {/* Mobile: לוגו + כפתורים בשורה אחת */}
+      <div className="flex items-center justify-between lg:hidden">
+        <div dir="ltr" className="flex items-baseline gap-1">
+          <span className="text-navy text-2xl font-extrabold tracking-tight">OTTO</span>
+          <span className="bg-accent mb-0.5 inline-block h-1.5 w-1.5 rounded-full" aria-hidden />
+        </div>
+        <div className="flex items-center gap-2">
+          <Timer />
+          <NotificationBell />
+          {onMenuClick && (
+            <button
+              type="button"
+              onClick={onMenuClick}
+              className="bg-cream-paper shadow-card text-ink-soft hover:text-navy flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-all"
+              aria-label="פתח תפריט"
+            >
+              <Menu className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </div>
 
+      {/* Desktop: greeting מלא */}
+      <div className="hidden items-start gap-3 lg:flex">
         <div>
           <h1 className="text-display-lg text-navy">
             {greeting}, {displayName}
@@ -42,11 +54,11 @@ export function AppHeader({ greeting, displayName, subline, onMenuClick }: Props
         </div>
       </div>
 
-      <div className="flex flex-1 items-center justify-end gap-2 md:max-w-[600px]">
+      <div className="hidden flex-1 items-center justify-end gap-2 lg:flex lg:max-w-[600px]">
         <Timer />
         <NotificationBell />
 
-        <div className="flex-1 md:w-[380px] md:flex-none">
+        <div className="flex-1 lg:w-[380px] lg:flex-none">
           <HeaderSearch />
         </div>
 

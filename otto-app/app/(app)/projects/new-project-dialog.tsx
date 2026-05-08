@@ -44,7 +44,7 @@ export function NewProjectDialog({
   }, [state, toast, onClose, router]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4">
       <div className="bg-cream max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl p-6 shadow-xl">
         <div className="mb-5 flex items-center justify-between">
           <h2 className="text-display-sm text-navy">פרויקט חדש</h2>

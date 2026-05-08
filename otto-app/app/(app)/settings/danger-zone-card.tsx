@@ -87,8 +87,8 @@ export function DangerZoneCard({ tenantName }: Props) {
       </section>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-cream w-full max-w-md rounded-2xl p-6 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4">
+          <div className="bg-cream w-full max-w-md rounded-t-2xl p-6 shadow-xl sm:rounded-2xl">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div className="flex items-center gap-2">
                 <AlertTriangle size={18} className="text-red-600" />

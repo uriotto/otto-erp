@@ -48,7 +48,7 @@ export function NewAgentDialog({ open, onClose, agent }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/40" onClick={onClose} />
-      <div className="bg-cream-paper border-ink-line relative z-10 w-full max-w-lg rounded-2xl border p-6 shadow-xl">
+      <div className="bg-cream-paper border-ink-line relative z-10 w-full max-w-lg rounded-t-2xl border p-6 shadow-xl sm:rounded-2xl">
         <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="bg-navy text-cream-paper flex h-8 w-8 items-center justify-center rounded-lg">
