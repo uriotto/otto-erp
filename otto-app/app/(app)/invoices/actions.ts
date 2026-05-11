@@ -357,15 +357,28 @@ export async function deleteInvoice(id: string): Promise<InvoiceActionResult> {
 const PostPaymentDocumentEnum = z.enum(["none", "tax_invoice_receipt", "receipt"]);
 export type PostPaymentDocument = z.infer<typeof PostPaymentDocumentEnum>;
 
-const RecordPaymentSchema = z.object({
-  invoice_id: z.string().uuid(),
-  amount: z.number().positive("סכום חייב להיות גדול מ-0"),
-  method: PaymentMethodEnum,
-  reference: z.string().max(120).optional().nullable(),
-  paid_at: z.string().optional().nullable(),
-  notes: z.string().max(2000).optional().nullable(),
-  issue_document: PostPaymentDocumentEnum.optional(),
-});
+const RecordPaymentSchema = z
+  .object({
+    invoice_id: z.string().uuid(),
+    amount: z.number().positive("סכום חייב להיות גדול מ-0"),
+    method: PaymentMethodEnum,
+    reference: z.string().max(120).optional().nullable(),
+    paid_at: z.string().optional().nullable(),
+    notes: z.string().max(2000).optional().nullable(),
+    issue_document: PostPaymentDocumentEnum.optional(),
+    card_last_4: z
+      .string()
+      .regex(/^\d{4}$/, "יש להזין 4 ספרות")
+      .optional()
+      .nullable(),
+  })
+  .refine(
+    (v) => v.method !== "credit_card" || (v.card_last_4 != null && /^\d{4}$/.test(v.card_last_4)),
+    {
+      message: "באשראי חובה להזין 4 ספרות אחרונות של הכרטיס",
+      path: ["card_last_4"],
+    },
+  );
 
 export async function recordPayment(
   input: z.infer<typeof RecordPaymentSchema>,
@@ -408,8 +421,9 @@ export async function recordPayment(
       reference: data.reference || null,
       notes: data.notes || null,
       paid_at: data.paid_at || new Date().toISOString(),
+      card_last_4: data.method === "credit_card" ? (data.card_last_4 ?? null) : null,
     })
-    .select("id, amount, method, paid_at, reference")
+    .select("id, amount, method, paid_at, reference, card_last_4")
     .single();
 
   if (error || !payment) return { ok: false, error: error?.message ?? "שגיאה ברישום תשלום" };
@@ -454,6 +468,7 @@ export async function recordPayment(
     amount: Number(payment.amount),
     method: payment.method,
     reference: payment.reference,
+    card_last_4: payment.card_last_4,
     paid_at: payment.paid_at,
     invoice: {
       number: inv.number,

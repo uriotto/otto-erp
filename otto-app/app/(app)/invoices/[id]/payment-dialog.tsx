@@ -46,12 +46,17 @@ export function PaymentDialog({
   const [paidAt, setPaidAt] = useState(todayISO());
   const [notes, setNotes] = useState("");
   const [issueDocument, setIssueDocument] = useState<PostPaymentDocument>("tax_invoice_receipt");
+  const [cardLast4, setCardLast4] = useState("");
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const amountNum = Number(amount);
     if (!Number.isFinite(amountNum) || amountNum <= 0) {
       toast.error("סכום לא תקין");
+      return;
+    }
+    if (method === "credit_card" && !/^\d{4}$/.test(cardLast4)) {
+      toast.error("באשראי חובה להזין 4 ספרות אחרונות של הכרטיס");
       return;
     }
 
@@ -64,6 +69,7 @@ export function PaymentDialog({
         paid_at: paidAt || null,
         notes: notes.trim() || null,
         issue_document: issueDocument,
+        card_last_4: method === "credit_card" ? cardLast4 : null,
       });
 
       if (!result.ok) {
@@ -130,6 +136,23 @@ export function PaymentDialog({
               ))}
             </select>
           </Field>
+
+          {method === "credit_card" && (
+            <Field label="4 ספרות אחרונות של הכרטיס *">
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="\d{4}"
+                maxLength={4}
+                value={cardLast4}
+                onChange={(e) => setCardLast4(e.target.value.replace(/\D/g, ""))}
+                required
+                placeholder="1234"
+                className={`${baseInput} font-mono`}
+                dir="ltr"
+              />
+            </Field>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="תאריך תשלום">
