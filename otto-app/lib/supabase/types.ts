@@ -2359,6 +2359,7 @@ export type Database = {
           age_bucket: string | null;
           customer_id: string | null;
           days_overdue: number | null;
+          document_type: Database["public"]["Enums"]["invoice_document_type"] | null;
           due_date: string | null;
           id: string | null;
           issue_date: string | null;
@@ -2372,6 +2373,7 @@ export type Database = {
           age_bucket?: never;
           customer_id?: string | null;
           days_overdue?: never;
+          document_type?: Database["public"]["Enums"]["invoice_document_type"] | null;
           due_date?: string | null;
           id?: string | null;
           issue_date?: string | null;
@@ -2385,6 +2387,7 @@ export type Database = {
           age_bucket?: never;
           customer_id?: string | null;
           days_overdue?: never;
+          document_type?: Database["public"]["Enums"]["invoice_document_type"] | null;
           due_date?: string | null;
           id?: string | null;
           issue_date?: string | null;

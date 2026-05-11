@@ -27,6 +27,7 @@ export default async function InvoicesPage() {
     return {
       id: row.id ?? "",
       number: row.number,
+      document_type: (row.document_type ?? null) as InvoiceListItem["document_type"],
       issue_date: row.issue_date,
       due_date: row.due_date,
       status: (row.status ?? "draft") as InvoiceListItem["status"],

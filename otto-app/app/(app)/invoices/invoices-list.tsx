@@ -39,9 +39,16 @@ export type InvoiceTypeUI =
 
 export type AgeBucket = "current" | "1-30" | "31-60" | "61-90" | "90+" | "paid";
 
+export type InvoiceDocumentTypeUI =
+  | "payment_request"
+  | "tax_invoice"
+  | "tax_invoice_receipt"
+  | "receipt";
+
 export type InvoiceListItem = {
   id: string;
   number: string | null;
+  document_type: InvoiceDocumentTypeUI | null;
   issue_date: string | null;
   due_date: string | null;
   status: InvoiceStatusUI;
@@ -91,6 +98,13 @@ export const STATUS_STYLES: Record<InvoiceStatusUI, string> = {
   paid: "border-emerald-200 bg-emerald-50 text-emerald-700",
   overdue: "border-rose-200 bg-rose-50 text-rose-700",
   cancelled: "border-gray-200 bg-gray-100 text-gray-500",
+};
+
+export const DOCUMENT_TYPE_LABELS: Record<InvoiceDocumentTypeUI, string> = {
+  payment_request: "דרישת תשלום",
+  tax_invoice: "חשבונית מס",
+  tax_invoice_receipt: "חשבונית מס קבלה",
+  receipt: "קבלה",
 };
 
 export const TYPE_LABELS: Record<InvoiceTypeUI, string> = {
@@ -355,6 +369,7 @@ export function InvoicesList({
                   />
                 </th>
                 <Th>מספר</Th>
+                <Th>סוג מסמך</Th>
                 <Th>לקוח</Th>
                 <Th>הוצאה</Th>
                 <Th>תשלום עד</Th>
@@ -463,6 +478,9 @@ function InvoiceRow({
         >
           {inv.number ?? "טיוטה"}
         </Link>
+      </td>
+      <td className="text-ink-soft px-4 py-3 text-xs">
+        {inv.document_type ? DOCUMENT_TYPE_LABELS[inv.document_type] : "—"}
       </td>
       <td className="px-4 py-3">
         <div className="text-navy">{inv.customer_name ?? "—"}</div>
