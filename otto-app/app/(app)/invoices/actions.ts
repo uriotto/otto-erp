@@ -354,6 +354,9 @@ export async function deleteInvoice(id: string): Promise<InvoiceActionResult> {
   return { ok: true, id };
 }
 
+const PostPaymentDocumentEnum = z.enum(["none", "tax_invoice_receipt", "receipt"]);
+export type PostPaymentDocument = z.infer<typeof PostPaymentDocumentEnum>;
+
 const RecordPaymentSchema = z.object({
   invoice_id: z.string().uuid(),
   amount: z.number().positive("סכום חייב להיות גדול מ-0"),
@@ -361,6 +364,7 @@ const RecordPaymentSchema = z.object({
   reference: z.string().max(120).optional().nullable(),
   paid_at: z.string().optional().nullable(),
   notes: z.string().max(2000).optional().nullable(),
+  issue_document: PostPaymentDocumentEnum.optional(),
 });
 
 export async function recordPayment(
@@ -381,7 +385,9 @@ export async function recordPayment(
 
   const { data: inv } = await supabase
     .from("invoices")
-    .select("id, status, total_amount, number, customer_id, currency")
+    .select(
+      "id, status, total_amount, number, customer_id, currency, finbot_invoice_id, document_type",
+    )
     .eq("id", data.invoice_id)
     .eq("tenant_id", profile.tenant_id)
     .maybeSingle();
@@ -408,10 +414,35 @@ export async function recordPayment(
 
   if (error || !payment) return { ok: false, error: error?.message ?? "שגיאה ברישום תשלום" };
 
+  const { data: customer } = inv.customer_id
+    ? await supabase
+        .from("customers")
+        .select("name, email, phone, company, address, company_registration_number")
+        .eq("id", inv.customer_id)
+        .maybeSingle()
+    : { data: null };
+
+  const issueDocument: PostPaymentDocument = data.issue_document ?? "none";
+
   await fireMakeWebhook(profile.tenant_id, "invoice.payment_recorded", {
     invoice_id: inv.id,
     invoice_number: inv.number,
     customer_id: inv.customer_id,
+    customer: customer
+      ? {
+          name: customer.name,
+          email: customer.email,
+          phone: customer.phone,
+          company: customer.company,
+          address: customer.address,
+          tax_id: customer.company_registration_number,
+        }
+      : null,
+    source_document: {
+      id: inv.finbot_invoice_id,
+      type: inv.document_type,
+    },
+    issue_document: issueDocument,
     payment_id: payment.id,
     amount: Number(payment.amount),
     method: payment.method,

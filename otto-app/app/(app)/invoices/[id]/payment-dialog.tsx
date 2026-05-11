@@ -6,7 +6,13 @@ import { X } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
 import { recordPayment } from "../actions";
-import type { PaymentMethod } from "../actions";
+import type { PaymentMethod, PostPaymentDocument } from "../actions";
+
+const POST_PAYMENT_DOCUMENT_LABELS: Record<PostPaymentDocument, string> = {
+  none: "אל תפיק מסמך",
+  tax_invoice_receipt: "חשבונית מס קבלה",
+  receipt: "קבלה",
+};
 
 const METHOD_LABELS: Record<PaymentMethod, string> = {
   bank_transfer: "העברה בנקאית",
@@ -39,6 +45,7 @@ export function PaymentDialog({
   const [reference, setReference] = useState("");
   const [paidAt, setPaidAt] = useState(todayISO());
   const [notes, setNotes] = useState("");
+  const [issueDocument, setIssueDocument] = useState<PostPaymentDocument>("tax_invoice_receipt");
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -56,6 +63,7 @@ export function PaymentDialog({
         reference: reference.trim() || null,
         paid_at: paidAt || null,
         notes: notes.trim() || null,
+        issue_document: issueDocument,
       });
 
       if (!result.ok) {
@@ -143,6 +151,20 @@ export function PaymentDialog({
               />
             </Field>
           </div>
+
+          <Field label="מסמך להפקה אחרי תשלום">
+            <select
+              value={issueDocument}
+              onChange={(e) => setIssueDocument(e.target.value as PostPaymentDocument)}
+              className={baseInput}
+            >
+              {(Object.keys(POST_PAYMENT_DOCUMENT_LABELS) as PostPaymentDocument[]).map((opt) => (
+                <option key={opt} value={opt}>
+                  {POST_PAYMENT_DOCUMENT_LABELS[opt]}
+                </option>
+              ))}
+            </select>
+          </Field>
 
           <Field label="הערות">
             <textarea

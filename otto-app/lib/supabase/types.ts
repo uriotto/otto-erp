@@ -2447,7 +2447,7 @@ export type Database = {
       document_type: "contract" | "spec" | "deliverable" | "reference" | "other";
       file_source: "storage" | "drive";
       hour_bank_status: "draft" | "active" | "depleted" | "expired" | "cancelled";
-      invoice_document_type: "payment_request" | "tax_invoice" | "tax_invoice_receipt";
+      invoice_document_type: "payment_request" | "tax_invoice" | "tax_invoice_receipt" | "receipt";
       invoice_status:
         | "draft"
         | "pending_review"
@@ -2616,7 +2616,7 @@ export const Constants = {
       document_type: ["contract", "spec", "deliverable", "reference", "other"],
       file_source: ["storage", "drive"],
       hour_bank_status: ["draft", "active", "depleted", "expired", "cancelled"],
-      invoice_document_type: ["payment_request", "tax_invoice", "tax_invoice_receipt"],
+      invoice_document_type: ["payment_request", "tax_invoice", "tax_invoice_receipt", "receipt"],
       invoice_status: [
         "draft",
         "pending_review",
