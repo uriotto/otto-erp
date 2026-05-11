@@ -12,6 +12,13 @@ import {
   type InvoiceTypeUI,
 } from "../invoices-list";
 
+const DOCUMENT_TYPE_LABELS: Record<string, string> = {
+  payment_request: "דרישת תשלום",
+  tax_invoice: "חשבונית מס",
+  tax_invoice_receipt: "חשבונית מס קבלה",
+  receipt: "קבלה",
+};
+
 export const metadata = { title: "חשבונית — OTTO" };
 
 const METHOD_LABELS: Record<string, string> = {
@@ -90,7 +97,12 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
               <h1 className="text-display-sm text-navy font-mono" dir="ltr">
                 {invoice.number ?? "—"}
               </h1>
-              <span className="text-ink-soft text-sm">· {TYPE_LABELS[type] ?? type}</span>
+              {invoice.document_type && (
+                <span className="text-navy text-sm font-semibold">
+                  · {DOCUMENT_TYPE_LABELS[invoice.document_type] ?? invoice.document_type}
+                </span>
+              )}
+              <span className="text-ink-faded text-xs">· {TYPE_LABELS[type] ?? type}</span>
             </div>
             {customer && (
               <Link
