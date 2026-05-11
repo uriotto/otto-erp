@@ -16,6 +16,7 @@ const CreateSchema = z.object({
   alert_threshold_hours: z.string().optional(),
   notes: z.string().optional(),
   confirm_duplicate: z.string().optional(),
+  document_type: z.enum(["payment_request", "tax_invoice", "tax_invoice_receipt"]).optional(),
 });
 
 const UpdateSchema = z.object({
@@ -180,7 +181,7 @@ export async function createHourBank(
     bank_id: bank.id,
     purchased_hours: purchasedHours,
     hourly_rate: hourlyRate,
-    document_type: "payment_request",
+    document_type: data.document_type ?? "payment_request",
   });
 
   // Fire Make webhook (best-effort, non-blocking semantics)

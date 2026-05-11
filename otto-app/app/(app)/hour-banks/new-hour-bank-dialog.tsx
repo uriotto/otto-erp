@@ -217,6 +217,24 @@ export function NewHourBankDialog({
             />
           </div>
 
+          <div>
+            <label className="text-micro text-ink-soft mb-1 block uppercase">
+              סוג מסמך לחיוב מקדמה
+            </label>
+            <select
+              name="document_type"
+              defaultValue="payment_request"
+              className="border-ink-line focus:border-navy w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none"
+            >
+              <option value="payment_request">דרישת תשלום</option>
+              <option value="tax_invoice">חשבונית מס</option>
+              <option value="tax_invoice_receipt">חשבונית מס קבלה</option>
+            </select>
+            <p className="text-ink-faded mt-1 text-xs">
+              המסמך שייווצר בפינבוט באמצעות Make כשהבנק יאושר
+            </p>
+          </div>
+
           <Field label="הערות" name="notes" as="textarea" />
 
           {state.warning && (
