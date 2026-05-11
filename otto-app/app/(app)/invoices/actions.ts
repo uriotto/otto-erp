@@ -386,7 +386,7 @@ export async function recordPayment(
   const { data: inv } = await supabase
     .from("invoices")
     .select(
-      "id, status, total_amount, number, customer_id, currency, finbot_invoice_id, document_type",
+      "id, status, total_amount, subtotal, tax_rate, tax_amount, number, customer_id, currency, finbot_invoice_id, document_type, issue_date, due_date, notes",
     )
     .eq("id", data.invoice_id)
     .eq("tenant_id", profile.tenant_id)
@@ -414,13 +414,20 @@ export async function recordPayment(
 
   if (error || !payment) return { ok: false, error: error?.message ?? "שגיאה ברישום תשלום" };
 
-  const { data: customer } = inv.customer_id
-    ? await supabase
-        .from("customers")
-        .select("name, email, phone, company, address, company_registration_number")
-        .eq("id", inv.customer_id)
-        .maybeSingle()
-    : { data: null };
+  const [{ data: customer }, { data: items }] = await Promise.all([
+    inv.customer_id
+      ? supabase
+          .from("customers")
+          .select("name, email, phone, company, address, company_registration_number")
+          .eq("id", inv.customer_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase
+      .from("invoice_items")
+      .select("description, quantity, unit_price, order_index")
+      .eq("invoice_id", inv.id)
+      .order("order_index", { ascending: true }),
+  ]);
 
   const issueDocument: PostPaymentDocument = data.issue_document ?? "none";
 
@@ -448,6 +455,23 @@ export async function recordPayment(
     method: payment.method,
     reference: payment.reference,
     paid_at: payment.paid_at,
+    invoice: {
+      number: inv.number,
+      issue_date: inv.issue_date,
+      due_date: inv.due_date,
+      subtotal: inv.subtotal == null ? null : Number(inv.subtotal),
+      tax_rate: inv.tax_rate == null ? null : Number(inv.tax_rate),
+      tax_amount: inv.tax_amount == null ? null : Number(inv.tax_amount),
+      total: inv.total_amount == null ? null : Number(inv.total_amount),
+      currency: inv.currency,
+      notes: inv.notes,
+      items: (items ?? []).map((it) => ({
+        description: it.description,
+        quantity: Number(it.quantity),
+        unit_price: Number(it.unit_price),
+        line_total: Math.round(Number(it.quantity) * Number(it.unit_price) * 100) / 100,
+      })),
+    },
     invoice_total: inv.total_amount == null ? null : Number(inv.total_amount),
     currency: inv.currency,
   });
