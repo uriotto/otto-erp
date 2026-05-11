@@ -180,6 +180,7 @@ export async function createHourBank(
     bank_id: bank.id,
     purchased_hours: purchasedHours,
     hourly_rate: hourlyRate,
+    document_type: "payment_request",
   });
 
   // Fire Make webhook (best-effort, non-blocking semantics)
@@ -232,7 +233,12 @@ export async function createHourBank(
 
 // ---------- Renewal drafts ----------
 
-export async function approveRenewalDraft(draftId: string): Promise<{ error?: string }> {
+export type InvoiceDocumentType = "payment_request" | "tax_invoice" | "tax_invoice_receipt";
+
+export async function approveRenewalDraft(
+  draftId: string,
+  documentType: InvoiceDocumentType = "payment_request",
+): Promise<{ error?: string }> {
   const { supabase, profile } = await getTenant();
   if (!profile) return { error: "לא מחובר" };
 
@@ -257,6 +263,7 @@ export async function approveRenewalDraft(draftId: string): Promise<{ error?: st
     bank_id: bank.id,
     purchased_hours: Number(bank.purchased_hours),
     hourly_rate: Number(bank.hourly_rate),
+    document_type: documentType,
   });
 
   await fireMakeWebhook(profile.tenant_id, "hour_bank.renewed", {
@@ -579,6 +586,7 @@ async function createAdvanceInvoiceForBank(input: {
   bank_id: string;
   purchased_hours: number;
   hourly_rate: number;
+  document_type: InvoiceDocumentType;
 }): Promise<void> {
   const subtotal = Math.round(input.purchased_hours * input.hourly_rate * 100) / 100;
   const today = new Date();
@@ -594,6 +602,7 @@ async function createAdvanceInvoiceForBank(input: {
       customer_id: input.customer_id,
       hour_bank_id: input.bank_id,
       type: "advance",
+      document_type: input.document_type,
       status: "draft",
       issue_date: today.toISOString().slice(0, 10),
       due_date: dueIso,
@@ -623,6 +632,7 @@ async function createAdvanceInvoiceForBank(input: {
     total_amount: invoice.total_amount,
     purchased_hours: input.purchased_hours,
     hourly_rate: input.hourly_rate,
+    document_type: input.document_type,
   });
 }
 

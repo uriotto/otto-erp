@@ -5,7 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Calendar, CheckCircle2, Edit2, FileClock, Trash2 } from "lucide-react";
 
-import { approveRenewalDraft, discardRenewalDraft } from "../actions";
+import { approveRenewalDraft, discardRenewalDraft, type InvoiceDocumentType } from "../actions";
+
+const DOCUMENT_TYPE_OPTIONS: { value: InvoiceDocumentType; label: string }[] = [
+  { value: "payment_request", label: "דרישת תשלום" },
+  { value: "tax_invoice", label: "חשבונית מס" },
+  { value: "tax_invoice_receipt", label: "חשבונית מס קבלה" },
+];
 import { EditHourBankDialog } from "../[id]/edit-hour-bank-dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
@@ -80,12 +86,13 @@ export function DraftRenewalsList({ drafts }: { drafts: DraftRenewalItem[] }) {
 function DraftRow({ draft, onEdit }: { draft: DraftRenewalItem; onEdit: () => void }) {
   const [pendingApprove, startApprove] = useTransition();
   const [pendingDiscard, startDiscard] = useTransition();
+  const [documentType, setDocumentType] = useState<InvoiceDocumentType>("payment_request");
   const router = useRouter();
   const toast = useToast();
 
   function handleApprove() {
     startApprove(async () => {
-      const result = await approveRenewalDraft(draft.id);
+      const result = await approveRenewalDraft(draft.id, documentType);
       if (result?.error) {
         toast.error(result.error);
         return;
@@ -178,6 +185,22 @@ function DraftRow({ draft, onEdit }: { draft: DraftRenewalItem; onEdit: () => vo
             <Edit2 size={13} />
             ערוך לפני אישור
           </button>
+          <label className="sr-only" htmlFor={`doctype-${draft.id}`}>
+            סוג מסמך
+          </label>
+          <select
+            id={`doctype-${draft.id}`}
+            value={documentType}
+            onChange={(e) => setDocumentType(e.target.value as InvoiceDocumentType)}
+            disabled={pendingApprove}
+            className="border-ink-line text-navy focus:border-navy rounded-lg border bg-white px-2 py-1.5 text-xs font-medium outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {DOCUMENT_TYPE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
           <button
             type="button"
             onClick={handleApprove}
