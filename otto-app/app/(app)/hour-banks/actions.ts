@@ -625,12 +625,32 @@ async function createAdvanceInvoiceForBank(input: {
     order_index: 0,
   });
 
-  // Fire Make webhook for the new invoice draft
+  // Fetch customer details so the Make scenario has everything it needs to
+  // produce the Finbot document without a follow-up lookup.
+  const { data: customer } = await input.supabase
+    .from("customers")
+    .select("name, email, phone, company, address, company_registration_number")
+    .eq("id", input.customer_id)
+    .maybeSingle();
+
   await fireMakeWebhook(input.tenant_id, "invoice.draft_for_bank", {
     invoice_id: invoice.id,
     bank_id: input.bank_id,
     customer_id: input.customer_id,
+    customer: customer
+      ? {
+          name: customer.name,
+          email: customer.email,
+          phone: customer.phone,
+          company: customer.company,
+          address: customer.address,
+          tax_id: customer.company_registration_number,
+        }
+      : null,
     total_amount: invoice.total_amount,
+    subtotal: input.purchased_hours * input.hourly_rate,
+    tax_rate: 18,
+    currency: "ILS",
     purchased_hours: input.purchased_hours,
     hourly_rate: input.hourly_rate,
     document_type: input.document_type,
