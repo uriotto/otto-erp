@@ -110,6 +110,27 @@ Critical logic lives entirely in Postgres:
 
 `lib/make-webhook.ts` fires a POST to the tenant's configured webhook URL (stored in `tenant_settings.make_webhook_url`) for events like `hour_bank.renewed` and `hour_bank.created`.
 
+### External bot API
+
+External bots (Telegram, etc.) call `/api/bot/*` routes with a long-lived bearer token instead of session cookies.
+
+- **Auth helper**: `lib/bot-auth.ts` — `authenticateBot(request)` reads `Authorization: Bearer <token>`, SHA-256 hashes it, and looks up `bot_api_tokens` via the service-role client. Returns `{ userId, tenantId, tokenId }` or null.
+- **Live timer state**: the `active_timers` table holds one row per running user. The web `<Timer>` component hydrates from it on mount and subscribes via Realtime, so a bot starting/stopping a timer is mirrored in the header pill within seconds.
+- **Token management UI**: `/settings/bot-tokens` — generates a token (shown once), labels it, and revokes when compromised. Plaintext is never stored, only the SHA-256 hash.
+- **Service-role client usage**: bot routes use `createServiceClient()` from `lib/supabase/service.ts` to bypass RLS, but every query explicitly filters by the `userId` + `tenantId` from the token, preserving tenant isolation.
+
+To add a new bot endpoint:
+
+1. Create `app/api/bot/<name>/route.ts`
+2. Call `authenticateBot(request)` first; return `unauthorized()` if null
+3. No middleware change needed — `/api/bot/` is already in `isPublicApi`
+
+### Sharing business logic between server actions and API routes
+
+Server Actions (`"use server"`) can only export async functions with serializable parameters — they can't accept a `SupabaseClient`. When the same business logic needs to run both as a cookie-authenticated action AND as a token-authenticated API route, extract the core logic into a plain module under `lib/`, then call it from both surfaces.
+
+Example: `lib/time-entries.ts` exports `createTimeEntryFromTimerForUser(supabase, userId, tenantId, input)`. The server action in `app/(app)/time/actions.ts` calls it with a cookie-bound client; the `/api/bot/timer/stop` route calls it with a service-role client. Identical DB writes, identical triggers fire, zero duplication.
+
 ### Google Calendar integration
 
 `lib/google-calendar.ts` — full OAuth + sync library. Key exports:
@@ -133,6 +154,8 @@ External webhooks (Zoom, Google, etc.) arrive without a session cookie — middl
 1. Create the route under `app/api/`
 2. Add `pathname.startsWith("/api/your-route")` to the `isPublicApi` check in `lib/supabase/middleware.ts`
 3. Validate the request inside the handler (signature, channel ID, etc.) — never trust unvalidated webhook payloads
+
+External-auth API routes (bearer token instead of webhook signature) follow the same pattern — see `/api/bot/*` and `lib/bot-auth.ts`.
 
 ### Calendar view layout
 
