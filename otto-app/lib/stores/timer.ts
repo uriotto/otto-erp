@@ -32,6 +32,7 @@ export interface TimerState extends TimerContext {
   saveRecentRun: (run: Omit<RecentRun, "id" | "stoppedAt">) => void;
   loadRecentRun: (run: RecentRun) => void;
   reset: () => void;
+  hydrateFromDB: (input: { ctx: TimerContext; startTime: string }) => void;
 }
 
 const initialCtx: TimerContext = {
@@ -93,6 +94,12 @@ export const useTimerStore = create<TimerState>()(
           notes: run.notes,
         }),
       reset: () => set({ isRunning: false, startTime: null, ...initialCtx }),
+      hydrateFromDB: ({ ctx, startTime }) =>
+        set({
+          ...ctx,
+          isRunning: true,
+          startTime,
+        }),
     }),
     {
       name: "otto:timer",

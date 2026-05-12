@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { LogOut, CalendarDays } from "lucide-react";
+import { LogOut, CalendarDays, KeyRound } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { ProfileCard } from "./profile-card";
@@ -109,6 +109,22 @@ export default async function SettingsPage({
         <TagsCard initialTags={tags} />
 
         <ExportCard />
+
+        <Link
+          href="/settings/bot-tokens"
+          className="border-ink-line hover:border-navy flex items-center justify-between rounded-2xl border bg-white p-5 transition-colors"
+        >
+          <div className="flex items-center gap-4">
+            <div className="bg-navy/8 rounded-xl p-2.5">
+              <KeyRound size={20} className="text-navy" />
+            </div>
+            <div>
+              <p className="text-navy font-semibold">טוקני בוט</p>
+              <p className="text-ink-faded text-xs">חיבור טלגרם ובוטים חיצוניים לטיימר</p>
+            </div>
+          </div>
+          <span className="text-ink-faded text-sm">←</span>
+        </Link>
 
         <Link
           href="/settings/booking"

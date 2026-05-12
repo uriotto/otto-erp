@@ -8,6 +8,71 @@ export type Database = {
   };
   public: {
     Tables: {
+      active_timers: {
+        Row: {
+          created_at: string;
+          customer_id: string | null;
+          notes: string | null;
+          project_id: string | null;
+          source: string;
+          started_at: string;
+          task_id: string | null;
+          tenant_id: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          customer_id?: string | null;
+          notes?: string | null;
+          project_id?: string | null;
+          source?: string;
+          started_at?: string;
+          task_id?: string | null;
+          tenant_id: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          customer_id?: string | null;
+          notes?: string | null;
+          project_id?: string | null;
+          source?: string;
+          started_at?: string;
+          task_id?: string | null;
+          tenant_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "active_timers_customer_id_fkey";
+            columns: ["customer_id"];
+            isOneToOne: false;
+            referencedRelation: "customers";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "active_timers_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "active_timers_task_id_fkey";
+            columns: ["task_id"];
+            isOneToOne: false;
+            referencedRelation: "tasks";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "active_timers_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       activities: {
         Row: {
           body: string | null;
@@ -233,6 +298,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "booking_types_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      bot_api_tokens: {
+        Row: {
+          created_at: string;
+          id: string;
+          label: string | null;
+          last_used_at: string | null;
+          tenant_id: string;
+          token_hash: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          label?: string | null;
+          last_used_at?: string | null;
+          tenant_id: string;
+          token_hash: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          label?: string | null;
+          last_used_at?: string | null;
+          tenant_id?: string;
+          token_hash?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "bot_api_tokens_tenant_id_fkey";
             columns: ["tenant_id"];
             isOneToOne: false;
             referencedRelation: "tenants";

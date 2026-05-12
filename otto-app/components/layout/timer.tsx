@@ -8,6 +8,16 @@ import { Spinner } from "@/components/ui/spinner";
 import { createClient } from "@/lib/supabase/client";
 import { createTimeEntryFromTimer } from "@/app/(app)/time/actions";
 
+type ActiveTimerRow = {
+  user_id: string;
+  tenant_id: string;
+  customer_id: string | null;
+  project_id: string | null;
+  task_id: string | null;
+  notes: string | null;
+  started_at: string;
+};
+
 interface CustomerOpt {
   id: string;
   name: string;
@@ -44,6 +54,7 @@ export function Timer() {
   const stop = useTimerStore((s) => s.stop);
   const updateContext = useTimerStore((s) => s.updateContext);
   const reset = useTimerStore((s) => s.reset);
+  const hydrateFromDB = useTimerStore((s) => s.hydrateFromDB);
   const recentRuns = useTimerStore((s) => s.recentRuns);
 
   const [mounted, setMounted] = useState(false);
@@ -95,14 +106,18 @@ export function Timer() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [showRecent]);
 
-  // Fetch lookups once
+  // Fetch lookups once + hydrate active timer from DB + subscribe to changes.
   const fetchedRef = useRef(false);
+  const userIdRef = useRef<string | null>(null);
+  const tenantIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (fetchedRef.current) return;
     fetchedRef.current = true;
+    const supabase = createClient();
+
     void (async () => {
-      const supabase = createClient();
-      const [c, p, t] = await Promise.all([
+      const [c, p, t, userResult] = await Promise.all([
         supabase.from("customers").select("id, name").order("name"),
         supabase
           .from("projects")
@@ -110,12 +125,79 @@ export function Timer() {
           .is("deleted_at", null)
           .order("name"),
         supabase.from("tasks").select("id, title, project_id").order("title"),
+        supabase.auth.getUser(),
       ]);
       setCustomers(c.data ?? []);
       setProjects(p.data ?? []);
       setTasks(t.data ?? []);
+
+      const user = userResult.data.user;
+      if (!user) return;
+      userIdRef.current = user.id;
+
+      const { data: profile } = await supabase
+        .from("users")
+        .select("tenant_id")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (profile?.tenant_id) tenantIdRef.current = profile.tenant_id;
+
+      const { data: row } = await supabase
+        .from("active_timers")
+        .select("customer_id, project_id, task_id, notes, started_at")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (row) {
+        hydrateFromDB({
+          ctx: {
+            customerId: row.customer_id,
+            projectId: row.project_id,
+            taskId: row.task_id,
+            notes: row.notes ?? "",
+          },
+          startTime: row.started_at,
+        });
+      } else if (useTimerStore.getState().isRunning) {
+        // localStorage thinks a timer is running but the DB disagrees - resync.
+        reset();
+      }
+
+      const channel = supabase
+        .channel(`active_timer:${user.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "active_timers",
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            if (payload.eventType === "DELETE") {
+              if (useTimerStore.getState().isRunning) reset();
+              return;
+            }
+            const next = payload.new as ActiveTimerRow;
+            hydrateFromDB({
+              ctx: {
+                customerId: next.customer_id,
+                projectId: next.project_id,
+                taskId: next.task_id,
+                notes: next.notes ?? "",
+              },
+              startTime: next.started_at,
+            });
+          },
+        )
+        .subscribe();
+
+      // Cleanup is handled by component unmount; keep channel alive while header is mounted.
+      return () => {
+        void supabase.removeChannel(channel);
+      };
     })();
-  }, []);
+  }, [hydrateFromDB, reset]);
 
   const elapsed = useMemo(() => {
     if (!startTime) return 0;
@@ -125,19 +207,60 @@ export function Timer() {
   const overWarning = isRunning && elapsed > FOUR_HOURS_MS;
   const customerName = customerId ? customers.find((c) => c.id === customerId)?.name : null;
 
+  const upsertActiveTimer = async (
+    ctx: {
+      customerId: string | null;
+      projectId: string | null;
+      taskId: string | null;
+      notes: string;
+    },
+    startedAt: string,
+  ) => {
+    const userId = userIdRef.current;
+    const tenantId = tenantIdRef.current;
+    if (!userId || !tenantId) return;
+    const supabase = createClient();
+    await supabase.from("active_timers").upsert(
+      {
+        user_id: userId,
+        tenant_id: tenantId,
+        customer_id: ctx.customerId,
+        project_id: ctx.projectId,
+        task_id: ctx.taskId,
+        notes: ctx.notes || null,
+        started_at: startedAt,
+        source: "web",
+      },
+      { onConflict: "user_id" },
+    );
+  };
+
+  const deleteActiveTimer = async () => {
+    const userId = userIdRef.current;
+    if (!userId) return;
+    const supabase = createClient();
+    await supabase.from("active_timers").delete().eq("user_id", userId);
+  };
+
   const handleStartNow = () => {
-    start({ customerId: null, projectId: null, taskId: null, notes: "" });
+    const startedAt = new Date().toISOString();
+    const ctx = { customerId: null, projectId: null, taskId: null, notes: "" };
+    start(ctx);
+    void upsertActiveTimer(ctx, startedAt);
     setShowAssign(true);
     setShowRecent(false);
   };
 
   const handleLoadRecent = (run: (typeof recentRuns)[0]) => {
-    start({
+    const startedAt = new Date().toISOString();
+    const ctx = {
       customerId: run.customerId,
       projectId: run.projectId,
       taskId: run.taskId,
       notes: run.notes ?? "",
-    });
+    };
+    start(ctx);
+    void upsertActiveTimer(ctx, startedAt);
     setShowRecent(false);
   };
 
@@ -145,6 +268,7 @@ export function Timer() {
     setShowAssign(false);
     setStopping(true);
     const snapshot = stop();
+    void deleteActiveTimer();
     if (!snapshot) {
       setStopping(false);
       return;
@@ -221,7 +345,10 @@ export function Timer() {
         <button
           type="button"
           onClick={() => {
-            if (confirm("לבטל את הטיימר ללא שמירה?")) reset();
+            if (confirm("לבטל את הטיימר ללא שמירה?")) {
+              reset();
+              void deleteActiveTimer();
+            }
           }}
           disabled={stopping}
           aria-label="בטל טיימר"
@@ -242,6 +369,7 @@ export function Timer() {
             currentNotes={notes}
             onAssign={(ctx) => {
               updateContext(ctx);
+              if (startTime) void upsertActiveTimer(ctx, startTime);
               setShowAssign(false);
             }}
             onClose={() => setShowAssign(false)}

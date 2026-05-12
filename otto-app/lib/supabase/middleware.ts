@@ -44,6 +44,7 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/health") ||
     pathname.startsWith("/api/finbot") ||
     pathname.startsWith("/api/calendar/sync") ||
+    pathname.startsWith("/api/bot/") ||
     pathname === "/manifest.webmanifest";
   const isPublicRoot = pathname === "/";
   const isPublicProposal = pathname.startsWith("/proposal/");
