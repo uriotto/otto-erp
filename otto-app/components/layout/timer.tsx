@@ -55,6 +55,7 @@ export function Timer() {
   const updateContext = useTimerStore((s) => s.updateContext);
   const reset = useTimerStore((s) => s.reset);
   const hydrateFromDB = useTimerStore((s) => s.hydrateFromDB);
+  const saveRecentRun = useTimerStore((s) => s.saveRecentRun);
   const recentRuns = useTimerStore((s) => s.recentRuns);
 
   const [mounted, setMounted] = useState(false);
@@ -287,6 +288,16 @@ export function Timer() {
       toast.error(res.error);
       return;
     }
+    saveRecentRun({
+      customerId: snapshot.ctx.customerId,
+      projectId: snapshot.ctx.projectId,
+      taskId: snapshot.ctx.taskId,
+      notes: snapshot.ctx.notes,
+      customerName: customers.find((c) => c.id === snapshot.ctx.customerId)?.name ?? null,
+      projectName: projects.find((p) => p.id === snapshot.ctx.projectId)?.name ?? null,
+      taskName: tasks.find((t) => t.id === snapshot.ctx.taskId)?.title ?? null,
+    });
+
     if (!snapshot.ctx.customerId) {
       toast.show(
         `נשמרו ${res.durationMinutes ?? 0} דקות ללא שיוך ללקוח. שייך מתוך מסך השעות.`,
@@ -388,7 +399,7 @@ export function Timer() {
         aria-label="התחל טיימר"
       >
         <Play size={14} className="text-emerald-600" />
-        <span className="hidden md:inline">התחל טיימר</span>
+        <span className="hidden whitespace-nowrap md:inline">התחל טיימר</span>
       </button>
 
       {recentRuns.length > 0 && (

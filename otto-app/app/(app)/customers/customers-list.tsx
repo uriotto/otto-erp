@@ -24,6 +24,7 @@ import { NewCustomerDialog } from "./new-customer-dialog";
 import { ExportCsvButton } from "@/components/ui/export-csv-button";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
+import { StatusDropdown } from "@/components/ui/status-dropdown";
 import {
   bulkDeactivateCustomers,
   bulkDeleteCustomers,
@@ -617,51 +618,13 @@ function InlineStatusCell({
   status: string | null;
   onSave: (val: CustomerStatus) => Promise<void>;
 }) {
-  const [open, setOpen] = useState(false);
-  const [pending, startTransition] = useTransition();
-  const ref = useRef<HTMLDivElement>(null);
-  const opt = getStatusOption(status);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
   return (
-    <div ref={ref} className="relative" onClick={(e) => e.stopPropagation()}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        disabled={pending}
-        className={`inline-flex cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium transition-all hover:opacity-80 disabled:opacity-50 ${opt.cls}`}
-      >
-        {pending ? <Spinner size={10} /> : <ChevronDown size={10} />}
-        {opt.label}
-      </button>
-      {open && (
-        <div className="bg-cream-paper border-ink-line absolute top-full z-20 mt-1 min-w-[110px] rounded-xl border shadow-lg">
-          {STATUS_OPTIONS.map((s) => (
-            <button
-              key={s.value}
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                startTransition(() => onSave(s.value));
-              }}
-              className={`hover:bg-cream-deep flex w-full items-center gap-2 px-3 py-2 text-start text-xs transition-colors first:rounded-t-xl last:rounded-b-xl ${
-                s.value === opt.value ? "font-semibold" : ""
-              }`}
-            >
-              <span className={`h-2 w-2 rounded-full border ${s.cls}`} />
-              {s.label}
-            </button>
-          ))}
-        </div>
-      )}
+    <div onClick={(e) => e.stopPropagation()}>
+      <StatusDropdown
+        status={status}
+        options={STATUS_OPTIONS}
+        onSave={(val) => onSave(val as CustomerStatus)}
+      />
     </div>
   );
 }

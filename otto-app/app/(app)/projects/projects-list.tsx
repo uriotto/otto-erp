@@ -21,9 +21,10 @@ import type { Tables } from "@/lib/supabase/types";
 import { NewProjectDialog } from "./new-project-dialog";
 import { ViewToggle, useStoredView } from "@/components/ui/view-toggle";
 import { BulkActionBar } from "@/components/ui/bulk-action-bar";
-import { bulkDeleteProjects, bulkUpdateProjectStatus } from "./actions";
+import { bulkDeleteProjects, bulkUpdateProjectStatus, quickUpdateProjectStatus } from "./actions";
 import { useToast } from "@/components/ui/toast";
 import { saveFilters, loadFilters } from "@/lib/persist-filters";
+import { StatusDropdown } from "@/components/ui/status-dropdown";
 
 const STATUS_LABELS: Record<string, string> = {
   planning: "תכנון",
@@ -40,6 +41,12 @@ const STATUS_STYLES: Record<string, string> = {
   completed: "border-gray-200 bg-gray-100 text-gray-600",
   cancelled: "border-rose-200 bg-rose-50 text-rose-700",
 };
+
+const PROJECT_STATUS_OPTIONS = Object.entries(STATUS_LABELS).map(([value, label]) => ({
+  value,
+  label,
+  cls: STATUS_STYLES[value] ?? "border-ink-line bg-cream text-ink-soft",
+}));
 
 const HEALTH_LABELS: Record<string, string> = {
   on_track: "בקצב",
@@ -383,12 +390,18 @@ export function ProjectsList({
                       <span className="text-ink-faded text-xs">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`rounded-full border px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[p.status] ?? "border-ink-line bg-cream text-ink-soft"}`}
-                    >
-                      {STATUS_LABELS[p.status] ?? p.status}
-                    </span>
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <StatusDropdown
+                      status={p.status}
+                      options={PROJECT_STATUS_OPTIONS}
+                      onSave={async (val) => {
+                        const res = await quickUpdateProjectStatus(
+                          p.id,
+                          val as "planning" | "active" | "on_hold" | "completed" | "cancelled",
+                        );
+                        if (res.error) toast.error(res.error);
+                      }}
+                    />
                   </td>
                   <td className="px-4 py-3">
                     <span className="text-ink-soft text-xs">

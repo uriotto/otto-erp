@@ -121,17 +121,16 @@ export function EventDialog({
   const [endLocal, setEndLocal] = useState(endVal);
 
   // When toggling all-day, adjust the local value format
-   
+
   useEffect(() => {
     if (allDay) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setStartLocal((p) => p.slice(0, 10));
-       
+
       setEndLocal((p) => p.slice(0, 10));
     } else {
-       
       setStartLocal((p) => (p.length === 10 ? `${p}T09:00` : p));
-       
+
       setEndLocal((p) => (p.length === 10 ? `${p}T10:00` : p));
     }
   }, [allDay]);
