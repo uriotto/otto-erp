@@ -1,0 +1,90 @@
+name: Daily DB Backup
+
+on:
+  schedule:
+    - cron: "0 3 * * *" # 03:00 UTC — change to whatever fits your timezone
+  workflow_dispatch: # allow manual run from Actions tab
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Install PostgreSQL 17 client
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client-17
+          # Force PG17 binaries first in PATH — Ubuntu may have older pg_restore preinstalled
+          echo "/usr/lib/postgresql/17/bin" >> $GITHUB_PATH
+          /usr/lib/postgresql/17/bin/pg_dump --version
+          /usr/lib/postgresql/17/bin/pg_restore --version
+
+      - name: Install rclone
+        run: |
+          curl https://rclone.org/install.sh | sudo bash
+          rclone --version
+
+      - name: Run pg_dump
+        env:
+          PGCONNECT_TIMEOUT: "30"
+          PGHOST: ${{ secrets.SUPABASE_DB_HOST }}
+          PGPORT: "5432"
+          PGUSER: ${{ secrets.SUPABASE_DB_USER }}
+          PGDATABASE: postgres
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          DATE=$(date -u +%Y-%m-%d)
+          REPO_NAME=$(echo "${GITHUB_REPOSITORY}" | cut -d/ -f2)
+          FILENAME="${REPO_NAME}-${DATE}.dump"
+          echo "FILENAME=${FILENAME}" >> $GITHUB_ENV
+
+          pg_dump \
+            --format=custom \
+            --no-owner \
+            --no-acl \
+            --file="${FILENAME}"
+
+          ls -lh "${FILENAME}"
+
+      - name: Verify dump file is non-empty
+        run: |
+          if [ ! -s "${FILENAME}" ]; then
+            echo "ERROR: Dump file is empty or missing"
+            exit 1
+          fi
+          SIZE=$(stat -c%s "${FILENAME}")
+          echo "Backup size: ${SIZE} bytes"
+          if [ "${SIZE}" -lt 1024 ]; then
+            echo "ERROR: Dump file suspiciously small (<1KB)"
+            exit 1
+          fi
+
+      - name: Upload to Cloudflare R2
+        env:
+          RCLONE_CONFIG_R2_TYPE: s3
+          RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+          RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          RCLONE_CONFIG_R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          RCLONE_CONFIG_R2_REGION: auto
+        run: |
+          rclone copy "${FILENAME}" "r2:${{ secrets.R2_BUCKET }}/" --progress --s3-no-check-bucket
+          echo "Uploaded ${FILENAME} to R2 bucket ${{ secrets.R2_BUCKET }}"
+
+      - name: Verify backup integrity (pg_restore --list)
+        run: |
+          echo "=== Backup contents ==="
+          pg_restore --list "${FILENAME}" | head -50
+          echo ""
+          # Sanity check: backup should have at least 1 TABLE DATA entry
+          TABLE_COUNT=$(pg_restore --list "${FILENAME}" | grep -cE "TABLE DATA " || true)
+          echo "Tables with data in backup: ${TABLE_COUNT}"
+          if [ "${TABLE_COUNT}" -eq 0 ]; then
+            echo "ERROR: Backup contains zero tables with data — likely corrupted"
+            exit 1
+          fi
+          echo "Backup integrity verified."
