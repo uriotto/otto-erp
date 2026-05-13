@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { authenticateBot, unauthorized } from "@/lib/bot-auth";
 import { createServiceClient } from "@/lib/supabase/service";
+import { createTimeEntryFromTimerForUser } from "@/lib/time-entries";
 
 const StartSchema = z.object({
   customer_id: z.string().uuid().nullish(),
@@ -27,6 +28,39 @@ export async function POST(request: Request) {
   }
 
   const supabase = createServiceClient();
+
+  // Stop any existing timer first so we never silently overwrite a running session.
+  const { data: existing, error: readError } = await supabase
+    .from("active_timers")
+    .select("customer_id, project_id, task_id, notes, started_at")
+    .eq("user_id", auth.userId)
+    .eq("tenant_id", auth.tenantId)
+    .maybeSingle();
+
+  if (readError) {
+    return Response.json({ error: readError.message }, { status: 500 });
+  }
+
+  let stoppedPrevious: { entry_id: string; duration_minutes: number } | undefined;
+  if (existing) {
+    const stopResult = await createTimeEntryFromTimerForUser(supabase, auth.userId, auth.tenantId, {
+      customer_id: existing.customer_id,
+      project_id: existing.project_id,
+      task_id: existing.task_id,
+      notes: existing.notes,
+      start_time: existing.started_at,
+      end_time: new Date().toISOString(),
+      billable: true,
+    });
+    if (stopResult.error) {
+      return Response.json({ error: stopResult.error }, { status: 500 });
+    }
+    stoppedPrevious = {
+      entry_id: stopResult.entryId!,
+      duration_minutes: stopResult.durationMinutes!,
+    };
+  }
+
   const startedAt = new Date().toISOString();
   const { error } = await supabase.from("active_timers").upsert(
     {
@@ -46,5 +80,9 @@ export async function POST(request: Request) {
     return Response.json({ error: error.message }, { status: 500 });
   }
 
-  return Response.json({ started: true, started_at: startedAt });
+  return Response.json({
+    started: true,
+    started_at: startedAt,
+    ...(stoppedPrevious ? { stopped_previous: stoppedPrevious } : {}),
+  });
 }
