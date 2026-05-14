@@ -107,14 +107,13 @@ export function Timer() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [showRecent]);
 
-  // Fetch lookups once + hydrate active timer from DB + subscribe to changes.
-  const fetchedRef = useRef(false);
+  // Hydrate active timer from DB + subscribe to changes.
   const userIdRef = useRef<string | null>(null);
   const tenantIdRef = useRef<string | null>(null);
+  const channelRef = useRef<ReturnType<ReturnType<typeof createClient>["channel"]> | null>(null);
 
   useEffect(() => {
-    if (fetchedRef.current) return;
-    fetchedRef.current = true;
+    let cancelled = false;
     const supabase = createClient();
 
     void (async () => {
@@ -128,6 +127,7 @@ export function Timer() {
         supabase.from("tasks").select("id, title, project_id").order("title"),
         supabase.auth.getUser(),
       ]);
+      if (cancelled) return;
       setCustomers(c.data ?? []);
       setProjects(p.data ?? []);
       setTasks(t.data ?? []);
@@ -141,6 +141,7 @@ export function Timer() {
         .select("tenant_id")
         .eq("id", user.id)
         .maybeSingle();
+      if (cancelled) return;
       if (profile?.tenant_id) tenantIdRef.current = profile.tenant_id;
 
       const { data: row } = await supabase
@@ -148,6 +149,7 @@ export function Timer() {
         .select("customer_id, project_id, task_id, notes, started_at")
         .eq("user_id", user.id)
         .maybeSingle();
+      if (cancelled) return;
 
       if (row) {
         hydrateFromDB({
@@ -164,8 +166,14 @@ export function Timer() {
         reset();
       }
 
+      // Ensure no stale channel with this name exists before subscribing
+      const channelName = `active_timer:${user.id}`;
+      const stale = supabase.getChannels().find((ch) => ch.topic === `realtime:${channelName}`);
+      if (stale) await supabase.removeChannel(stale);
+      if (cancelled) return;
+
       const channel = supabase
-        .channel(`active_timer:${user.id}`)
+        .channel(channelName)
         .on(
           "postgres_changes",
           {
@@ -192,12 +200,16 @@ export function Timer() {
           },
         )
         .subscribe();
-
-      // Cleanup is handled by component unmount; keep channel alive while header is mounted.
-      return () => {
-        void supabase.removeChannel(channel);
-      };
+      channelRef.current = channel;
     })();
+
+    return () => {
+      cancelled = true;
+      if (channelRef.current) {
+        void supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
   }, [hydrateFromDB, reset]);
 
   const elapsed = useMemo(() => {
@@ -331,7 +343,11 @@ export function Timer() {
         >
           <span
             className={`h-2 w-2 rounded-full ${
-              overWarning ? "animate-pulse bg-rose-500" : "bg-emerald-500"
+              overWarning
+                ? "animate-pulse bg-rose-500"
+                : !customerId
+                  ? "bg-amber-400"
+                  : "bg-emerald-500"
             }`}
             aria-hidden
           />
