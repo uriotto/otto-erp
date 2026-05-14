@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("customers")
-    .select("id, name")
+    .select("id, name, phone, email, status")
     .eq("tenant_id", auth.tenantId)
     .order("name");
 
