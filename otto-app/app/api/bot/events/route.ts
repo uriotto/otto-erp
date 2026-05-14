@@ -3,6 +3,18 @@ import { z } from "zod";
 import { authenticateBot, unauthorized } from "@/lib/bot-auth";
 import { createServiceClient } from "@/lib/supabase/service";
 
+const CreateEventSchema = z.object({
+  title: z.string().min(1),
+  start_at: z.string().datetime(),
+  end_at: z.string().datetime(),
+  customer_id: z.string().uuid().optional(),
+  project_id: z.string().uuid().optional(),
+  description: z.string().optional(),
+  location: z.string().optional(),
+  meeting_url: z.string().url().optional(),
+  all_day: z.boolean().optional(),
+});
+
 const QuerySchema = z.object({
   from: z.string().datetime().optional(),
   to: z.string().datetime().optional(),
@@ -38,4 +50,45 @@ export async function GET(request: Request) {
   if (error) return Response.json({ error: error.message }, { status: 500 });
 
   return Response.json({ events: data ?? [], count: data?.length ?? 0 });
+}
+
+export async function POST(request: Request) {
+  const auth = await authenticateBot(request);
+  if (!auth) return unauthorized();
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "invalid json" }, { status: 400 });
+  }
+  const parsed = CreateEventSchema.safeParse(body);
+  if (!parsed.success) {
+    return Response.json(
+      { error: "invalid body", details: parsed.error.flatten() },
+      { status: 400 },
+    );
+  }
+
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("events")
+    .insert({
+      tenant_id: auth.tenantId,
+      title: parsed.data.title,
+      start_at: parsed.data.start_at,
+      end_at: parsed.data.end_at,
+      customer_id: parsed.data.customer_id ?? null,
+      project_id: parsed.data.project_id ?? null,
+      description: parsed.data.description ?? null,
+      location: parsed.data.location ?? null,
+      meeting_url: parsed.data.meeting_url ?? null,
+      all_day: parsed.data.all_day ?? false,
+    })
+    .select("id, title, start_at, end_at")
+    .single();
+
+  if (error) return Response.json({ error: error.message }, { status: 500 });
+
+  return Response.json({ created: true, event: data }, { status: 201 });
 }
