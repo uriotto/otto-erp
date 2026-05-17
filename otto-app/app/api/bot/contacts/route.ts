@@ -35,72 +35,52 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const auth = await authenticateBot(request);
+  if (!auth) return unauthorized();
+
+  let body: unknown;
   try {
-    const auth = await authenticateBot(request);
-    if (!auth) return unauthorized();
-
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return Response.json({ error: "invalid json" }, { status: 400 });
-    }
-
-    console.log("[bot/contacts POST] body:", JSON.stringify(body));
-
-    const parsed = CreateContactSchema.safeParse(body);
-    if (!parsed.success) {
-      console.log("[bot/contacts POST] zod fail:", JSON.stringify(parsed.error.flatten()));
-      return Response.json(
-        { error: "invalid body", details: parsed.error.flatten() },
-        { status: 400 },
-      );
-    }
-
-    console.log("[bot/contacts POST] parsed ok, customer_id:", parsed.data.customer_id);
-
-    const supabase = createServiceClient();
-
-    if (parsed.data.customer_id) {
-      const { data: customer, error: custErr } = await supabase
-        .from("customers")
-        .select("id")
-        .eq("id", parsed.data.customer_id)
-        .eq("tenant_id", auth.tenantId)
-        .is("deleted_at", null)
-        .maybeSingle();
-      if (custErr) {
-        console.error("[bot/contacts POST] custErr:", custErr.code, custErr.message);
-        return Response.json({ error: custErr.message }, { status: 500 });
-      }
-      if (!customer) {
-        console.log("[bot/contacts POST] customer not found:", parsed.data.customer_id);
-        return Response.json({ error: "customer not found" }, { status: 404 });
-      }
-    }
-
-    const { data, error } = await supabase
-      .from("contacts")
-      .insert({
-        tenant_id: auth.tenantId,
-        name: parsed.data.name,
-        role: parsed.data.role ?? null,
-        email: parsed.data.email ?? null,
-        phone: parsed.data.phone ?? null,
-        notes: parsed.data.notes ?? null,
-        customer_id: parsed.data.customer_id ?? null,
-      })
-      .select("id, name, role, email, phone, customer_id")
-      .single();
-
-    if (error) {
-      console.error("[bot/contacts POST] insert error:", error.code, error.message, error.details);
-      return Response.json({ error: error.message }, { status: 500 });
-    }
-
-    return Response.json({ created: true, contact: data }, { status: 201 });
-  } catch (e) {
-    console.error("[bot/contacts POST] unhandled:", e);
-    return Response.json({ error: "internal error" }, { status: 500 });
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "invalid json" }, { status: 400 });
   }
+
+  const parsed = CreateContactSchema.safeParse(body);
+  if (!parsed.success) {
+    return Response.json(
+      { error: "invalid body", details: parsed.error.flatten() },
+      { status: 400 },
+    );
+  }
+
+  const supabase = createServiceClient();
+
+  if (parsed.data.customer_id) {
+    const { data: customer, error: custErr } = await supabase
+      .from("customers")
+      .select("id")
+      .eq("id", parsed.data.customer_id)
+      .eq("tenant_id", auth.tenantId)
+      .maybeSingle();
+    if (custErr) return Response.json({ error: custErr.message }, { status: 500 });
+    if (!customer) return Response.json({ error: "customer not found" }, { status: 404 });
+  }
+
+  const { data, error } = await supabase
+    .from("contacts")
+    .insert({
+      tenant_id: auth.tenantId,
+      name: parsed.data.name,
+      role: parsed.data.role ?? null,
+      email: parsed.data.email ?? null,
+      phone: parsed.data.phone ?? null,
+      notes: parsed.data.notes ?? null,
+      customer_id: parsed.data.customer_id ?? null,
+    })
+    .select("id, name, role, email, phone, customer_id")
+    .single();
+
+  if (error) return Response.json({ error: error.message }, { status: 500 });
+
+  return Response.json({ created: true, contact: data }, { status: 201 });
 }

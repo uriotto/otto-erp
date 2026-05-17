@@ -62,7 +62,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .select("id")
     .eq("id", id)
     .eq("tenant_id", auth.tenantId)
-    .is("deleted_at", null)
     .maybeSingle();
 
   if (checkError) return Response.json({ error: checkError.message }, { status: 500 });
@@ -105,7 +104,6 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     .select("id")
     .eq("id", id)
     .eq("tenant_id", auth.tenantId)
-    .is("deleted_at", null)
     .maybeSingle();
 
   if (checkError) return Response.json({ error: checkError.message }, { status: 500 });

@@ -72,7 +72,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       .select("id")
       .eq("id", parsed.data.customer_id)
       .eq("tenant_id", auth.tenantId)
-      .is("deleted_at", null)
       .maybeSingle();
     if (custErr) return Response.json({ error: custErr.message }, { status: 500 });
     if (!customer) return Response.json({ error: "customer not found" }, { status: 404 });
