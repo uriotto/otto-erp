@@ -81,7 +81,16 @@ export async function POST(request: Request) {
     .select("id, name, role, email, phone, customer_id")
     .single();
 
-  if (error) return Response.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error(
+      "[bot/contacts POST] insert error:",
+      error.code,
+      error.message,
+      error.details,
+      error.hint,
+    );
+    return Response.json({ error: error.message }, { status: 500 });
+  }
 
   return Response.json({ created: true, contact: data }, { status: 201 });
 }
