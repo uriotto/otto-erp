@@ -65,3 +65,34 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   return Response.json({ updated: true });
 }
+
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await authenticateBot(request);
+  if (!auth) return unauthorized();
+
+  const { id } = await params;
+
+  const supabase = createServiceClient();
+
+  const { data: existing, error: fetchError } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("id", id)
+    .eq("tenant_id", auth.tenantId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (fetchError) return Response.json({ error: fetchError.message }, { status: 500 });
+  if (!existing) return Response.json({ error: "project not found" }, { status: 404 });
+
+  const { error } = await supabase
+    .from("projects")
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .update({ deleted_at: new Date().toISOString() } as any)
+    .eq("id", id)
+    .eq("tenant_id", auth.tenantId);
+
+  if (error) return Response.json({ error: error.message }, { status: 500 });
+
+  return Response.json({ deleted: true });
+}

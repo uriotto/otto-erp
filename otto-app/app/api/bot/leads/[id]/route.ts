@@ -63,3 +63,37 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   return Response.json({ updated: true });
 }
+
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await authenticateBot(request);
+  if (!auth) return unauthorized();
+
+  const { id } = await params;
+
+  const supabase = createServiceClient();
+
+  const { data: existing, error: fetchError } = await supabase
+    .from("leads")
+    .select("id")
+    .eq("id", id)
+    .eq("tenant_id", auth.tenantId)
+    .maybeSingle();
+
+  if (fetchError) return Response.json({ error: fetchError.message }, { status: 500 });
+  if (!existing) return Response.json({ error: "lead not found" }, { status: 404 });
+
+  const { error } = await supabase
+    .from("leads")
+    .delete()
+    .eq("id", id)
+    .eq("tenant_id", auth.tenantId);
+
+  if (error) {
+    if (error.code === "23503") {
+      return Response.json({ error: "lead is referenced by other records" }, { status: 409 });
+    }
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+
+  return Response.json({ deleted: true });
+}
