@@ -4,11 +4,22 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Banknote, Gift, Wallet, X } from "lucide-react";
 
-import { absorbOverageIntoBank, cancelOverageEntries, invoiceOverageSeparately } from "./actions";
+import {
+  absorbOverageIntoBank,
+  cancelOverageEntries,
+  invoiceOverageSeparately,
+  type InvoiceDocumentType,
+} from "./actions";
 import { Spinner } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
 
 type Choice = "absorb" | "invoice" | "cancel";
+
+const DOCUMENT_TYPE_OPTIONS: { value: InvoiceDocumentType; label: string }[] = [
+  { value: "payment_request", label: "דרישת תשלום" },
+  { value: "tax_invoice", label: "חשבונית מס" },
+  { value: "tax_invoice_receipt", label: "חשבונית מס קבלה" },
+];
 
 export function OverageDialog({
   bankId,
@@ -30,6 +41,7 @@ export function OverageDialog({
   onClose: () => void;
 }) {
   const [choice, setChoice] = useState<Choice>("absorb");
+  const [documentType, setDocumentType] = useState<InvoiceDocumentType>("payment_request");
   const [pending, startTransition] = useTransition();
   const router = useRouter();
   const toast = useToast();
@@ -44,12 +56,12 @@ export function OverageDialog({
         }
         toast.success(`${result.absorbedHours ?? 0} שעות נכללו בבנק`);
       } else if (choice === "invoice") {
-        const result = await invoiceOverageSeparately(customerId, entryIds);
+        const result = await invoiceOverageSeparately(customerId, entryIds, documentType);
         if (result?.error) {
           toast.error(result.error);
           return;
         }
-        toast.success("בקשת חשבונית נשלחה");
+        toast.success("חשבונית טיוטה נוצרה");
       } else {
         const result = await cancelOverageEntries(entryIds);
         if (result?.error) {
@@ -103,8 +115,24 @@ export function OverageDialog({
             onClick={() => setChoice("invoice")}
             icon={<Banknote size={18} />}
             title="חשבונית נפרדת על השעות"
-            subtitle="תיפתח אוטומציה ב-Make לחיוב נפרד"
+            subtitle="תיווצר חשבונית טיוטה במערכת, מוכנה לשליחה"
           />
+          {choice === "invoice" && (
+            <div className="border-ink-line bg-cream-paper ms-12 rounded-xl border p-3">
+              <label className="text-ink-soft mb-1.5 block text-xs font-semibold">סוג מסמך</label>
+              <select
+                value={documentType}
+                onChange={(e) => setDocumentType(e.target.value as InvoiceDocumentType)}
+                className="border-ink-line bg-cream text-navy focus:border-navy w-full rounded-lg border px-3 py-2 text-sm outline-none"
+              >
+                {DOCUMENT_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <ChoiceCard
             active={choice === "cancel"}
             onClick={() => setChoice("cancel")}

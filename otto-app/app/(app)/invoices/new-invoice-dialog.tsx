@@ -8,11 +8,19 @@ import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
 import {
   TYPE_LABELS,
+  DOCUMENT_TYPE_LABELS,
   type CustomerOption,
   type ProjectOption,
   type HourBankOption,
   type InvoiceTypeUI,
+  type InvoiceDocumentTypeUI,
 } from "./invoices-list";
+
+const CREATE_DOCUMENT_TYPES: InvoiceDocumentTypeUI[] = [
+  "payment_request",
+  "tax_invoice",
+  "tax_invoice_receipt",
+];
 
 type ItemRow = {
   key: string;
@@ -59,6 +67,7 @@ export function NewInvoiceDialog({
   const [projectId, setProjectId] = useState("");
   const [hourBankId, setHourBankId] = useState("");
   const [type, setType] = useState<InvoiceTypeUI>("monthly_hours");
+  const [documentType, setDocumentType] = useState<InvoiceDocumentTypeUI>("payment_request");
   const [number, setNumber] = useState("");
   const [issueDate, setIssueDate] = useState(todayISO());
   const [dueDate, setDueDate] = useState(plusDaysISO(30));
@@ -134,6 +143,7 @@ export function NewInvoiceDialog({
         project_id: projectId || null,
         hour_bank_id: hourBankId || null,
         type,
+        document_type: documentType,
         number: number.trim() || null,
         issue_date: issueDate,
         due_date: dueDate || null,
@@ -167,7 +177,7 @@ export function NewInvoiceDialog({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <Field label="לקוח *" error={errors.customer_id}>
               <select
                 value={customerId}
@@ -184,6 +194,20 @@ export function NewInvoiceDialog({
                   <option key={c.id} value={c.id}>
                     {c.name}
                     {c.company ? ` · ${c.company}` : ""}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="סוג מסמך">
+              <select
+                value={documentType}
+                onChange={(e) => setDocumentType(e.target.value as InvoiceDocumentTypeUI)}
+                className={baseInput}
+              >
+                {CREATE_DOCUMENT_TYPES.map((d) => (
+                  <option key={d} value={d}>
+                    {DOCUMENT_TYPE_LABELS[d]}
                   </option>
                 ))}
               </select>

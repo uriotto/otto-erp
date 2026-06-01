@@ -33,11 +33,19 @@ const ItemSchema = z.object({
   unit_price: z.number().min(0, "מחיר לא יכול להיות שלילי"),
 });
 
+const DocumentTypeEnum = z.enum([
+  "payment_request",
+  "tax_invoice",
+  "tax_invoice_receipt",
+  "receipt",
+]);
+
 const CreateInvoiceSchema = z.object({
   customer_id: z.string().uuid("יש לבחור לקוח"),
   project_id: z.string().uuid().optional().nullable(),
   hour_bank_id: z.string().uuid().optional().nullable(),
   type: InvoiceTypeEnum,
+  document_type: DocumentTypeEnum.optional().default("payment_request"),
   number: z.string().max(60).optional().nullable(),
   issue_date: z.string().min(1, "תאריך הוצאה חובה"),
   due_date: z.string().optional().nullable(),
@@ -65,7 +73,7 @@ async function getTenant() {
 }
 
 export async function createInvoice(
-  input: z.infer<typeof CreateInvoiceSchema>,
+  input: z.input<typeof CreateInvoiceSchema>,
 ): Promise<InvoiceActionResult> {
   const parsed = CreateInvoiceSchema.safeParse(input);
   if (!parsed.success) {
@@ -101,6 +109,7 @@ export async function createInvoice(
       project_id: data.project_id || null,
       hour_bank_id: data.hour_bank_id || null,
       type: data.type,
+      document_type: data.document_type,
       number: data.number || null,
       issue_date: data.issue_date,
       due_date: data.due_date || null,
@@ -137,6 +146,7 @@ export async function createInvoice(
     invoice_id: invoice.id,
     number: invoice.number,
     type: invoice.type,
+    document_type: data.document_type,
     status: invoice.status,
     issue_date: invoice.issue_date,
     due_date: invoice.due_date,

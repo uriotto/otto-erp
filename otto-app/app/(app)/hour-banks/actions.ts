@@ -363,28 +363,129 @@ export async function absorbOverageIntoBank(
 export async function invoiceOverageSeparately(
   customerId: string,
   overageEntryIds: string[],
-): Promise<{ error?: string }> {
+  documentType: InvoiceDocumentType = "payment_request",
+): Promise<{ error?: string; invoiceId?: string }> {
   if (overageEntryIds.length === 0) return {};
   const { supabase, profile } = await getTenant();
   if (!profile) return { error: "לא מחובר" };
 
-  const { error } = await supabase
+  // Pull the entries so we can build invoice line items from real hours/rates.
+  const { data: entries, error: entriesErr } = await supabase
     .from("time_entries")
-    .update({ billing_status: "invoiced" })
+    .select("id, duration_minutes, hourly_rate_at_entry")
     .in("id", overageEntryIds)
     .eq("tenant_id", profile.tenant_id)
     .eq("customer_id", customerId);
 
-  if (error) return { error: error.message };
+  if (entriesErr) return { error: entriesErr.message };
+  if (!entries || entries.length === 0) return { error: "לא נמצאו שעות לחיוב" };
 
-  await fireMakeWebhook(profile.tenant_id, "overage.invoice_requested", {
-    customer_id: customerId,
+  const { data: customer } = await supabase
+    .from("customers")
+    .select(
+      "name, email, phone, company, address, company_registration_number, hourly_rate_override",
+    )
+    .eq("id", customerId)
+    .eq("tenant_id", profile.tenant_id)
+    .maybeSingle();
+
+  if (!customer) return { error: "לקוח לא נמצא" };
+
+  const fallbackRate = Number(customer.hourly_rate_override) || 0;
+
+  // Group hours by their effective rate so each rate becomes one invoice line.
+  const byRate = new Map<number, number>();
+  for (const e of entries) {
+    const rate = Number(e.hourly_rate_at_entry) || fallbackRate;
+    const hours = (Number(e.duration_minutes) || 0) / 60;
+    byRate.set(rate, (byRate.get(rate) ?? 0) + hours);
+  }
+
+  const items = Array.from(byRate.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([rate, hours], idx) => ({
+      description: `שעות חריגה — ${Math.round(hours * 100) / 100} שעות`,
+      quantity: Math.round(hours * 100) / 100,
+      unit_price: rate,
+      order_index: idx,
+    }));
+
+  const subtotal =
+    Math.round(items.reduce((sum, it) => sum + it.quantity * it.unit_price, 0) * 100) / 100;
+
+  const today = new Date();
+  const due = new Date(today);
+  due.setDate(due.getDate() + 14);
+
+  const { data: invoice, error: invErr } = await supabase
+    .from("invoices")
+    .insert({
+      tenant_id: profile.tenant_id,
+      created_by: profile.id,
+      customer_id: customerId,
+      type: "overage",
+      document_type: documentType,
+      status: "draft",
+      issue_date: today.toISOString().slice(0, 10),
+      due_date: due.toISOString().slice(0, 10),
+      subtotal,
+      tax_rate: 18,
+      currency: "ILS",
+      notes: "חשבונית על שעות חריגה (טיוטה)",
+    })
+    .select("id, total_amount, tax_amount, subtotal")
+    .single();
+
+  if (invErr || !invoice) return { error: invErr?.message ?? "שגיאה ביצירת חשבונית" };
+
+  const { error: itemsErr } = await supabase
+    .from("invoice_items")
+    .insert(items.map((it) => ({ ...it, invoice_id: invoice.id })));
+
+  if (itemsErr) {
+    await supabase.from("invoices").delete().eq("id", invoice.id);
+    return { error: itemsErr.message };
+  }
+
+  // Link the entries to the new invoice and mark them invoiced.
+  const { error: linkErr } = await supabase
+    .from("time_entries")
+    .update({ billing_status: "invoiced", invoice_id: invoice.id })
+    .in("id", overageEntryIds)
+    .eq("tenant_id", profile.tenant_id)
+    .eq("customer_id", customerId);
+
+  if (linkErr) return { error: linkErr.message };
+
+  await fireMakeWebhook(profile.tenant_id, "invoice.created", {
+    invoice_id: invoice.id,
+    type: "overage",
+    document_type: documentType,
+    status: "draft",
+    issue_date: today.toISOString().slice(0, 10),
+    due_date: due.toISOString().slice(0, 10),
+    subtotal,
+    tax_rate: 18,
+    tax_amount: invoice.tax_amount == null ? null : Number(invoice.tax_amount),
+    total_amount: invoice.total_amount == null ? null : Number(invoice.total_amount),
+    currency: "ILS",
+    customer: {
+      id: customerId,
+      name: customer.name,
+      email: customer.email,
+      phone: customer.phone,
+      company: customer.company,
+      address: customer.address,
+      tax_id: customer.company_registration_number,
+    },
+    items,
     time_entry_ids: overageEntryIds,
   });
 
   revalidatePath("/hour-banks");
   revalidatePath("/time");
-  return {};
+  revalidatePath("/invoices");
+  return { invoiceId: invoice.id };
 }
 
 export async function cancelOverageEntries(overageEntryIds: string[]): Promise<{ error?: string }> {
