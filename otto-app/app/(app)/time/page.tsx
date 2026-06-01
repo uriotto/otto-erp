@@ -3,12 +3,22 @@ import { TimeList, type TimeEntryItem } from "./time-list";
 
 export const metadata = { title: "שעות — OTTO" };
 
-export default async function TimePage() {
+export default async function TimePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string; to?: string }>;
+}) {
   const supabase = await createClient();
 
-  const since = new Date();
-  since.setDate(since.getDate() - 30);
-  const sinceISO = since.toISOString();
+  const { from, to } = await searchParams;
+
+  // Default range = current month. Otherwise honour the from/to params (yyyy-mm-dd).
+  const now = new Date();
+  const defaultFrom = new Date(now.getFullYear(), now.getMonth(), 1);
+  const fromDate = from ? new Date(`${from}T00:00:00`) : defaultFrom;
+  const toDate = to ? new Date(`${to}T23:59:59`) : now;
+  const fromISO = fromDate.toISOString();
+  const toISO = toDate.toISOString();
 
   const [
     { data: entries },
@@ -23,7 +33,8 @@ export default async function TimePage() {
       .select(
         "id, customer_id, project_id, task_id, start_time, end_time, duration_minutes, billable, billing_status, notes",
       )
-      .gte("start_time", sinceISO)
+      .gte("start_time", fromISO)
+      .lte("start_time", toISO)
       .order("start_time", { ascending: false }),
     supabase
       .from("customers")
@@ -49,6 +60,9 @@ export default async function TimePage() {
     task_name: e.task_id ? (taskMap.get(e.task_id) ?? null) : null,
   }));
 
+  const rangeFrom = fromDate.toISOString().slice(0, 10);
+  const rangeTo = toDate.toISOString().slice(0, 10);
+
   return (
     <TimeList
       entries={items}
@@ -57,6 +71,8 @@ export default async function TimePage() {
       tasks={tasks ?? []}
       customersWithActiveBank={customersWithActiveBank}
       defaultHourlyRate={tenantSettings?.default_hourly_rate ?? 0}
+      rangeFrom={rangeFrom}
+      rangeTo={rangeTo}
     />
   );
 }

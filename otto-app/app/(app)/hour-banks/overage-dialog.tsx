@@ -42,6 +42,7 @@ export function OverageDialog({
 }) {
   const [choice, setChoice] = useState<Choice>("absorb");
   const [documentType, setDocumentType] = useState<InvoiceDocumentType>("payment_request");
+  const [attachDetail, setAttachDetail] = useState(true);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
   const toast = useToast();
@@ -56,7 +57,12 @@ export function OverageDialog({
         }
         toast.success(`${result.absorbedHours ?? 0} שעות נכללו בבנק`);
       } else if (choice === "invoice") {
-        const result = await invoiceOverageSeparately(customerId, entryIds, documentType);
+        const result = await invoiceOverageSeparately(
+          customerId,
+          entryIds,
+          documentType,
+          attachDetail,
+        );
         if (result?.error) {
           toast.error(result.error);
           return;
@@ -131,6 +137,15 @@ export function OverageDialog({
                   </option>
                 ))}
               </select>
+              <label className="text-ink-soft mt-3 flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={attachDetail}
+                  onChange={(e) => setAttachDetail(e.target.checked)}
+                  className="accent-navy h-4 w-4 rounded"
+                />
+                צרף פירוט שעות להערות החשבונית
+              </label>
             </div>
           )}
           <ChoiceCard

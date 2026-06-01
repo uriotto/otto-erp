@@ -14,10 +14,13 @@ import {
   CalendarDays,
   CalendarRange,
   Calendar,
+  Download,
+  Copy,
 } from "lucide-react";
 import type { Tables } from "@/lib/supabase/types";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
+import { toCsv, toTsv, downloadTextFile, type Cell } from "@/lib/table-export";
 import {
   assignCustomerToEntry,
   deleteTimeEntry,
@@ -98,6 +101,13 @@ function dateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+const BILLING_STATUS_EXPORT_LABELS: Record<string, string> = {
+  pending: "ממתין",
+  overage: "חריגה",
+  invoiced: "חויב",
+  allocated_to_bank: "שויך לבנק",
+};
+
 export function TimeList({
   entries,
   customers,
@@ -105,6 +115,8 @@ export function TimeList({
   tasks,
   customersWithActiveBank,
   defaultHourlyRate,
+  rangeFrom,
+  rangeTo,
 }: {
   entries: TimeEntryItem[];
   customers: CustomerOpt[];
@@ -112,6 +124,8 @@ export function TimeList({
   tasks: TaskOpt[];
   customersWithActiveBank: Set<string>;
   defaultHourlyRate: number;
+  rangeFrom: string;
+  rangeTo: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -276,12 +290,94 @@ export function TimeList({
     });
   }
 
+  // --- Period selection (drives the server query via from/to URL params) ---
+  const [customFrom, setCustomFrom] = useState(rangeFrom);
+  const [customTo, setCustomTo] = useState(rangeTo);
+
+  function applyPreset(preset: "this" | "last") {
+    const now = new Date();
+    if (preset === "this") {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      updateUrl({ from: dateKey(start), to: dateKey(now) });
+    } else {
+      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const end = new Date(now.getFullYear(), now.getMonth(), 0);
+      updateUrl({ from: dateKey(start), to: dateKey(end) });
+    }
+  }
+
+  // --- Export / copy of the currently filtered rows ---
+  function buildExport(): { headers: string[]; rows: Cell[][] } {
+    const headers = ["תאריך", "לקוח", "פרויקט", "משימה", "שעות", "חיוב", "סטטוס", "הערות"];
+    const sorted = [...filtered].sort(
+      (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime(),
+    );
+    const fmt = (e: TimeEntryItem): Cell[] => [
+      e.start_time ? new Date(e.start_time).toLocaleDateString("he-IL") : "",
+      e.customer_name ?? "",
+      e.project_name ?? "",
+      e.task_name ?? "",
+      ((e.duration_minutes ?? 0) / 60).toFixed(2),
+      e.billable ? "כן" : "לא",
+      BILLING_STATUS_EXPORT_LABELS[e.billing_status ?? ""] ?? e.billing_status ?? "",
+      (e.notes ?? "").replace(/\s*\n\s*/g, " "),
+    ];
+
+    if (customerFilter !== "all") {
+      return { headers, rows: sorted.map(fmt) };
+    }
+
+    // Group by customer with a subtotal row after each group.
+    const groups = new Map<string, TimeEntryItem[]>();
+    for (const e of sorted) {
+      const key = e.customer_name ?? "ללא לקוח";
+      const list = groups.get(key);
+      if (list) list.push(e);
+      else groups.set(key, [e]);
+    }
+    const rows: Cell[][] = [];
+    for (const [name, list] of groups) {
+      for (const e of list) rows.push(fmt(e));
+      const totalHours = list.reduce((s, e) => s + (e.duration_minutes ?? 0), 0) / 60;
+      rows.push(["", `סה״כ ${name}`, "", "", totalHours.toFixed(2), "", "", ""]);
+    }
+    return { headers, rows };
+  }
+
+  function handleExportCsv() {
+    const { headers, rows } = buildExport();
+    if (rows.length === 0) {
+      toast.error("אין שורות לייצוא");
+      return;
+    }
+    downloadTextFile(toCsv(headers, rows), `שעות-${rangeFrom}-${rangeTo}.csv`);
+    toast.success("הקובץ הורד");
+  }
+
+  async function handleCopyTable() {
+    const { headers, rows } = buildExport();
+    if (rows.length === 0) {
+      toast.error("אין שורות להעתקה");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(toTsv(headers, rows));
+      toast.success("הטבלה הועתקה");
+    } catch {
+      toast.error("ההעתקה נכשלה");
+    }
+  }
+
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-display-md text-navy">שעות</h1>
-          <p className="text-ink-soft mt-1 text-sm">{entries.length} רשומות ב-30 הימים האחרונים</p>
+          <p className="text-ink-soft mt-1 text-sm">
+            {entries.length} רשומות ·{" "}
+            {new Date(`${rangeFrom}T00:00:00`).toLocaleDateString("he-IL")} -{" "}
+            {new Date(`${rangeTo}T00:00:00`).toLocaleDateString("he-IL")}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <TimeViewToggle
@@ -353,6 +449,66 @@ export function TimeList({
           <option value="yes">לחיוב</option>
           <option value="no">לא לחיוב</option>
         </select>
+      </div>
+
+      {/* Period + export */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <span className="text-ink-faded text-xs font-semibold">תקופה:</span>
+        <button
+          type="button"
+          onClick={() => applyPreset("this")}
+          className="border-ink-line text-navy hover:border-navy rounded-lg border bg-white px-3 py-2 text-sm font-medium transition-colors"
+        >
+          החודש
+        </button>
+        <button
+          type="button"
+          onClick={() => applyPreset("last")}
+          className="border-ink-line text-navy hover:border-navy rounded-lg border bg-white px-3 py-2 text-sm font-medium transition-colors"
+        >
+          חודש קודם
+        </button>
+        <input
+          type="date"
+          value={customFrom}
+          onChange={(e) => setCustomFrom(e.target.value)}
+          className="border-ink-line focus:border-navy rounded-lg border bg-white px-2 py-2 text-sm outline-none"
+          dir="ltr"
+        />
+        <span className="text-ink-faded text-sm">-</span>
+        <input
+          type="date"
+          value={customTo}
+          onChange={(e) => setCustomTo(e.target.value)}
+          className="border-ink-line focus:border-navy rounded-lg border bg-white px-2 py-2 text-sm outline-none"
+          dir="ltr"
+        />
+        <button
+          type="button"
+          onClick={() => updateUrl({ from: customFrom, to: customTo })}
+          className="bg-navy text-cream-paper hover:bg-navy-deep rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+        >
+          החל
+        </button>
+
+        <div className="ms-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleCopyTable}
+            className="border-ink-line text-navy hover:border-navy flex items-center gap-1.5 rounded-lg border bg-white px-3 py-2 text-sm font-medium transition-colors"
+          >
+            <Copy size={14} />
+            העתק
+          </button>
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            className="border-ink-line text-navy hover:border-navy flex items-center gap-1.5 rounded-lg border bg-white px-3 py-2 text-sm font-medium transition-colors"
+          >
+            <Download size={14} />
+            ייצוא CSV
+          </button>
+        </div>
       </div>
 
       <HourlyInvoiceBar
@@ -1065,6 +1221,9 @@ function HourlyInvoiceBar({
   const toast = useToast();
   const [pending, startTransition] = useTransition();
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [modalCustomer, setModalCustomer] = useState<{ id: string; name: string } | null>(null);
+  const [docType, setDocType] = useState<HourlyInvoiceDocType>("payment_request");
+  const [attachDetail, setAttachDetail] = useState(true);
 
   const hourlyCustomersWithPending = useMemo(() => {
     const map = new Map<string, { name: string; minutes: number; rate: number }>();
@@ -1093,10 +1252,15 @@ function HourlyInvoiceBar({
 
   if (hourlyCustomersWithPending.length === 0) return null;
 
-  function handleInvoice(customerId: string) {
+  function runInvoice() {
+    if (!modalCustomer) return;
+    const customerId = modalCustomer.id;
     setLoadingId(customerId);
     startTransition(async () => {
-      const res = await createHourlyInvoice(customerId);
+      const res = await createHourlyInvoice(customerId, {
+        documentType: docType,
+        attachHoursDetail: attachDetail,
+      });
       setLoadingId(null);
       if (res.error) {
         toast.error(res.error);
@@ -1105,9 +1269,14 @@ function HourlyInvoiceBar({
       const hours = res.hours ?? 0;
       const amount = res.amount ?? 0;
       toast.success(
-        `חויבו ${hours.toFixed(1)} שעות${amount > 0 ? ` = ₪${amount.toLocaleString("he-IL")}` : ""}`,
+        `נוצרה חשבונית טיוטה · ${hours.toFixed(1)} שעות${amount > 0 ? ` = ₪${amount.toLocaleString("he-IL")}` : ""}`,
       );
-      router.refresh();
+      setModalCustomer(null);
+      if (res.invoiceId) {
+        router.push(`/invoices/${res.invoiceId}`);
+      } else {
+        router.refresh();
+      }
     });
   }
 
@@ -1129,7 +1298,7 @@ function HourlyInvoiceBar({
               </span>
               <button
                 type="button"
-                onClick={() => handleInvoice(customerId)}
+                onClick={() => setModalCustomer({ id: customerId, name })}
                 disabled={pending}
                 className="rounded-md bg-amber-600 px-2 py-1 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
               >
@@ -1139,9 +1308,71 @@ function HourlyInvoiceBar({
           );
         })}
       </div>
+
+      {modalCustomer && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4">
+          <div className="bg-cream w-full max-w-md rounded-2xl p-6 shadow-xl">
+            <h2 className="text-display-sm text-navy mb-1">הפקת חשבונית</h2>
+            <p className="text-ink-soft mb-4 text-sm">
+              חשבונית טיוטה עבור <strong className="text-navy">{modalCustomer.name}</strong> מכל
+              השעות הממתינות לחיוב.
+            </p>
+
+            <label className="text-ink-soft mb-1.5 block text-xs font-semibold">סוג מסמך</label>
+            <select
+              value={docType}
+              onChange={(e) => setDocType(e.target.value as HourlyInvoiceDocType)}
+              className="border-ink-line bg-cream-paper text-navy focus:border-navy mb-3 w-full rounded-lg border px-3 py-2 text-sm outline-none"
+            >
+              {HOURLY_INVOICE_DOC_TYPES.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+
+            <label className="text-ink-soft flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={attachDetail}
+                onChange={(e) => setAttachDetail(e.target.checked)}
+                className="accent-navy h-4 w-4 rounded"
+              />
+              צרף פירוט שעות להערות החשבונית
+            </label>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setModalCustomer(null)}
+                disabled={pending}
+                className="border-ink-line text-navy hover:border-navy rounded-lg border px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50"
+              >
+                ביטול
+              </button>
+              <button
+                type="button"
+                onClick={runInvoice}
+                disabled={pending}
+                className="bg-navy text-cream-paper hover:bg-navy-deep rounded-lg px-5 py-2 text-sm font-semibold transition-colors disabled:opacity-50"
+              >
+                {pending ? <Spinner size={14} /> : "הפק חשבונית"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+type HourlyInvoiceDocType = "payment_request" | "tax_invoice" | "tax_invoice_receipt";
+
+const HOURLY_INVOICE_DOC_TYPES: { value: HourlyInvoiceDocType; label: string }[] = [
+  { value: "payment_request", label: "דרישת תשלום" },
+  { value: "tax_invoice", label: "חשבונית מס" },
+  { value: "tax_invoice_receipt", label: "חשבונית מס קבלה" },
+];
 
 function BillingStatusActions({
   entry,

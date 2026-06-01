@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createTimeEntryFromTimerForUser, type TimerCreateInput } from "@/lib/time-entries";
+import { fireMakeWebhook } from "@/lib/make-webhook";
+import { buildHoursDetail } from "@/lib/hours-detail";
+
+type InvoiceDocumentType = "payment_request" | "tax_invoice" | "tax_invoice_receipt";
 
 const TimeEntrySchema = z
   .object({
@@ -308,27 +312,42 @@ export async function resetEntryToPending(entryId: string): Promise<{ error?: st
 
 export async function createHourlyInvoice(
   customerId: string,
-): Promise<{ error?: string; hours?: number; amount?: number; count?: number }> {
+  opts?: { documentType?: InvoiceDocumentType; attachHoursDetail?: boolean },
+): Promise<{
+  error?: string;
+  hours?: number;
+  amount?: number;
+  count?: number;
+  invoiceId?: string;
+}> {
+  const documentType = opts?.documentType ?? "payment_request";
+  const attachDetail = opts?.attachHoursDetail ?? true;
+
   const { supabase, profile } = await getTenant();
   if (!profile) return { error: "לא מחובר" };
 
   const { data: customer } = await supabase
     .from("customers")
-    .select("hourly_rate_override")
+    .select(
+      "name, email, phone, company, address, company_registration_number, hourly_rate_override",
+    )
     .eq("id", customerId)
     .eq("tenant_id", profile.tenant_id)
     .maybeSingle();
+
+  if (!customer) return { error: "לקוח לא נמצא" };
 
   const { data: settings } = await supabase
     .from("tenant_settings")
     .select("default_hourly_rate")
     .maybeSingle();
 
-  const hourlyRate = customer?.hourly_rate_override ?? settings?.default_hourly_rate ?? 0;
+  const fallbackRate =
+    Number(customer.hourly_rate_override) || Number(settings?.default_hourly_rate) || 0;
 
   const { data: entries, error: fetchError } = await supabase
     .from("time_entries")
-    .select("id, duration_minutes")
+    .select("id, start_time, duration_minutes, notes, task_id, hourly_rate_at_entry")
     .eq("customer_id", customerId)
     .eq("tenant_id", profile.tenant_id)
     .eq("billable", true)
@@ -337,23 +356,120 @@ export async function createHourlyInvoice(
   if (fetchError) return { error: fetchError.message };
   if (!entries || entries.length === 0) return { error: "אין שעות ממתינות לחיוב" };
 
-  const totalMinutes = entries.reduce((sum, e) => sum + (e.duration_minutes ?? 0), 0);
-  const ids = entries.map((e) => e.id);
+  // Resolve task titles to enrich descriptions where the entry has no notes.
+  const taskIds = Array.from(
+    new Set(entries.map((e) => e.task_id).filter((id): id is string => !!id)),
+  );
+  const taskTitle = new Map<string, string>();
+  if (taskIds.length > 0) {
+    const { data: tasks } = await supabase.from("tasks").select("id, title").in("id", taskIds);
+    for (const t of tasks ?? []) taskTitle.set(t.id, t.title);
+  }
 
-  const { error: updateError } = await supabase
+  // Group hours by their effective rate so each rate becomes one invoice line.
+  const byRate = new Map<number, number>();
+  for (const e of entries) {
+    const rate = Number(e.hourly_rate_at_entry) || fallbackRate;
+    const minutes = Number(e.duration_minutes) || 0;
+    byRate.set(rate, (byRate.get(rate) ?? 0) + minutes / 60);
+  }
+
+  const items = Array.from(byRate.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([rate, hrs], idx) => ({
+      description: `שעות עבודה — ${Math.round(hrs * 100) / 100} שעות`,
+      quantity: Math.round(hrs * 100) / 100,
+      unit_price: rate,
+      order_index: idx,
+    }));
+
+  const subtotal =
+    Math.round(items.reduce((sum, it) => sum + it.quantity * it.unit_price, 0) * 100) / 100;
+
+  const detail = buildHoursDetail(
+    entries.map((e) => ({
+      start_time: e.start_time,
+      duration_minutes: e.duration_minutes,
+      description: (e.notes ?? "").trim() || (e.task_id ? (taskTitle.get(e.task_id) ?? "") : ""),
+    })),
+  );
+
+  const today = new Date();
+  const due = new Date(today);
+  due.setDate(due.getDate() + 14);
+
+  const { data: invoice, error: invErr } = await supabase
+    .from("invoices")
+    .insert({
+      tenant_id: profile.tenant_id,
+      created_by: profile.id,
+      customer_id: customerId,
+      type: "monthly_hours",
+      document_type: documentType,
+      status: "draft",
+      issue_date: today.toISOString().slice(0, 10),
+      due_date: due.toISOString().slice(0, 10),
+      subtotal,
+      tax_rate: 18,
+      currency: "ILS",
+      notes: attachDetail ? detail.notesText : null,
+    })
+    .select("id, total_amount, tax_amount")
+    .single();
+
+  if (invErr || !invoice) return { error: invErr?.message ?? "שגיאה ביצירת חשבונית" };
+
+  const { error: itemsErr } = await supabase
+    .from("invoice_items")
+    .insert(items.map((it) => ({ ...it, invoice_id: invoice.id })));
+
+  if (itemsErr) {
+    await supabase.from("invoices").delete().eq("id", invoice.id);
+    return { error: itemsErr.message };
+  }
+
+  const ids = entries.map((e) => e.id);
+  const { error: linkErr } = await supabase
     .from("time_entries")
-    .update({ billing_status: "invoiced" })
+    .update({ billing_status: "invoiced", invoice_id: invoice.id })
     .in("id", ids)
     .eq("tenant_id", profile.tenant_id);
 
-  if (updateError) return { error: updateError.message };
+  if (linkErr) return { error: linkErr.message };
+
+  await fireMakeWebhook(profile.tenant_id, "invoice.created", {
+    invoice_id: invoice.id,
+    type: "monthly_hours",
+    document_type: documentType,
+    status: "draft",
+    issue_date: today.toISOString().slice(0, 10),
+    due_date: due.toISOString().slice(0, 10),
+    subtotal,
+    tax_rate: 18,
+    tax_amount: invoice.tax_amount == null ? null : Number(invoice.tax_amount),
+    total_amount: invoice.total_amount == null ? null : Number(invoice.total_amount),
+    currency: "ILS",
+    customer: {
+      id: customerId,
+      name: customer.name,
+      email: customer.email,
+      phone: customer.phone,
+      company: customer.company,
+      address: customer.address,
+      tax_id: customer.company_registration_number,
+    },
+    items,
+    hours_detail: attachDetail ? detail.lines : null,
+    time_entry_ids: ids,
+  });
 
   revalidatePath("/time");
+  revalidatePath("/invoices");
   revalidatePath(`/customers/${customerId}`);
 
-  const hours = Math.round((totalMinutes / 60) * 100) / 100;
-  const amount = Math.round(hours * hourlyRate);
-  return { hours, amount, count: entries.length };
+  const hours = detail.totalHours;
+  const amount = Math.round(subtotal);
+  return { hours, amount, count: entries.length, invoiceId: invoice.id };
 }
 
 export async function bulkToggleBillable(

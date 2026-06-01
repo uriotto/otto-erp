@@ -3,7 +3,9 @@ import Link from "next/link";
 import { ArrowRight, Receipt, Building2, Calendar, ExternalLink, FileText } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { BreadcrumbLabel } from "@/components/layout/breadcrumb-label";
+import { buildHoursDetail } from "@/lib/hours-detail";
 import { InvoiceActionsBar } from "./invoice-actions-bar";
+import { LinkedHoursPanel } from "./linked-hours-panel";
 import {
   STATUS_LABELS,
   STATUS_STYLES,
@@ -42,23 +44,37 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
   if (!invoice) notFound();
 
-  const [{ data: customer }, { data: items }, { data: payments }] = await Promise.all([
-    supabase
-      .from("customers")
-      .select("id, name, company, email, phone")
-      .eq("id", invoice.customer_id)
-      .maybeSingle(),
-    supabase
-      .from("invoice_items")
-      .select("id, description, quantity, unit_price, amount, order_index")
-      .eq("invoice_id", id)
-      .order("order_index", { ascending: true }),
-    supabase
-      .from("payments")
-      .select("id, amount, method, paid_at, reference, notes")
-      .eq("invoice_id", id)
-      .order("paid_at", { ascending: false }),
-  ]);
+  const [{ data: customer }, { data: items }, { data: payments }, { data: linkedEntries }] =
+    await Promise.all([
+      supabase
+        .from("customers")
+        .select("id, name, company, email, phone")
+        .eq("id", invoice.customer_id)
+        .maybeSingle(),
+      supabase
+        .from("invoice_items")
+        .select("id, description, quantity, unit_price, amount, order_index")
+        .eq("invoice_id", id)
+        .order("order_index", { ascending: true }),
+      supabase
+        .from("payments")
+        .select("id, amount, method, paid_at, reference, notes")
+        .eq("invoice_id", id)
+        .order("paid_at", { ascending: false }),
+      supabase
+        .from("time_entries")
+        .select("start_time, duration_minutes, notes")
+        .eq("invoice_id", id)
+        .order("start_time", { ascending: true }),
+    ]);
+
+  const hoursDetail = buildHoursDetail(
+    (linkedEntries ?? []).map((e) => ({
+      start_time: e.start_time,
+      duration_minutes: e.duration_minutes,
+      description: e.notes,
+    })),
+  );
 
   const status = invoice.status as InvoiceStatusUI;
   const type = invoice.type as InvoiceTypeUI;
@@ -241,6 +257,13 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           <div className="text-ink-soft mt-4 text-sm whitespace-pre-wrap">{invoice.notes}</div>
         )}
       </div>
+
+      {/* Linked hours */}
+      <LinkedHoursPanel
+        lines={hoursDetail.lines}
+        totalHours={hoursDetail.totalHours}
+        invoiceNumber={invoice.number}
+      />
 
       {/* Payments */}
       <div className="bg-cream-paper border-ink-line mb-4 rounded-2xl border p-6">

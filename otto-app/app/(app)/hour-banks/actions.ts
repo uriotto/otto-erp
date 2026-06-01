@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { fireMakeWebhook } from "@/lib/make-webhook";
+import { buildHoursDetail } from "@/lib/hours-detail";
 import type { TablesUpdate } from "@/lib/supabase/types";
 
 const CreateSchema = z.object({
@@ -364,6 +365,7 @@ export async function invoiceOverageSeparately(
   customerId: string,
   overageEntryIds: string[],
   documentType: InvoiceDocumentType = "payment_request",
+  attachHoursDetail: boolean = true,
 ): Promise<{ error?: string; invoiceId?: string }> {
   if (overageEntryIds.length === 0) return {};
   const { supabase, profile } = await getTenant();
@@ -372,7 +374,7 @@ export async function invoiceOverageSeparately(
   // Pull the entries so we can build invoice line items from real hours/rates.
   const { data: entries, error: entriesErr } = await supabase
     .from("time_entries")
-    .select("id, duration_minutes, hourly_rate_at_entry")
+    .select("id, start_time, duration_minutes, notes, task_id, hourly_rate_at_entry")
     .in("id", overageEntryIds)
     .eq("tenant_id", profile.tenant_id)
     .eq("customer_id", customerId);
@@ -413,6 +415,25 @@ export async function invoiceOverageSeparately(
   const subtotal =
     Math.round(items.reduce((sum, it) => sum + it.quantity * it.unit_price, 0) * 100) / 100;
 
+  // Resolve task titles to enrich descriptions where the entry has no notes.
+  const taskIds = Array.from(
+    new Set(entries.map((e) => e.task_id).filter((id): id is string => !!id)),
+  );
+  const taskTitle = new Map<string, string>();
+  if (taskIds.length > 0) {
+    const { data: tasks } = await supabase.from("tasks").select("id, title").in("id", taskIds);
+    for (const t of tasks ?? []) taskTitle.set(t.id, t.title);
+  }
+
+  const detail = buildHoursDetail(
+    entries.map((e) => ({
+      start_time: e.start_time,
+      duration_minutes: e.duration_minutes,
+      description: (e.notes ?? "").trim() || (e.task_id ? (taskTitle.get(e.task_id) ?? "") : ""),
+    })),
+  );
+  const baseNote = "חשבונית על שעות חריגה (טיוטה)";
+
   const today = new Date();
   const due = new Date(today);
   due.setDate(due.getDate() + 14);
@@ -431,7 +452,7 @@ export async function invoiceOverageSeparately(
       subtotal,
       tax_rate: 18,
       currency: "ILS",
-      notes: "חשבונית על שעות חריגה (טיוטה)",
+      notes: attachHoursDetail ? `${baseNote}\n\n${detail.notesText}` : baseNote,
     })
     .select("id, total_amount, tax_amount, subtotal")
     .single();
@@ -479,6 +500,7 @@ export async function invoiceOverageSeparately(
       tax_id: customer.company_registration_number,
     },
     items,
+    hours_detail: attachHoursDetail ? detail.lines : null,
     time_entry_ids: overageEntryIds,
   });
 
