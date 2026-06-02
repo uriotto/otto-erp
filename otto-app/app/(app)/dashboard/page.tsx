@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardStats } from "./dashboard-stats";
+import { DashboardBusinessState } from "./dashboard-business-state";
 import { DashboardActivity } from "./dashboard-activity";
 import { DashboardTasks } from "./dashboard-tasks";
 import { StatsGridSkeleton, ActivitySkeleton, TasksSkeleton } from "./dashboard-skeletons";
@@ -27,6 +28,10 @@ export default async function DashboardPage() {
 
       <Suspense fallback={<StatsGridSkeleton />}>
         <DashboardStats />
+      </Suspense>
+
+      <Suspense fallback={<StatsGridSkeleton />}>
+        <DashboardBusinessState />
       </Suspense>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
