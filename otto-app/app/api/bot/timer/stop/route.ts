@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (readError) {
-    return Response.json({ error: readError.message }, { status: 500 });
+    return Response.json({ error: "internal error" }, { status: 500 });
   }
   if (!timer) {
     return Response.json({ error: "no active timer" }, { status: 404 });

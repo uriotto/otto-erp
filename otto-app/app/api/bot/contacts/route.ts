@@ -29,7 +29,7 @@ export async function GET(request: Request) {
   if (customerId) query = query.eq("customer_id", customerId);
 
   const { data, error } = await query;
-  if (error) return Response.json({ error: error.message }, { status: 500 });
+  if (error) return Response.json({ error: "internal error" }, { status: 500 });
 
   return Response.json({ contacts: data ?? [] });
 }
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
       .eq("id", parsed.data.customer_id)
       .eq("tenant_id", auth.tenantId)
       .maybeSingle();
-    if (custErr) return Response.json({ error: custErr.message }, { status: 500 });
+    if (custErr) return Response.json({ error: "internal error" }, { status: 500 });
     if (!customer) return Response.json({ error: "customer not found" }, { status: 404 });
   }
 
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
     .select("id, name, role, email, phone, customer_id")
     .single();
 
-  if (error) return Response.json({ error: error.message }, { status: 500 });
+  if (error) return Response.json({ error: "internal error" }, { status: 500 });
 
   return Response.json({ created: true, contact: data }, { status: 201 });
 }

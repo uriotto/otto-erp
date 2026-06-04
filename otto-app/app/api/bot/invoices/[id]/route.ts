@@ -42,7 +42,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .eq("tenant_id", auth.tenantId)
     .maybeSingle();
 
-  if (findErr) return Response.json({ error: findErr.message }, { status: 500 });
+  if (findErr) return Response.json({ error: "internal error" }, { status: 500 });
   if (!existing) return Response.json({ error: "not found" }, { status: 404 });
 
   type InvoiceStatus =
@@ -70,7 +70,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .eq("id", id)
     .eq("tenant_id", auth.tenantId);
 
-  if (updateErr) return Response.json({ error: updateErr.message }, { status: 500 });
+  if (updateErr) return Response.json({ error: "internal error" }, { status: 500 });
 
   return Response.json({ updated: true });
 }
@@ -90,7 +90,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     .eq("tenant_id", auth.tenantId)
     .maybeSingle();
 
-  if (findErr) return Response.json({ error: findErr.message }, { status: 500 });
+  if (findErr) return Response.json({ error: "internal error" }, { status: 500 });
   if (!existing) return Response.json({ error: "not found" }, { status: 404 });
 
   const { data: payments, error: payErr } = await supabase
@@ -99,7 +99,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     .eq("invoice_id", id)
     .limit(1);
 
-  if (payErr) return Response.json({ error: payErr.message }, { status: 500 });
+  if (payErr) return Response.json({ error: "internal error" }, { status: 500 });
   if (payments && payments.length > 0) {
     return Response.json(
       { error: "cannot delete invoice with recorded payments" },
@@ -117,7 +117,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     if (error.code === "23503") {
       return Response.json({ error: "invoice is referenced by other records" }, { status: 409 });
     }
-    return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ error: "internal error" }, { status: 500 });
   }
 
   return Response.json({ deleted: true });

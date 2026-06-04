@@ -37,7 +37,7 @@ export async function GET(request: Request) {
   if (parsed.data.customer_id) query = query.eq("customer_id", parsed.data.customer_id);
 
   const { data, error } = await query;
-  if (error) return Response.json({ error: error.message }, { status: 500 });
+  if (error) return Response.json({ error: "internal error" }, { status: 500 });
 
   const totalMinutes = (data ?? []).reduce((sum, e) => sum + (e.duration_minutes ?? 0), 0);
   return Response.json({

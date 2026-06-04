@@ -40,7 +40,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .eq("tenant_id", auth.tenantId)
     .maybeSingle();
 
-  if (findErr) return Response.json({ error: findErr.message }, { status: 500 });
+  if (findErr) return Response.json({ error: "internal error" }, { status: 500 });
   if (!existing) return Response.json({ error: "not found" }, { status: 404 });
 
   const updates: {
@@ -63,7 +63,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .eq("user_id", auth.userId)
     .eq("tenant_id", auth.tenantId);
 
-  if (updateErr) return Response.json({ error: updateErr.message }, { status: 500 });
+  if (updateErr) return Response.json({ error: "internal error" }, { status: 500 });
 
   return Response.json({ updated: true });
 }
@@ -84,7 +84,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     .eq("tenant_id", auth.tenantId)
     .maybeSingle();
 
-  if (findErr) return Response.json({ error: findErr.message }, { status: 500 });
+  if (findErr) return Response.json({ error: "internal error" }, { status: 500 });
   if (!existing) return Response.json({ error: "not found" }, { status: 404 });
 
   const { error: deleteErr } = await supabase
@@ -94,7 +94,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     .eq("user_id", auth.userId)
     .eq("tenant_id", auth.tenantId);
 
-  if (deleteErr) return Response.json({ error: deleteErr.message }, { status: 500 });
+  if (deleteErr) return Response.json({ error: "internal error" }, { status: 500 });
 
   return Response.json({ deleted: true });
 }

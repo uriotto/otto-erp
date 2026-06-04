@@ -40,7 +40,7 @@ export async function GET(request: Request) {
   if (parsed.data.status) query = query.eq("status", parsed.data.status);
 
   const { data, error } = await query;
-  if (error) return Response.json({ error: error.message }, { status: 500 });
+  if (error) return Response.json({ error: "internal error" }, { status: 500 });
 
   return Response.json({ leads: data ?? [], count: data?.length ?? 0 });
 }
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
     .select("id, name")
     .single();
 
-  if (error) return Response.json({ error: error.message }, { status: 500 });
+  if (error) return Response.json({ error: "internal error" }, { status: 500 });
 
   return Response.json({ created: true, lead: data }, { status: 201 });
 }

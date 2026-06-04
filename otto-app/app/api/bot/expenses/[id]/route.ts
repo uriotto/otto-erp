@@ -27,7 +27,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     .eq("tenant_id", auth.tenantId)
     .maybeSingle();
 
-  if (error) return Response.json({ error: error.message }, { status: 500 });
+  if (error) return Response.json({ error: "internal error" }, { status: 500 });
   if (!data) return Response.json({ error: "not found" }, { status: 404 });
 
   return Response.json({ expense: data });
@@ -63,7 +63,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .eq("tenant_id", auth.tenantId)
     .maybeSingle();
 
-  if (checkError) return Response.json({ error: checkError.message }, { status: 500 });
+  if (checkError) return Response.json({ error: "internal error" }, { status: 500 });
   if (!existing) return Response.json({ error: "not found" }, { status: 404 });
 
   if (parsed.data.customer_id !== undefined && parsed.data.customer_id !== null) {
@@ -73,7 +73,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       .eq("id", parsed.data.customer_id)
       .eq("tenant_id", auth.tenantId)
       .maybeSingle();
-    if (custErr) return Response.json({ error: custErr.message }, { status: 500 });
+    if (custErr) return Response.json({ error: "internal error" }, { status: 500 });
     if (!customer) return Response.json({ error: "customer not found" }, { status: 404 });
   }
 
@@ -95,7 +95,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .eq("id", id)
     .eq("tenant_id", auth.tenantId);
 
-  if (error) return Response.json({ error: error.message }, { status: 500 });
+  if (error) return Response.json({ error: "internal error" }, { status: 500 });
 
   return Response.json({ updated: true });
 }
@@ -115,7 +115,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     .eq("tenant_id", auth.tenantId)
     .maybeSingle();
 
-  if (checkError) return Response.json({ error: checkError.message }, { status: 500 });
+  if (checkError) return Response.json({ error: "internal error" }, { status: 500 });
   if (!existing) return Response.json({ error: "not found" }, { status: 404 });
 
   const { error } = await supabase
@@ -128,7 +128,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     if (error.code === "23503") {
       return Response.json({ error: "expense is referenced by other records" }, { status: 409 });
     }
-    return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ error: "internal error" }, { status: 500 });
   }
 
   return Response.json({ deleted: true });

@@ -47,7 +47,7 @@ export async function GET(request: Request) {
   if (parsed.data.to) query = query.lte("start_at", parsed.data.to);
 
   const { data, error } = await query;
-  if (error) return Response.json({ error: error.message }, { status: 500 });
+  if (error) return Response.json({ error: "internal error" }, { status: 500 });
 
   return Response.json({ events: data ?? [], count: data?.length ?? 0 });
 }
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
     .select("id, title, start_at, end_at")
     .single();
 
-  if (error) return Response.json({ error: error.message }, { status: 500 });
+  if (error) return Response.json({ error: "internal error" }, { status: 500 });
 
   return Response.json({ created: true, event: data }, { status: 201 });
 }

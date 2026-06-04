@@ -40,7 +40,7 @@ export async function GET(request: Request) {
   if (status) query = query.eq("status", status);
 
   const { data, error } = await query;
-  if (error) return Response.json({ error: error.message }, { status: 500 });
+  if (error) return Response.json({ error: "internal error" }, { status: 500 });
 
   return Response.json({ invoices: data ?? [], count: data?.length ?? 0 });
 }
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
 
   const { error: itemsErr } = await supabase.from("invoice_items").insert(itemRows);
   if (itemsErr) {
-    return Response.json({ error: itemsErr.message }, { status: 500 });
+    return Response.json({ error: "internal error" }, { status: 500 });
   }
 
   return Response.json(

@@ -49,7 +49,7 @@ export async function GET(request: Request) {
   if (parsed.data.customer_id) query = query.eq("customer_id", parsed.data.customer_id);
 
   const { data, error } = await query;
-  if (error) return Response.json({ error: error.message }, { status: 500 });
+  if (error) return Response.json({ error: "internal error" }, { status: 500 });
 
   const total_amount = (data ?? []).reduce((sum, e) => sum + (e.amount ?? 0), 0);
   return Response.json({ expenses: data ?? [], total_amount, count: data?.length ?? 0 });

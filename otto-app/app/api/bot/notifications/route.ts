@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   if (unreadOnly) query = query.is("read_at", null);
 
   const { data, error } = await query;
-  if (error) return Response.json({ error: error.message }, { status: 500 });
+  if (error) return Response.json({ error: "internal error" }, { status: 500 });
 
   return Response.json({ notifications: data ?? [], count: data?.length ?? 0 });
 }

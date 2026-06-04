@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     .order("name");
 
   if (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ error: "internal error" }, { status: 500 });
   }
   return Response.json({ customers: data ?? [] });
 }
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     .select("id, name")
     .single();
 
-  if (error) return Response.json({ error: error.message }, { status: 500 });
+  if (error) return Response.json({ error: "internal error" }, { status: 500 });
 
   return Response.json({ created: true, customer: data }, { status: 201 });
 }

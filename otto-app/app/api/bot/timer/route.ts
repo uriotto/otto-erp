@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     .eq("tenant_id", auth.tenantId)
     .maybeSingle();
 
-  if (error) return Response.json({ error: error.message }, { status: 500 });
+  if (error) return Response.json({ error: "internal error" }, { status: 500 });
 
   if (!data) {
     return Response.json({
@@ -83,7 +83,7 @@ export async function PATCH(request: Request) {
     .maybeSingle();
 
   if (readError) {
-    return Response.json({ error: readError.message }, { status: 500 });
+    return Response.json({ error: "internal error" }, { status: 500 });
   }
   if (!existing) {
     return Response.json({ error: "no active timer" }, { status: 404 });
@@ -99,7 +99,7 @@ export async function PATCH(request: Request) {
     .eq("tenant_id", auth.tenantId);
 
   if (updateError) {
-    return Response.json({ error: updateError.message }, { status: 500 });
+    return Response.json({ error: "internal error" }, { status: 500 });
   }
 
   return Response.json({ updated: true, notes: nextNotes });

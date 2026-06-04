@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (readError) {
-    return Response.json({ error: readError.message }, { status: 500 });
+    return Response.json({ error: "internal error" }, { status: 500 });
   }
 
   let stoppedPrevious: { entry_id: string; duration_minutes: number } | undefined;
@@ -77,7 +77,7 @@ export async function POST(request: Request) {
   );
 
   if (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ error: "internal error" }, { status: 500 });
   }
 
   return Response.json({
