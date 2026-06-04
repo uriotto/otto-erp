@@ -4,6 +4,7 @@ import { ArrowRight, Mail, Phone, Building2, TrendingUp } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { ActivityFeed } from "@/components/activities/activity-feed";
 import { TasksSection, type TasksSectionItem } from "@/components/tasks/tasks-section";
+import { RecordingsSection } from "@/app/(app)/recordings/recordings-section";
 import { LeadActionsBar } from "./lead-actions-bar";
 import { LeadTagsEditor } from "./lead-tags-editor";
 import { RecentTracker } from "@/components/search/recent-tracker";
@@ -49,6 +50,12 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     .order("due_date", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: false });
   const tasks = (tasksData ?? []) as TasksSectionItem[];
+
+  const { data: recordingsData } = await supabase
+    .from("recordings")
+    .select("id, title, status, duration_seconds, recorded_at")
+    .eq("lead_id", id)
+    .order("recorded_at", { ascending: false });
 
   const initials = lead.name
     .split(" ")
@@ -147,6 +154,10 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
 
       <div className="mt-6">
         <TasksSection tasks={tasks} />
+      </div>
+
+      <div className="mt-6">
+        <RecordingsSection recordings={recordingsData ?? []} />
       </div>
 
       <div className="mt-6">

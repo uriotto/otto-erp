@@ -11,6 +11,7 @@ const STATUS_LABELS: Record<string, string> = {
   uploaded: "הועלה",
   transcribing: "בתמלול",
   transcribed: "תומלל",
+  completed: "תומלל",
   failed: "נכשל",
 };
 
@@ -18,6 +19,7 @@ const STATUS_STYLES: Record<string, string> = {
   uploaded: "bg-blue-50 text-blue-700 border-blue-200",
   transcribing: "bg-amber-50 text-amber-700 border-amber-200",
   transcribed: "bg-green-50 text-green-700 border-green-200",
+  completed: "bg-green-50 text-green-700 border-green-200",
   failed: "bg-red-50 text-red-700 border-red-200",
 };
 
