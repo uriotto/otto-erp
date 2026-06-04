@@ -8,9 +8,40 @@
  *  - summaryToMarkdown: הופך את הסיכום המובנה ל-markdown לשמירה בכרטיס.
  */
 
+import { createHmac, timingSafeEqual } from "node:crypto";
+
 const RUNPOD_ENDPOINT = "https://api.runpod.ai/v2/kqbaw3igklde92";
 const RUNPOD_MODEL = "ivrit-ai/whisper-large-v3-turbo-ct2";
 const SUMMARY_MODEL = "claude-sonnet-4-6";
+
+function webhookSecret(): string {
+  const s = process.env.RECORDINGS_WEBHOOK_SECRET;
+  if (!s) throw new Error("Missing RECORDINGS_WEBHOOK_SECRET");
+  return s;
+}
+
+/**
+ * חתימת HMAC הקושרת את הטוקן להקלטה ספציפית. נשלחת בכתובת ה-webhook במקום
+ * הטוקן-אב הגלובלי: גם אם הכתובת דולפת ללוגים, היא מאשרת רק את ה-rec הזה
+ * ולא חושפת את הסוד עצמו.
+ */
+export function signRecording(recordingId: string): string {
+  return createHmac("sha256", webhookSecret()).update(recordingId).digest("hex");
+}
+
+/** אימות constant-time של חתימת ה-webhook מול ה-rec id. */
+export function verifyRecordingSig(recordingId: string, sig: string | null): boolean {
+  if (!sig) return false;
+  let expected: Buffer;
+  let got: Buffer;
+  try {
+    expected = Buffer.from(signRecording(recordingId), "hex");
+    got = Buffer.from(sig, "hex");
+  } catch {
+    return false;
+  }
+  return expected.length === got.length && timingSafeEqual(expected, got);
+}
 
 /** שולח אודיו ל-RunPod ומחזיר job id. RunPod ידפוק ל-webhookUrl כשיסיים. */
 export async function submitTranscription(audioUrl: string, webhookUrl: string): Promise<string> {

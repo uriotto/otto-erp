@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { submitTranscription } from "@/lib/recordings/transcription";
+import { submitTranscription, signRecording } from "@/lib/recordings/transcription";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -25,12 +25,15 @@ async function kickoffTranscription(
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://otto-erp.vercel.app";
 
   try {
+    // 30 דק' - מספיק בשפע ל-RunPod, מצמצם חלון חשיפה אם ה-URL דולף (M3)
     const { data: signed } = await supabase.storage
       .from("recordings")
-      .createSignedUrl(storagePath, 7200);
+      .createSignedUrl(storagePath, 1800);
     if (!signed?.signedUrl) throw new Error("could not sign audio url");
 
-    const webhookUrl = `${appUrl}/api/recordings/webhook?rec=${recordingId}&token=${encodeURIComponent(secret)}`;
+    // חתימה הקשורה ל-rec הזה במקום הטוקן-אב ב-URL (H1/M1/M2)
+    const sig = signRecording(recordingId);
+    const webhookUrl = `${appUrl}/api/recordings/webhook?rec=${recordingId}&sig=${sig}`;
     await submitTranscription(signed.signedUrl, webhookUrl);
 
     await supabase.from("recordings").update({ status: "transcribing" }).eq("id", recordingId);

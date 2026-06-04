@@ -3,6 +3,7 @@ import {
   extractTranscript,
   summarizeTranscript,
   summaryToMarkdown,
+  verifyRecordingSig,
 } from "@/lib/recordings/transcription";
 
 export const runtime = "nodejs";
@@ -16,14 +17,14 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   const url = new URL(request.url);
   const recordingId = url.searchParams.get("rec");
-  const token = url.searchParams.get("token");
+  const sig = url.searchParams.get("sig");
 
-  const secret = process.env.RECORDINGS_WEBHOOK_SECRET;
-  if (!secret || token !== secret) {
-    return Response.json({ error: "unauthorized" }, { status: 401 });
-  }
   if (!recordingId) {
     return Response.json({ error: "missing rec id" }, { status: 400 });
+  }
+  // חתימת HMAC הקשורה ל-rec הזה (constant-time). הסוד עצמו לא עובר ב-URL.
+  if (!verifyRecordingSig(recordingId, sig)) {
+    return Response.json({ error: "unauthorized" }, { status: 401 });
   }
 
   let body: { status?: string; output?: unknown };
