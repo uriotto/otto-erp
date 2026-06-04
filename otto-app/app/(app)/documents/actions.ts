@@ -80,7 +80,7 @@ export async function uploadDocument(
 
 const SignDocumentSchema = z.object({
   id: z.string().uuid(),
-  signature_data: z.string().min(1),
+  signature_data: z.string().min(1).max(500_000), // H4: cap signature payload (DoS)
   signed_by_name: z.string().min(1, "שם חובה").max(200),
   signed_by_email: z.string().email("מייל לא תקין").optional().nullable(),
 });

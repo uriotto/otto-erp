@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { assertPublicHttpsUrl } from "@/lib/ssrf-guard";
 
 const VALID_CONTEXTS = ["customer", "project", "recording", "lead"] as const;
 
@@ -184,6 +185,9 @@ export async function invokeAgent(
     let errorMsg: string | null = null;
 
     try {
+      // SSRF guard: חוסם פנייה ל-IP פנימי / cloud metadata (C2)
+      await assertPublicHttpsUrl(agent.webhook_url);
+
       const res = await fetch(agent.webhook_url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

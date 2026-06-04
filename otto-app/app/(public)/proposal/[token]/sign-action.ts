@@ -27,6 +27,7 @@ export async function signProposal(
   if (!signerName.trim()) return { ok: false, error: "שם חובה" };
   if (!signerEmail.trim()) return { ok: false, error: "אימייל חובה" };
   if (!signatureData) return { ok: false, error: "חתימה חובה" };
+  if (signatureData.length > 500_000) return { ok: false, error: "החתימה גדולה מדי" }; // H4: DoS
 
   const supabase = serviceClient();
 
@@ -62,7 +63,10 @@ export async function signProposal(
     })
     .eq("id", quote.id);
 
-  if (updateError) return { ok: false, error: updateError.message };
+  if (updateError) {
+    console.error("[signProposal] update failed", updateError);
+    return { ok: false, error: "שגיאה בשמירת החתימה" }; // M2: לא לחשוף שגיאת DB
+  }
 
   // Notify admin
   await supabase.from("notifications").insert({

@@ -172,10 +172,7 @@ export function AgentButton({ contextType, contextId, contextData = {}, agents }
               <X size={13} />
             </button>
           </div>
-          <div
-            className="text-navy prose-sm max-w-none text-sm"
-            dangerouslySetInnerHTML={{ __html: invState.result }}
-          />
+          <div className="text-navy max-w-none text-sm whitespace-pre-wrap">{invState.result}</div>
         </div>
       )}
 
