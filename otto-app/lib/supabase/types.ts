@@ -1786,6 +1786,7 @@ export type Database = {
           duration_seconds: number | null;
           file_size: number | null;
           id: string;
+          lead_id: string | null;
           project_id: string | null;
           recorded_at: string;
           status: string;
@@ -1801,6 +1802,7 @@ export type Database = {
           duration_seconds?: number | null;
           file_size?: number | null;
           id?: string;
+          lead_id?: string | null;
           project_id?: string | null;
           recorded_at?: string;
           status?: string;
@@ -1816,6 +1818,7 @@ export type Database = {
           duration_seconds?: number | null;
           file_size?: number | null;
           id?: string;
+          lead_id?: string | null;
           project_id?: string | null;
           recorded_at?: string;
           status?: string;
@@ -1831,6 +1834,13 @@ export type Database = {
             columns: ["customer_id"];
             isOneToOne: false;
             referencedRelation: "customers";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "recordings_lead_id_fkey";
+            columns: ["lead_id"];
+            isOneToOne: false;
+            referencedRelation: "leads";
             referencedColumns: ["id"];
           },
           {

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ChevronRight, User, FolderKanban, Clock, FileText, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { AudioPlayer } from "./audio-player";
+import { LeadLink } from "./lead-link";
 
 export const metadata = { title: "פרטי הקלטה — OTTO" };
 
@@ -59,7 +60,8 @@ export default async function RecordingDetailPage({ params }: Props) {
       `
       *,
       customers(name),
-      projects(name)
+      projects(name),
+      leads(name)
     `,
     )
     .eq("id", id)
@@ -74,6 +76,10 @@ export default async function RecordingDetailPage({ params }: Props) {
   const projectName = Array.isArray(recording.projects)
     ? ((recording.projects[0] as { name: string } | null)?.name ?? null)
     : ((recording.projects as { name: string } | null)?.name ?? null);
+
+  const leadName = Array.isArray(recording.leads)
+    ? ((recording.leads[0] as { name: string } | null)?.name ?? null)
+    : ((recording.leads as { name: string } | null)?.name ?? null);
 
   const statusLabel = STATUS_LABELS[recording.status] ?? recording.status;
   const statusStyle = STATUS_STYLES[recording.status] ?? "bg-gray-50 text-gray-700 border-gray-200";
@@ -117,6 +123,12 @@ export default async function RecordingDetailPage({ params }: Props) {
                 {projectName}
               </span>
             )}
+            <LeadLink
+              recordingId={recording.id}
+              leadId={recording.lead_id}
+              leadName={leadName}
+              canCreate={!customerName}
+            />
             <span className="text-ink-soft flex items-center gap-1.5 text-sm" dir="ltr">
               <Clock size={14} className="text-ink-faded" />
               {formatDuration(recording.duration_seconds)}

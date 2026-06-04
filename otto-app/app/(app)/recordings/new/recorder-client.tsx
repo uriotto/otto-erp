@@ -18,9 +18,15 @@ interface Project {
   customer_id: string | null;
 }
 
+interface Lead {
+  id: string;
+  name: string;
+}
+
 interface Props {
   customers: Customer[];
   projects: Project[];
+  leads: Lead[];
 }
 
 function formatTime(seconds: number): string {
@@ -36,14 +42,29 @@ function todayTitle(): string {
   return `הקלטה מ-${new Date().toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit", year: "numeric" })}`;
 }
 
-export function RecorderClient({ customers, projects }: Props) {
+export function RecorderClient({ customers, projects, leads }: Props) {
   const router = useRouter();
   const toast = useToast();
   const [isPending, startTransition] = useTransition();
 
   const [customerId, setCustomerId] = useState("");
+  const [leadId, setLeadId] = useState("");
   const [projectId, setProjectId] = useState("");
   const [title, setTitle] = useState(todayTitle);
+
+  // לקוח וליד הם הדדיים-בלעדיים: בחירת אחד מנקה את השני
+  const pickCustomer = (id: string) => {
+    setCustomerId(id);
+    setProjectId(""); // פרויקט תלוי-לקוח - מתאפס בכל שינוי לקוח
+    if (id) setLeadId("");
+  };
+  const pickLead = (id: string) => {
+    setLeadId(id);
+    if (id) {
+      setCustomerId("");
+      setProjectId("");
+    }
+  };
 
   const [state, setState] = useState<"idle" | "recording" | "preview">("idle");
   const [elapsed, setElapsed] = useState(0);
@@ -84,14 +105,6 @@ export function RecorderClient({ customers, projects }: Props) {
   const filteredProjects = customerId
     ? projects.filter((p) => p.customer_id === customerId)
     : projects;
-
-  // Reset project if not in filtered list
-  useEffect(() => {
-    if (projectId && customerId) {
-      const exists = filteredProjects.some((p) => p.id === projectId);
-      if (!exists) setProjectId("");
-    }
-  }, [customerId, filteredProjects, projectId]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -269,6 +282,7 @@ export function RecorderClient({ customers, projects }: Props) {
         const result = await createRecording({
           title: title || todayTitle(),
           customer_id: customerId || null,
+          lead_id: leadId || null,
           project_id: projectId || null,
           storage_path: storagePath,
           duration_seconds: elapsed,
@@ -282,11 +296,11 @@ export function RecorderClient({ customers, projects }: Props) {
 
         toast.show("ההקלטה נשמרה בהצלחה", "success");
         router.push("/recordings");
-      } catch (err) {
+      } catch {
         toast.show("שגיאה לא צפויה בשמירת ההקלטה", "error");
       }
     });
-  }, [blob, title, customerId, projectId, elapsed, router, toast]);
+  }, [blob, title, customerId, leadId, projectId, elapsed, router, toast]);
 
   return (
     <div className="px-4 py-6 sm:px-6">
@@ -320,7 +334,7 @@ export function RecorderClient({ customers, projects }: Props) {
             <label className="text-navy mb-1 block text-sm font-medium">לקוח (אופציונלי)</label>
             <select
               value={customerId}
-              onChange={(e) => setCustomerId(e.target.value)}
+              onChange={(e) => pickCustomer(e.target.value)}
               className="border-ink-line bg-cream-paper text-navy focus:border-navy w-full rounded-lg border px-3 py-2 text-sm transition-colors outline-none"
             >
               <option value="">— ללא לקוח —</option>
@@ -330,6 +344,23 @@ export function RecorderClient({ customers, projects }: Props) {
                 </option>
               ))}
             </select>
+          </div>
+
+          <div>
+            <label className="text-navy mb-1 block text-sm font-medium">ליד (אופציונלי)</label>
+            <select
+              value={leadId}
+              onChange={(e) => pickLead(e.target.value)}
+              className="border-ink-line bg-cream-paper text-navy focus:border-navy w-full rounded-lg border px-3 py-2 text-sm transition-colors outline-none"
+            >
+              <option value="">— ללא ליד —</option>
+              {leads.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-ink-faded mt-1 text-xs">בוחרים לקוח או ליד - לא את שניהם</p>
           </div>
 
           <div>

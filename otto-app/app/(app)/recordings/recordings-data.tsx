@@ -11,7 +11,7 @@ export async function RecordingsData() {
     .select(
       `
       id, title, status, duration_seconds, file_size, storage_path, recorded_at, created_at,
-      customer_id, project_id,
+      customer_id, lead_id, project_id,
       customers(name),
       projects(name)
     `,
