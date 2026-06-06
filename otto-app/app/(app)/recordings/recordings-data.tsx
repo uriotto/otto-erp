@@ -29,6 +29,8 @@ export async function RecordingsData() {
     transcript: null,
     summary: null,
     tenant_id: "",
+    vault_processed_at: null,
+    vault_retry_count: 0,
   }));
 
   return (

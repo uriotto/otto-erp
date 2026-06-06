@@ -1795,6 +1795,8 @@ export type Database = {
           tenant_id: string;
           title: string;
           transcript: string | null;
+          vault_processed_at: string | null;
+          vault_retry_count: number;
         };
         Insert: {
           created_at?: string;
@@ -1811,6 +1813,8 @@ export type Database = {
           tenant_id: string;
           title: string;
           transcript?: string | null;
+          vault_processed_at?: string | null;
+          vault_retry_count?: number;
         };
         Update: {
           created_at?: string;
@@ -1827,6 +1831,8 @@ export type Database = {
           tenant_id?: string;
           title?: string;
           transcript?: string | null;
+          vault_processed_at?: string | null;
+          vault_retry_count?: number;
         };
         Relationships: [
           {
