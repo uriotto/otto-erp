@@ -1,6 +1,4 @@
 @AGENTS.md
 @../otto-docs/CLAUDE.md
-@../otto-docs/tasks/phase-1.md
-@../otto-docs/tasks/phase-2.md
-@../otto-docs/tasks/phase-3.md
-@../otto-docs/tasks/phase-4-5-6.md
+
+Historical phase plans (phase-1 ... phase-4-5-6) live in `otto-docs/tasks/` - read them only if a task explicitly relates to them. Do not load them by default.

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { authenticateBot, unauthorized } from "@/lib/bot-auth";
+import { guardBotRequest } from "@/lib/bot-auth";
 import { createServiceClient } from "@/lib/supabase/service";
 
 const PatchInvoiceSchema = z.object({
@@ -13,8 +13,9 @@ const PatchInvoiceSchema = z.object({
 });
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await authenticateBot(request);
-  if (!auth) return unauthorized();
+  const guard = await guardBotRequest(request);
+  if (!guard.ok) return guard.response;
+  const auth = guard.auth;
 
   const { id } = await params;
 
@@ -76,8 +77,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await authenticateBot(request);
-  if (!auth) return unauthorized();
+  const guard = await guardBotRequest(request);
+  if (!guard.ok) return guard.response;
+  const auth = guard.auth;
 
   const { id } = await params;
 

@@ -1,7 +1,6 @@
 import { z } from "zod";
 
-import { authenticateBot, unauthorized } from "@/lib/bot-auth";
-import { createServiceClient } from "@/lib/supabase/service";
+import { botScopedClient, guardBotRequest } from "@/lib/bot-auth";
 
 const CreateCustomerSchema = z.object({
   name: z.string().min(1),
@@ -12,14 +11,12 @@ const CreateCustomerSchema = z.object({
 });
 
 export async function GET(request: Request) {
-  const auth = await authenticateBot(request);
-  if (!auth) return unauthorized();
+  const guard = await guardBotRequest(request);
+  if (!guard.ok) return guard.response;
 
-  const supabase = createServiceClient();
-  const { data, error } = await supabase
-    .from("customers")
-    .select("id, name, phone, email, status")
-    .eq("tenant_id", auth.tenantId)
+  const db = botScopedClient(guard.auth);
+  const { data, error } = await db
+    .select("customers", "id, name, phone, email, status")
     .order("name");
 
   if (error) {
@@ -29,8 +26,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await authenticateBot(request);
-  if (!auth) return unauthorized();
+  const guard = await guardBotRequest(request);
+  if (!guard.ok) return guard.response;
 
   let body: unknown;
   try {
@@ -46,11 +43,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const supabase = createServiceClient();
-  const { data, error } = await supabase
-    .from("customers")
-    .insert({
-      tenant_id: auth.tenantId,
+  const db = botScopedClient(guard.auth);
+  const { data, error } = await db
+    .insert("customers", {
       name: parsed.data.name,
       email: parsed.data.email ?? null,
       phone: parsed.data.phone ?? null,

@@ -1,10 +1,11 @@
-import { authenticateBot, unauthorized } from "@/lib/bot-auth";
+import { guardBotRequest } from "@/lib/bot-auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createTimeEntryFromTimerForUser } from "@/lib/time-entries";
 
 export async function POST(request: Request) {
-  const auth = await authenticateBot(request);
-  if (!auth) return unauthorized();
+  const guard = await guardBotRequest(request);
+  if (!guard.ok) return guard.response;
+  const auth = guard.auth;
 
   const supabase = createServiceClient();
 

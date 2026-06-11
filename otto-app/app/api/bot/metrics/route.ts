@@ -1,4 +1,4 @@
-import { authenticateBot, unauthorized } from "@/lib/bot-auth";
+import { guardBotRequest } from "@/lib/bot-auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getBusinessSnapshot } from "@/lib/business-metrics";
 
@@ -8,8 +8,9 @@ import { getBusinessSnapshot } from "@/lib/business-metrics";
  * open invoices, pipeline) for the morning brief and the Telegram bot.
  */
 export async function GET(request: Request) {
-  const auth = await authenticateBot(request);
-  if (!auth) return unauthorized();
+  const guard = await guardBotRequest(request);
+  if (!guard.ok) return guard.response;
+  const auth = guard.auth;
 
   const supabase = createServiceClient();
 

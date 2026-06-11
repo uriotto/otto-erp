@@ -12,6 +12,7 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+!.env.example.deprecated
 
 # Node / Next.js (otto-app)
 node_modules/
@@ -48,3 +49,7 @@ supabase/.temp
 .claude/
 vault/
 .worktrees/
+.playwright-mcp/
+
+# Obsidian leftovers (Untitled.md / Untitled.canvas already tracked - removal needs Uri's approval)
+Untitled*

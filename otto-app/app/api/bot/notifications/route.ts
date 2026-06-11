@@ -1,9 +1,10 @@
-import { authenticateBot, unauthorized } from "@/lib/bot-auth";
+import { guardBotRequest } from "@/lib/bot-auth";
 import { createServiceClient } from "@/lib/supabase/service";
 
 export async function GET(request: Request) {
-  const auth = await authenticateBot(request);
-  if (!auth) return unauthorized();
+  const guard = await guardBotRequest(request);
+  if (!guard.ok) return guard.response;
+  const auth = guard.auth;
 
   const url = new URL(request.url);
   const unreadOnly = url.searchParams.get("unread") === "true";

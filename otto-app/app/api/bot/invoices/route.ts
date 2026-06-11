@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { authenticateBot, unauthorized } from "@/lib/bot-auth";
+import { botScopedClient, guardBotRequest } from "@/lib/bot-auth";
 import { createServiceClient } from "@/lib/supabase/service";
 
 const StatusEnum = z.enum([
@@ -14,8 +14,8 @@ const StatusEnum = z.enum([
 ]);
 
 export async function GET(request: Request) {
-  const auth = await authenticateBot(request);
-  if (!auth) return unauthorized();
+  const guard = await guardBotRequest(request);
+  if (!guard.ok) return guard.response;
 
   const url = new URL(request.url);
   const statusParam = url.searchParams.get("status");
@@ -28,13 +28,12 @@ export async function GET(request: Request) {
     status = parsed.data;
   }
 
-  const supabase = createServiceClient();
-  let query = supabase
-    .from("invoices")
+  const db = botScopedClient(guard.auth);
+  let query = db
     .select(
+      "invoices",
       "id, number, customer_id, status, total_amount, currency, issue_date, due_date, paid_at, document_type",
     )
-    .eq("tenant_id", auth.tenantId)
     .order("issue_date", { ascending: false })
     .limit(100);
   if (status) query = query.eq("status", status);
@@ -58,8 +57,9 @@ const CreateInvoiceSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const auth = await authenticateBot(request);
-  if (!auth) return unauthorized();
+  const guard = await guardBotRequest(request);
+  if (!guard.ok) return guard.response;
+  const auth = guard.auth;
 
   let body: unknown;
   try {
@@ -80,12 +80,9 @@ export async function POST(request: Request) {
   const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
   const today = new Date().toISOString().slice(0, 10);
 
-  const supabase = createServiceClient();
-
-  const { data: invoice, error: invErr } = await supabase
-    .from("invoices")
-    .insert({
-      tenant_id: auth.tenantId,
+  const db = botScopedClient(auth);
+  const { data: invoice, error: invErr } = await db
+    .insert("invoices", {
       created_by: auth.userId,
       customer_id,
       status: "draft",
@@ -97,7 +94,7 @@ export async function POST(request: Request) {
       type: "project",
     })
     .select("id, number")
-    .single();
+    .single<{ id: string; number: string | null }>();
 
   if (invErr || !invoice) {
     return Response.json({ error: invErr?.message ?? "failed to create invoice" }, { status: 500 });
@@ -111,6 +108,9 @@ export async function POST(request: Request) {
     order_index: index,
   }));
 
+  // invoice_items has no tenant_id column - it is tenant-scoped through the
+  // invoice_id FK (the invoice above was created inside this tenant).
+  const supabase = createServiceClient();
   const { error: itemsErr } = await supabase.from("invoice_items").insert(itemRows);
   if (itemsErr) {
     return Response.json({ error: "internal error" }, { status: 500 });

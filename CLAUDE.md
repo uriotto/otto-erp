@@ -2,14 +2,35 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Obsidian Vault (mandatory)
+## Obsidian Vault
 
-**At every session start and before any task:** use the `obsidian-vault-workflow` skill.
+**לפני כל עבודה:** קרא את הtopic file הרלוונטי ב-`~/obsidian-engineering/vault/`.
+**אחרי כל סשן משמעותי:** הוסף session log entry לtopic file המתאים.
 
-- Vault location: `~/obsidian-engineering/vault/`
-- Folder indexes: `vault/Meeting Notes/_index.md`, `vault/Architecture/_index.md`, `vault/Integrations/_index.md`
-- Topic files cover all OTTO modules — read the relevant topic file before touching code
-- After completing any task: append a session log entry to the matching topic file
+- `vault/Meeting Notes/` — topic file לכל מודול (overview + session log)
+- `vault/Architecture/` — ארכיטקטורה, lib/, components/
+- `vault/Integrations/` — Google Calendar, Make, Zoom, Sentry
+
+## Current Modules
+
+All modules live under `otto-app/app/(app)/`. Status as of May 2026:
+
+| Module        | Path                | Notes                                                            |
+| ------------- | ------------------- | ---------------------------------------------------------------- |
+| Dashboard     | `/dashboard`        | KPIs, activity feed, tasks — Suspense streaming                  |
+| Customers     | `/customers`        | List + 360 profile, activities, tags                             |
+| Leads         | `/leads`            | Kanban pipeline, lead scoring, convert to customer               |
+| Contacts      | `/contacts`         | Contact management                                               |
+| Projects      | `/projects`         | Project tracking                                                 |
+| Tasks         | `/tasks`            | Kanban/list/calendar, subtasks                                   |
+| Calendar      | `/calendar`         | Week/day/month/list, Google Calendar sync (OAuth, push webhook)  |
+| Time Tracking | `/time`             | Timer in header (Zustand + localStorage + `active_timers` table) |
+| Hour Banks    | `/hour-banks`       | FIFO allocation, alerts, renewal drafts — logic in Postgres      |
+| Invoices      | `/invoices`         | Document types, payment recording, webhooks to Make              |
+| Recordings    | `/recordings`       | Zoom webhook, ivrit-ai transcription, Claude summary             |
+| Settings      | `/settings`         | Profile, tenant, Google Calendar OAuth, bot tokens               |
+| Portal        | `/portal/[token]`   | Read-only client-facing (magic link)                             |
+| Proposals     | `/proposal/[token]` | Public, no auth, UUID token                                      |
 
 ## Repository layout
 
@@ -31,7 +52,7 @@ npm run lint         # eslint
 npm run format       # prettier --write .
 ```
 
-No test suite exists yet. Verify by running `build` + `typecheck`.
+E2E tests exist: `npx playwright test` (or `npm run test:e2e`) from `otto-app/`. Specs live in `otto-app/tests/e2e/`, config in `otto-app/playwright.config.ts`. Also verify with `build` + `typecheck`. No unit test suite yet.
 
 ## Deploy
 
@@ -114,16 +135,28 @@ Critical logic lives entirely in Postgres:
 
 External bots (Telegram, etc.) call `/api/bot/*` routes with a long-lived bearer token instead of session cookies.
 
-- **Auth helper**: `lib/bot-auth.ts` — `authenticateBot(request)` reads `Authorization: Bearer <token>`, SHA-256 hashes it, and looks up `bot_api_tokens` via the service-role client. Returns `{ userId, tenantId, tokenId }` or null.
+- **Auth + rate-limit guard**: `lib/bot-auth.ts` — `guardBotRequest(request)` is the canonical entry point for every bot route. It authenticates the bearer token (SHA-256 lookup in `bot_api_tokens`, rejects revoked tokens) AND rate-limits (per token + per IP, via `lib/rate-limit.ts`, fail-open until the `rate_limit_hits` migration is applied). Returns `{ ok: true, auth }` or `{ ok: false, response }`.
 - **Live timer state**: the `active_timers` table holds one row per running user. The web `<Timer>` component hydrates from it on mount and subscribes via Realtime, so a bot starting/stopping a timer is mirrored in the header pill within seconds.
 - **Token management UI**: `/settings/bot-tokens` — generates a token (shown once), labels it, and revokes when compromised. Plaintext is never stored, only the SHA-256 hash.
-- **Service-role client usage**: bot routes use `createServiceClient()` from `lib/supabase/service.ts` to bypass RLS, but every query explicitly filters by the `userId` + `tenantId` from the token, preserving tenant isolation.
+- **Tenant scoping (MANDATORY)**: the service-role client bypasses RLS, so a single forgotten `.eq("tenant_id", ...)` leaks all tenants' data. New bot routes MUST use `botScopedClient(auth)` from `lib/bot-auth.ts` instead of `createServiceClient()` directly — it pre-filters every select/update/delete by the token's tenant and injects `tenant_id` on insert. Reference examples: `app/api/bot/customers/route.ts`, `app/api/bot/leads/route.ts`, `app/api/bot/search/route.ts`, `app/api/bot/invoices/route.ts`. If a query genuinely cannot go through it (e.g. a table without `tenant_id`), add an explicit comment explaining how tenant isolation is preserved.
 
 To add a new bot endpoint:
 
 1. Create `app/api/bot/<name>/route.ts`
-2. Call `authenticateBot(request)` first; return `unauthorized()` if null
-3. No middleware change needed — `/api/bot/` is already in `isPublicApi`
+2. Call `guardBotRequest(request)` first; if `!guard.ok` return `guard.response`
+3. Use `botScopedClient(guard.auth)` for all DB access (see MANDATORY rule above)
+4. No middleware change needed — `/api/bot/` is already in `isPublicApi`
+
+### Security patterns (mandatory templates for new APIs)
+
+When adding any new API route or webhook, copy the pattern from these existing routes — they are the reference implementations:
+
+- **Cron auth (shared secret, constant-time)**: `app/api/cron/monthly-invoices/route.ts` — `CRON_SECRET` + `timingSafeEqual`
+- **Webhook auth (HMAC signature)**: `lib/recordings/transcription.ts` — `RECORDINGS_WEBHOOK_SECRET`
+- **Bearer-token auth (hashed at rest)**: `lib/bot-auth.ts` — SHA-256 token hash, revocation check, rate limiting
+- **Secrets encryption**: AES-256-GCM (credentials vault); **input validation**: Zod schema on every request body/query
+
+Never weaken these: no plaintext tokens in DB, no string-compare on secrets, no unvalidated input, no secrets in code or logs.
 
 ### Sharing business logic between server actions and API routes
 

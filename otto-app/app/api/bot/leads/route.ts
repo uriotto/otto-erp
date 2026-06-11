@@ -1,7 +1,6 @@
 import { z } from "zod";
 
-import { authenticateBot, unauthorized } from "@/lib/bot-auth";
-import { createServiceClient } from "@/lib/supabase/service";
+import { botScopedClient, guardBotRequest } from "@/lib/bot-auth";
 
 const QuerySchema = z.object({
   status: z.string().optional(),
@@ -18,8 +17,8 @@ const CreateLeadSchema = z.object({
 });
 
 export async function GET(request: Request) {
-  const auth = await authenticateBot(request);
-  if (!auth) return unauthorized();
+  const guard = await guardBotRequest(request);
+  if (!guard.ok) return guard.response;
 
   const url = new URL(request.url);
   const parsed = QuerySchema.safeParse({
@@ -29,11 +28,12 @@ export async function GET(request: Request) {
     return Response.json({ error: "invalid query" }, { status: 400 });
   }
 
-  const supabase = createServiceClient();
-  let query = supabase
-    .from("leads")
-    .select("id, name, phone, email, status, source, notes, company, value, created_at, updated_at")
-    .eq("tenant_id", auth.tenantId)
+  const db = botScopedClient(guard.auth);
+  let query = db
+    .select(
+      "leads",
+      "id, name, phone, email, status, source, notes, company, value, created_at, updated_at",
+    )
     .order("created_at", { ascending: false })
     .limit(50);
 
@@ -46,8 +46,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await authenticateBot(request);
-  if (!auth) return unauthorized();
+  const guard = await guardBotRequest(request);
+  if (!guard.ok) return guard.response;
 
   let body: unknown;
   try {
@@ -64,15 +64,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const supabase = createServiceClient();
-  const { data, error } = await supabase
-    .from("leads")
-    .insert({
-      ...parsed.data,
-      tenant_id: auth.tenantId,
-    })
-    .select("id, name")
-    .single();
+  const db = botScopedClient(guard.auth);
+  const { data, error } = await db.insert("leads", parsed.data).select("id, name").single();
 
   if (error) return Response.json({ error: "internal error" }, { status: 500 });
 

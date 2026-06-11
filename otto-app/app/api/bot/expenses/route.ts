@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { authenticateBot, unauthorized } from "@/lib/bot-auth";
+import { guardBotRequest } from "@/lib/bot-auth";
 import { createServiceClient } from "@/lib/supabase/service";
 
 const GetQuerySchema = z.object({
@@ -18,8 +18,9 @@ const CreateExpenseSchema = z.object({
 });
 
 export async function GET(request: Request) {
-  const auth = await authenticateBot(request);
-  if (!auth) return unauthorized();
+  const guard = await guardBotRequest(request);
+  if (!guard.ok) return guard.response;
+  const auth = guard.auth;
 
   const url = new URL(request.url);
   const parsed = GetQuerySchema.safeParse({
@@ -56,8 +57,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await authenticateBot(request);
-  if (!auth) return unauthorized();
+  const guard = await guardBotRequest(request);
+  if (!guard.ok) return guard.response;
+  const auth = guard.auth;
 
   let body: unknown;
   try {
