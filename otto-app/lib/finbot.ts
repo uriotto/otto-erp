@@ -196,8 +196,11 @@ async function loadInvoiceContext(supabase: Supabase, tenantId: string, invoiceI
 
 /**
  * Issues the Finbot document for a freshly created (or retried) invoice and stores
- * the returned document link on the invoice. Prices are sent before VAT
- * (vatType:false) - matching how invoice_items are stored.
+ * the returned document link on the invoice.
+ *
+ * VAT: `vatType:true` tells Finbot to CHARGE VAT and treat item prices as NET
+ * (18% added on top). invoice_items store net prices with tax_rate=18, so this
+ * yields the same gross as invoices.total_amount. (`vatType:false` = VAT-exempt.)
  *
  * Receipt-flavoured document types are NOT issued here (a receipt needs a payment);
  * they are produced by issueReceiptForPayment when the payment is recorded.
@@ -226,7 +229,7 @@ export async function issueDocumentForInvoice(
     date: dateKeyToFinbot(invoice.issue_date),
     language: "HE",
     currency: invoice.currency ?? "ILS",
-    vatType: false,
+    vatType: true,
     rounding: false,
     description: `${DOC_LABELS[documentType]}${invoice.number ? ` ${invoice.number}` : ""}`.slice(
       0,
@@ -262,8 +265,14 @@ export type PaymentForReceipt = {
 
 /**
  * Issues a receipt (קבלה) or tax-invoice-receipt (חשבונית מס קבלה) in Finbot for a
- * recorded payment. Amounts are VAT-inclusive (vatType:true) with a single line for
- * the paid sum, so items always match payments - including partial payments.
+ * recorded payment.
+ *
+ * VAT: the recorded payment amount is GROSS (VAT-included). Finbot's `vatType:true`
+ * treats the item price as NET and adds VAT on top, so we send the net figure
+ * (gross / (1 + rate)) and set the payment sum to the gross Finbot will recompute
+ * from that net. This keeps items == payments (Finbot rejects a mismatch) and shows
+ * the correct VAT line. For a full payment of an OTTO invoice the net divides
+ * cleanly, so the receipt total equals the amount paid to the agora.
  */
 export async function issueReceiptForPayment(
   supabase: Supabase,
@@ -276,8 +285,15 @@ export async function issueReceiptForPayment(
   if (!invoice) return { ok: false, error: "חשבונית לא נמצאה" };
   if (!customer) return { ok: false, error: "ללקוח של החשבונית אין רשומה - לא ניתן להפיק קבלה" };
 
-  const amount = Math.round(Number(payment.amount) * 100) / 100;
-  if (!(amount > 0)) return { ok: false, error: "סכום תשלום לא תקין" };
+  const grossPaid = Math.round(Number(payment.amount) * 100) / 100;
+  if (!(grossPaid > 0)) return { ok: false, error: "סכום תשלום לא תקין" };
+
+  // Derive the net figure so Finbot's added VAT lands back on the paid gross.
+  const rate = Number(invoice.tax_rate) || 18;
+  const net = Math.round((grossPaid / (1 + rate / 100)) * 100) / 100;
+  // The gross Finbot will recompute from that net - use it as the payment sum so
+  // items and payments always reconcile (avoids Finbot's amount-mismatch error).
+  const grossReconciled = Math.round(net * (1 + rate / 100) * 100) / 100;
 
   const paidDate = payment.paid_at ? new Date(payment.paid_at) : new Date();
   const paidKey = Number.isNaN(paidDate.getTime()) ? null : ilDayKey(paidDate);
@@ -293,12 +309,12 @@ export async function issueReceiptForPayment(
     rounding: false,
     description: label.slice(0, 200),
     customer: customerPayload(customer),
-    items: [{ name: label.slice(0, 100), amount: 1, price: amount }],
+    items: [{ name: label.slice(0, 100), amount: 1, price: net }],
     payments: [
       {
         type: FINBOT_PAYMENT_TYPE[payment.method] ?? FINBOT_PAYMENT_TYPE.other,
         date: dateKeyToFinbot(paidKey),
-        sum: amount,
+        sum: grossReconciled,
         ...(payment.method === "credit_card" && payment.card_last_4
           ? { cardNumber: Number(payment.card_last_4) }
           : {}),
