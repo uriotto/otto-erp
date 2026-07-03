@@ -2,10 +2,16 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Send, Pencil, Wallet, Ban, Trash2, FileOutput } from "lucide-react";
+import { Send, Pencil, Wallet, Ban, Trash2, FileOutput, RefreshCw } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
-import { cancelInvoice, deleteInvoice, markInvoiceSent, retryFinbotDocument } from "../actions";
+import {
+  cancelInvoice,
+  deleteInvoice,
+  markInvoiceSent,
+  retryFinbotDocument,
+  reissueFinbotDocument,
+} from "../actions";
 import { EditInvoiceDialog } from "./edit-invoice-dialog";
 import { PaymentDialog } from "./payment-dialog";
 import type { InvoiceStatusUI } from "../invoices-list";
@@ -37,12 +43,14 @@ export function InvoiceActionsBar({ invoice }: { invoice: EditableInvoice }) {
   const canEdit = invoice.status !== "paid";
   const canRecordPayment = invoice.status !== "cancelled" && invoice.balance > 0;
   const canDelete = invoice.status === "draft" || invoice.status === "cancelled";
-  // Retry Finbot issuance when the original attempt failed (receipt flavours are
-  // produced on payment recording, not here).
-  const canIssueFinbot =
-    !invoice.finbot_url &&
-    invoice.status !== "cancelled" &&
-    (invoice.document_type === "payment_request" || invoice.document_type === "tax_invoice");
+  const isCreationDoc =
+    invoice.document_type === "payment_request" || invoice.document_type === "tax_invoice";
+  const isOpen = invoice.status !== "cancelled" && invoice.status !== "paid";
+
+  // Issue when no document exists yet (first attempt or after a failure).
+  const canIssueFinbot = !invoice.finbot_url && invoice.status !== "cancelled" && isCreationDoc;
+  // Re-issue when a document already exists but is wrong and needs replacing.
+  const canReissueFinbot = Boolean(invoice.finbot_url) && isOpen && isCreationDoc;
 
   function handleIssueFinbot() {
     if (!confirm("להפיק את המסמך בפינבוט? אם ללקוח יש מייל, המסמך יישלח אליו.")) return;
@@ -52,6 +60,25 @@ export function InvoiceActionsBar({ invoice }: { invoice: EditableInvoice }) {
         toast.error(result.error);
       } else {
         toast.success("המסמך הופק בפינבוט");
+        router.refresh();
+      }
+    });
+  }
+
+  function handleReissueFinbot() {
+    if (
+      !confirm(
+        "המסמך הקודם בפינבוט לא יבוטל אוטומטית - בטל אותו ידנית בפינבוט.\nלהפיק מסמך חדש? (אם ללקוח יש מייל, המסמך החדש יישלח אליו.)",
+      )
+    ) {
+      return;
+    }
+    startTransition(async () => {
+      const result = await reissueFinbotDocument(invoice.id);
+      if (!result.ok) {
+        toast.error(result.error);
+      } else {
+        toast.success("מסמך חדש הופק בפינבוט");
         router.refresh();
       }
     });
@@ -123,6 +150,17 @@ export function InvoiceActionsBar({ invoice }: { invoice: EditableInvoice }) {
           >
             {pending ? <Spinner size={12} /> : <FileOutput size={14} />}
             הפק בפינבוט
+          </button>
+        )}
+        {canReissueFinbot && (
+          <button
+            type="button"
+            onClick={handleReissueFinbot}
+            disabled={pending}
+            className="flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 transition-colors hover:bg-amber-100 disabled:opacity-50"
+          >
+            {pending ? <Spinner size={12} /> : <RefreshCw size={14} />}
+            בטל והפק מחדש
           </button>
         )}
         {canSend && (

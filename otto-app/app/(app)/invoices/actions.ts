@@ -269,6 +269,43 @@ export async function retryFinbotDocument(id: string): Promise<InvoiceActionResu
   return { ok: true, id, finbotUrl: result.url };
 }
 
+/**
+ * Re-issues the Finbot document for an invoice that already has one (e.g. the first
+ * document was wrong). Clears the stored link so issuance can proceed, then issues a
+ * fresh document. The OLD document is NOT voided automatically - the Finbot API is
+ * issue-only, so the user must cancel it in Finbot manually (the UI warns about this).
+ */
+export async function reissueFinbotDocument(id: string): Promise<InvoiceActionResult> {
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { ok: false, error: "לא מחובר" };
+
+  const { data: inv } = await supabase
+    .from("invoices")
+    .select("id, status, document_type")
+    .eq("id", id)
+    .eq("tenant_id", profile.tenant_id)
+    .maybeSingle();
+
+  if (!inv) return { ok: false, error: "חשבונית לא נמצאה" };
+  if (inv.status === "paid" || inv.status === "cancelled") {
+    return { ok: false, error: "לא ניתן להפיק מחדש חשבונית ששולמה או בוטלה" };
+  }
+
+  const { error: clearErr } = await supabase
+    .from("invoices")
+    .update({ finbot_url: null, finbot_invoice_id: null })
+    .eq("id", id)
+    .eq("tenant_id", profile.tenant_id);
+  if (clearErr) return { ok: false, error: clearErr.message };
+
+  const result = await issueDocumentForInvoice(supabase, profile.tenant_id, id);
+  if (!result.ok) return { ok: false, error: result.error };
+
+  revalidatePath("/invoices");
+  revalidatePath(`/invoices/${id}`);
+  return { ok: true, id, finbotUrl: result.url };
+}
+
 export async function cancelInvoice(id: string): Promise<InvoiceActionResult> {
   const { supabase, profile } = await getTenant();
   if (!profile) return { ok: false, error: "לא מחובר" };
