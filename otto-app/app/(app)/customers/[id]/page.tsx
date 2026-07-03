@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, Mail, Phone, Globe, MapPin, Building2 } from "lucide-react";
+import { ArrowRight, Mail, Phone, Globe, MapPin, Building2, Banknote } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { ActivityFeed } from "@/components/activities/activity-feed";
 import { TasksSection, type TasksSectionItem } from "@/components/tasks/tasks-section";
@@ -174,6 +174,21 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           {customer.address && (
             <InfoRow icon={<MapPin size={15} />} label="כתובת" value={customer.address} />
           )}
+          {(() => {
+            const override = customer.hourly_rate_override;
+            const fallback = tenantSettings?.default_hourly_rate ?? null;
+            const rate =
+              override != null ? Number(override) : fallback != null ? Number(fallback) : null;
+            if (rate == null) return null;
+            const isDefault = override == null;
+            return (
+              <InfoRow
+                icon={<Banknote size={15} />}
+                label="תעריף שעתי"
+                value={`₪${rate.toLocaleString("he-IL")}/שעה${isDefault ? " (ברירת מחדל)" : ""}`}
+              />
+            );
+          })()}
         </div>
 
         {customer.notes && (
