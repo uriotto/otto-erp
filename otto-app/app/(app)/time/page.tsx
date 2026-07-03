@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { ilDayEnd, ilDayStart, ilDayKey, ilMonthRange } from "@/lib/dates";
 import { TimeList, type TimeEntryItem } from "./time-list";
 
 export const metadata = { title: "שעות — OTTO" };
@@ -12,11 +13,10 @@ export default async function TimePage({
 
   const { from, to } = await searchParams;
 
-  // Default range = current month. Otherwise honour the from/to params (yyyy-mm-dd).
+  // Default range = current month (Israel calendar). from/to params are Israel days (yyyy-mm-dd).
   const now = new Date();
-  const defaultFrom = new Date(now.getFullYear(), now.getMonth(), 1);
-  const fromDate = from ? new Date(`${from}T00:00:00`) : defaultFrom;
-  const toDate = to ? new Date(`${to}T23:59:59`) : now;
+  const fromDate = from ? ilDayStart(from) : ilMonthRange(now).start;
+  const toDate = to ? ilDayEnd(to) : now;
   const fromISO = fromDate.toISOString();
   const toISO = toDate.toISOString();
 
@@ -60,8 +60,8 @@ export default async function TimePage({
     task_name: e.task_id ? (taskMap.get(e.task_id) ?? null) : null,
   }));
 
-  const rangeFrom = fromDate.toISOString().slice(0, 10);
-  const rangeTo = toDate.toISOString().slice(0, 10);
+  const rangeFrom = ilDayKey(fromDate);
+  const rangeTo = ilDayKey(toDate);
 
   return (
     <TimeList

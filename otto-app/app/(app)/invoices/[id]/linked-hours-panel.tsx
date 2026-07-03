@@ -11,14 +11,18 @@ export function LinkedHoursPanel({
   lines,
   totalHours,
   invoiceNumber,
+  invoicedHours = null,
 }: {
   lines: HoursDetailLine[];
   totalHours: number;
   invoiceNumber: string | null;
+  invoicedHours?: number | null;
 }) {
   const toast = useToast();
 
   if (lines.length === 0) return null;
+
+  const hasDrift = invoicedHours != null && Math.abs(invoicedHours - totalHours) > 0.01;
 
   const rows = lines.map((l) => [l.date, l.description, l.hours.toFixed(2)]);
 
@@ -63,6 +67,20 @@ export function LinkedHoursPanel({
           </button>
         </div>
       </div>
+
+      {hasDrift && (
+        <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+          שים לב: רשומות השעות המקושרות עודכנו אחרי הפקת החשבונית (
+          <span dir="ltr" className="font-mono">
+            {totalHours.toFixed(2)}
+          </span>{" "}
+          שעות כעת לעומת{" "}
+          <span dir="ltr" className="font-mono">
+            {invoicedHours?.toFixed(2)}
+          </span>{" "}
+          בחשבונית). החשבונית עצמה לא השתנתה.
+        </div>
+      )}
 
       <div className="border-ink-line overflow-hidden rounded-xl border">
         <table className="w-full text-sm">

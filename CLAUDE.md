@@ -26,7 +26,8 @@ All modules live under `otto-app/app/(app)/`. Status as of May 2026:
 | Calendar      | `/calendar`         | Week/day/month/list, Google Calendar sync (OAuth, push webhook)  |
 | Time Tracking | `/time`             | Timer in header (Zustand + localStorage + `active_timers` table) |
 | Hour Banks    | `/hour-banks`       | FIFO allocation, alerts, renewal drafts — logic in Postgres      |
-| Invoices      | `/invoices`         | Document types, payment recording, webhooks to Make              |
+| Invoices      | `/invoices`         | Document types, payment recording, direct Finbot API             |
+| Billing Run   | `/billing-run`      | Monthly billing review — unbilled hours per customer, issue via Finbot |
 | Recordings    | `/recordings`       | Zoom webhook, ivrit-ai transcription, Claude summary             |
 | Settings      | `/settings`         | Profile, tenant, Google Calendar OAuth, bot tokens               |
 | Portal        | `/portal/[token]`   | Read-only client-facing (magic link)                             |
@@ -127,9 +128,15 @@ Critical logic lives entirely in Postgres:
 - `check_bank_alerts(bank_id)` — fires threshold alerts and creates renewal drafts
 - Both are `SECURITY DEFINER`; the trigger `tg_allocate_on_insert` fires after every `time_entries` INSERT
 
-### Make webhook
+### Finbot (document generation)
 
-`lib/make-webhook.ts` fires a POST to the tenant's configured webhook URL (stored in `tenant_settings.make_webhook_url`) for events like `hour_bank.renewed` and `hour_bank.created`.
+`lib/finbot.ts` calls the Finbot Income API directly (`POST https://api.finbotai.co.il/income`, auth header `secret: FINBOT_API_KEY`). Make.com was fully removed (July 2026).
+
+- `issueDocumentForInvoice(supabase, tenantId, invoiceId)` — issues payment_request / tax_invoice documents at invoice creation; stores the returned link in `invoices.finbot_url`. Receipt-flavoured document types are deferred to payment time.
+- `issueReceiptForPayment(...)` — issues receipt / tax_invoice_receipt when a payment is recorded (VAT-inclusive single line matching the paid sum).
+- Failures never lose the invoice: it stays a draft and the invoice page shows a "הפק בפינבוט" retry button (`retryFinbotDocument` action).
+- Finbot emails the document to the customer when `customer.email` is set — issuing IS a client-facing action; UI dialogs confirm before calling.
+- Monthly billing: cron `/api/cron/monthly-invoices` only notifies (nothing auto-issued); the `/billing-run` screen is where invoices are reviewed and issued per customer.
 
 ### External bot API
 
@@ -215,6 +222,7 @@ NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY      # required for write operations on public routes (signing)
 ENCRYPTION_KEY                 # 32-byte hex — used for credentials vault AES-256
+FINBOT_API_KEY                 # Finbot income API — document generation (lib/finbot.ts)
 
 # Google Calendar integration
 GOOGLE_CLIENT_ID

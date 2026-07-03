@@ -16,11 +16,9 @@ import {
   type InvoiceDocumentTypeUI,
 } from "./invoices-list";
 
-const CREATE_DOCUMENT_TYPES: InvoiceDocumentTypeUI[] = [
-  "payment_request",
-  "tax_invoice",
-  "tax_invoice_receipt",
-];
+// Receipt-flavoured documents require a payment, so they're not offered at creation -
+// they're produced when a payment is recorded (see PaymentDialog).
+const CREATE_DOCUMENT_TYPES: InvoiceDocumentTypeUI[] = ["payment_request", "tax_invoice"];
 
 type ItemRow = {
   key: string;
@@ -156,7 +154,13 @@ export function NewInvoiceDialog({
         toast.error(result.error);
         return;
       }
-      toast.success("החשבונית נוצרה");
+      if (result.finbotError) {
+        toast.error(`החשבונית נשמרה אך ההפקה בפינבוט נכשלה: ${result.finbotError}`);
+      } else if (result.finbotUrl) {
+        toast.success("החשבונית נוצרה והמסמך הופק בפינבוט");
+      } else {
+        toast.success("החשבונית נוצרה. הקבלה תופק בפינבוט עם רישום התשלום");
+      }
       onClose();
       router.push(`/invoices/${result.id}`);
     });
@@ -263,12 +267,12 @@ export function NewInvoiceDialog({
           </div>
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <Field label="מספר חשבונית (Finbot)">
+            <Field label="מספר מסמך (אופציונלי)">
               <input
                 type="text"
                 value={number}
                 onChange={(e) => setNumber(e.target.value)}
-                placeholder="הזן ידנית מ-Finbot"
+                placeholder="מתמלא אוטומטית מפינבוט"
                 className={baseInput}
                 dir="ltr"
               />

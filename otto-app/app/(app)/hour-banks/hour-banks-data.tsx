@@ -49,7 +49,7 @@ export async function HourBanksData() {
       customers={customers ?? []}
       draftCount={draftCount ?? 0}
       defaultHourlyRate={
-        settings?.default_hourly_rate != null ? Number(settings.default_hourly_rate) : 400
+        settings?.default_hourly_rate != null ? Number(settings.default_hourly_rate) : 425
       }
       defaultExpiryMonths={settings?.default_hour_bank_expiry_months ?? 12}
       defaultAlertPct={settings?.default_alert_threshold_pct ?? 30}

@@ -8,7 +8,6 @@ import { TagsCard } from "./tags-card";
 import { ExportCard } from "./export-card";
 import { DangerZoneCard } from "./danger-zone-card";
 import { BillingCard } from "./billing-card";
-import { IntegrationsCard } from "./integrations-card";
 import { GoogleCalendarCard } from "./google-calendar-card";
 import { getBillingSettings, listTagsUsage } from "./actions";
 
@@ -83,10 +82,6 @@ export default async function SettingsPage({
         )}
 
         {profile.role === "admin" && billing && <BillingCard initial={billing} />}
-
-        {profile.role === "admin" && billing && (
-          <IntegrationsCard initialUrl={billing.make_webhook_url} />
-        )}
 
         {profile.role === "admin" && (
           <GoogleCalendarCard

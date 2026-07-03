@@ -16,6 +16,7 @@ import {
   Sparkles,
   Megaphone,
   CalendarDays,
+  CalendarClock,
   BarChart2,
   type LucideIcon,
 } from "lucide-react";
@@ -56,6 +57,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     label: "כסף ומסמכים",
     items: [
+      { label: "חיוב חודשי", href: "/billing-run", icon: CalendarClock },
       { label: "חשבוניות", href: "/invoices", icon: Receipt },
       { label: "פיננסים", href: "/finance", icon: Banknote },
       { label: "הצעות מחיר", href: "/quotes", icon: FileText },

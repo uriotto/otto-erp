@@ -2,9 +2,10 @@
  * Builds a human-readable hours breakdown from a set of time entries.
  * Used when generating an hours-based invoice so the client receives a detailed
  * report of exactly which hours the invoice covers - both as a text block written
- * into the invoice notes (which flows to Finbot via the Make webhook) and as a
- * structured array included in the webhook payload.
+ * into the invoice notes and as a structured array.
  */
+
+import { formatDateIL } from "@/lib/dates";
 
 export type HoursDetailInput = {
   start_time: string | null;
@@ -25,16 +26,6 @@ export type HoursDetail = {
   totalHours: number;
   notesText: string;
 };
-
-function formatDateIL(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  return `${dd}.${mm}.${yyyy}`;
-}
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;

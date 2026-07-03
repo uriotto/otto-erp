@@ -3,8 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { fireMakeWebhook } from "@/lib/make-webhook";
+import { issueDocumentForInvoice } from "@/lib/finbot";
 import { buildHoursDetail } from "@/lib/hours-detail";
+import { todayIL, ilDayKey } from "@/lib/dates";
 import type { TablesUpdate } from "@/lib/supabase/types";
 
 const CreateSchema = z.object({
@@ -120,7 +121,7 @@ export async function createHourBank(
       ? Number(customer.hourly_rate_override)
       : settings?.default_hourly_rate != null
         ? Number(settings.default_hourly_rate)
-        : 400;
+        : 425;
 
   const hourlyRate = num(data.hourly_rate) ?? defaultRate;
   if (hourlyRate <= 0) {
@@ -183,16 +184,6 @@ export async function createHourBank(
     purchased_hours: purchasedHours,
     hourly_rate: hourlyRate,
     document_type: data.document_type ?? "payment_request",
-  });
-
-  // Fire Make webhook (best-effort, non-blocking semantics)
-  await fireMakeWebhook(profile.tenant_id, "hour_bank.created", {
-    bank_id: bank.id,
-    customer_id: data.customer_id,
-    purchased_hours: purchasedHours,
-    hourly_rate: hourlyRate,
-    purchase_date: purchaseDate,
-    expiry_date: expiryDate,
   });
 
   // Detect unhandled overage entries for this customer
@@ -268,13 +259,21 @@ export async function approveRenewalDraft(
     document_type: documentType,
   });
 
-  await fireMakeWebhook(profile.tenant_id, "hour_bank.renewed", {
-    bank_id: bank.id,
-    parent_bank_id: bank.parent_bank_id,
-    customer_id: bank.customer_id,
-    purchased_hours: bank.purchased_hours,
-    hourly_rate: bank.hourly_rate,
-    expiry_date: bank.expiry_date,
+  // In-app notification (replaces the old Make automation)
+  const { data: renewedCustomer } = await supabase
+    .from("customers")
+    .select("name")
+    .eq("id", bank.customer_id)
+    .eq("tenant_id", profile.tenant_id)
+    .maybeSingle();
+
+  await supabase.from("notifications").insert({
+    tenant_id: profile.tenant_id,
+    user_id: profile.id,
+    severity: "info",
+    title: `✅ בנק שעות חודש: ${renewedCustomer?.name ?? ""}`,
+    body: `${Number(bank.purchased_hours)} שעות בתעריף ₪${Number(bank.hourly_rate)}`,
+    link: `/hour-banks/${bank.id}`,
   });
 
   revalidatePath("/hour-banks");
@@ -356,6 +355,9 @@ export async function absorbOverageIntoBank(
 
   if (bankErr) return { error: bankErr.message };
 
+  // Recompute bank status under the new consumption (may deplete + fire alerts).
+  await supabase.rpc("recalculate_bank", { p_bank_id: bankId });
+
   revalidatePath("/hour-banks");
   revalidatePath(`/hour-banks/${bankId}`);
   return { absorbedHours: Math.round(totalHours * 100) / 100 };
@@ -366,7 +368,7 @@ export async function invoiceOverageSeparately(
   overageEntryIds: string[],
   documentType: InvoiceDocumentType = "payment_request",
   attachHoursDetail: boolean = true,
-): Promise<{ error?: string; invoiceId?: string }> {
+): Promise<{ error?: string; invoiceId?: string; finbotError?: string }> {
   if (overageEntryIds.length === 0) return {};
   const { supabase, profile } = await getTenant();
   if (!profile) return { error: "לא מחובר" };
@@ -393,7 +395,18 @@ export async function invoiceOverageSeparately(
 
   if (!customer) return { error: "לקוח לא נמצא" };
 
-  const fallbackRate = Number(customer.hourly_rate_override) || 0;
+  const { data: settings } = await supabase
+    .from("tenant_settings")
+    .select("default_hourly_rate")
+    .eq("tenant_id", profile.tenant_id)
+    .maybeSingle();
+
+  // Rate precedence: rate frozen on the entry -> customer override -> tenant default.
+  const fallbackRate =
+    Number(customer.hourly_rate_override) || Number(settings?.default_hourly_rate) || 0;
+  if (fallbackRate <= 0) {
+    return { error: "ללקוח אין תעריף מוגדר ואין תעריף ברירת מחדל - הגדר תעריף לפני הפקת חשבונית" };
+  }
 
   // Group hours by their effective rate so each rate becomes one invoice line.
   const byRate = new Map<number, number>();
@@ -434,8 +447,8 @@ export async function invoiceOverageSeparately(
   );
   const baseNote = "חשבונית על שעות חריגה (טיוטה)";
 
-  const today = new Date();
-  const due = new Date(today);
+  const issueDate = todayIL();
+  const due = new Date();
   due.setDate(due.getDate() + 14);
 
   const { data: invoice, error: invErr } = await supabase
@@ -447,8 +460,8 @@ export async function invoiceOverageSeparately(
       type: "overage",
       document_type: documentType,
       status: "draft",
-      issue_date: today.toISOString().slice(0, 10),
-      due_date: due.toISOString().slice(0, 10),
+      issue_date: issueDate,
+      due_date: ilDayKey(due),
       subtotal,
       tax_rate: 18,
       currency: "ILS",
@@ -478,36 +491,13 @@ export async function invoiceOverageSeparately(
 
   if (linkErr) return { error: linkErr.message };
 
-  await fireMakeWebhook(profile.tenant_id, "invoice.created", {
-    invoice_id: invoice.id,
-    type: "overage",
-    document_type: documentType,
-    status: "draft",
-    issue_date: today.toISOString().slice(0, 10),
-    due_date: due.toISOString().slice(0, 10),
-    subtotal,
-    tax_rate: 18,
-    tax_amount: invoice.tax_amount == null ? null : Number(invoice.tax_amount),
-    total_amount: invoice.total_amount == null ? null : Number(invoice.total_amount),
-    currency: "ILS",
-    customer: {
-      id: customerId,
-      name: customer.name,
-      email: customer.email,
-      phone: customer.phone,
-      company: customer.company,
-      address: customer.address,
-      tax_id: customer.company_registration_number,
-    },
-    items,
-    hours_detail: attachHoursDetail ? detail.lines : null,
-    time_entry_ids: overageEntryIds,
-  });
+  // Issue the document directly in Finbot (failure keeps the draft; UI offers retry).
+  const finbot = await issueDocumentForInvoice(supabase, profile.tenant_id, invoice.id);
 
   revalidatePath("/hour-banks");
   revalidatePath("/time");
   revalidatePath("/invoices");
-  return { invoiceId: invoice.id };
+  return { invoiceId: invoice.id, finbotError: finbot.ok ? undefined : finbot.error };
 }
 
 export async function cancelOverageEntries(overageEntryIds: string[]): Promise<{ error?: string }> {
@@ -713,10 +703,8 @@ async function createAdvanceInvoiceForBank(input: {
   document_type: InvoiceDocumentType;
 }): Promise<void> {
   const subtotal = Math.round(input.purchased_hours * input.hourly_rate * 100) / 100;
-  const today = new Date();
-  const due = new Date(today);
+  const due = new Date();
   due.setDate(due.getDate() + 14);
-  const dueIso = due.toISOString().slice(0, 10);
 
   const { data: invoice, error } = await input.supabase
     .from("invoices")
@@ -728,8 +716,8 @@ async function createAdvanceInvoiceForBank(input: {
       type: "advance",
       document_type: input.document_type,
       status: "draft",
-      issue_date: today.toISOString().slice(0, 10),
-      due_date: dueIso,
+      issue_date: todayIL(),
+      due_date: ilDayKey(due),
       subtotal,
       tax_rate: 18,
       currency: "ILS",
@@ -748,36 +736,9 @@ async function createAdvanceInvoiceForBank(input: {
     order_index: 0,
   });
 
-  // Fetch customer details so the Make scenario has everything it needs to
-  // produce the Finbot document without a follow-up lookup.
-  const { data: customer } = await input.supabase
-    .from("customers")
-    .select("name, email, phone, company, address, company_registration_number")
-    .eq("id", input.customer_id)
-    .maybeSingle();
-
-  await fireMakeWebhook(input.tenant_id, "invoice.draft_for_bank", {
-    invoice_id: invoice.id,
-    bank_id: input.bank_id,
-    customer_id: input.customer_id,
-    customer: customer
-      ? {
-          name: customer.name,
-          email: customer.email,
-          phone: customer.phone,
-          company: customer.company,
-          address: customer.address,
-          tax_id: customer.company_registration_number,
-        }
-      : null,
-    total_amount: invoice.total_amount,
-    subtotal: input.purchased_hours * input.hourly_rate,
-    tax_rate: 18,
-    currency: "ILS",
-    purchased_hours: input.purchased_hours,
-    hourly_rate: input.hourly_rate,
-    document_type: input.document_type,
-  });
+  // Issue the advance document directly in Finbot (failure keeps the draft;
+  // the invoice page offers a retry).
+  await issueDocumentForInvoice(input.supabase, input.tenant_id, invoice.id);
 }
 
 export async function bulkCancelHourBanks(

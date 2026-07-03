@@ -42,7 +42,6 @@ export async function updateSession(request: NextRequest) {
   const isPortalRoute = pathname.startsWith("/portal");
   const isPublicApi =
     pathname.startsWith("/api/health") ||
-    pathname.startsWith("/api/finbot") ||
     pathname.startsWith("/api/calendar/sync") ||
     pathname.startsWith("/api/bot/") ||
     pathname.startsWith("/api/recordings/webhook") ||

@@ -16,7 +16,9 @@ import {
   Calendar,
   Download,
   Copy,
+  BarChart3,
 } from "lucide-react";
+import Link from "next/link";
 import type { Tables } from "@/lib/supabase/types";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
@@ -380,6 +382,13 @@ export function TimeList({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Link
+            href="/time/summary"
+            className="border-ink-line text-navy hover:border-navy flex items-center gap-2 rounded-xl border bg-white px-4 py-2.5 text-sm font-semibold transition-colors"
+          >
+            <BarChart3 size={16} />
+            סיכומים
+          </Link>
           <TimeViewToggle
             view={view}
             onChange={(v) => {
@@ -993,6 +1002,12 @@ function EditEntryRow({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (
+      entry.billing_status === "invoiced" &&
+      !confirm("הרשומה כבר על חשבונית. השינוי לא ישנה את החשבונית עצמה. להמשיך?")
+    ) {
+      return;
+    }
     const fd = new FormData();
     fd.set("id", entry.id);
     fd.set("start_time", startISO);
@@ -1008,14 +1023,19 @@ function EditEntryRow({
         toast.error(res.error);
         return;
       }
-      toast.success("הרשומה עודכנה");
+      if (res.warning) toast.show(res.warning);
+      else toast.success("הרשומה עודכנה");
       onClose();
       router.refresh();
     });
   }
 
   function handleDelete() {
-    if (!confirm("למחוק את הרשומה?")) return;
+    const msg =
+      entry.billing_status === "invoiced"
+        ? "הרשומה כבר על חשבונית. המחיקה לא תשנה את החשבונית עצמה. למחוק?"
+        : "למחוק את הרשומה?";
+    if (!confirm(msg)) return;
     startDelete(async () => {
       const res = await deleteTimeEntry(entry.id);
       if (res.error) {
@@ -1268,9 +1288,13 @@ function HourlyInvoiceBar({
       }
       const hours = res.hours ?? 0;
       const amount = res.amount ?? 0;
-      toast.success(
-        `נוצרה חשבונית טיוטה · ${hours.toFixed(1)} שעות${amount > 0 ? ` = ₪${amount.toLocaleString("he-IL")}` : ""}`,
-      );
+      if (res.finbotError) {
+        toast.error(`החשבונית נשמרה אך ההפקה בפינבוט נכשלה: ${res.finbotError}`);
+      } else {
+        toast.success(
+          `נוצרה חשבונית · ${hours.toFixed(1)} שעות${amount > 0 ? ` = ₪${amount.toLocaleString("he-IL")}` : ""}`,
+        );
+      }
       setModalCustomer(null);
       if (res.invoiceId) {
         router.push(`/invoices/${res.invoiceId}`);

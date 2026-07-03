@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { fireMakeWebhook } from "@/lib/make-webhook";
+import { issueDocumentForInvoice, issueReceiptForPayment } from "@/lib/finbot";
 import type { TablesUpdate, Enums } from "@/lib/supabase/types";
 
 const InvoiceTypeEnum = z.enum([
@@ -55,7 +55,7 @@ const CreateInvoiceSchema = z.object({
 });
 
 export type InvoiceActionResult =
-  | { ok: true; id: string }
+  | { ok: true; id: string; finbotError?: string; finbotUrl?: string | null }
   | { ok: false; error: string; fieldErrors?: Record<string, string[]> };
 
 async function getTenant() {
@@ -142,31 +142,17 @@ export async function createInvoice(
     return { ok: false, error: itemsErr.message };
   }
 
-  await fireMakeWebhook(profile.tenant_id, "invoice.created", {
-    invoice_id: invoice.id,
-    number: invoice.number,
-    type: invoice.type,
-    document_type: data.document_type,
-    status: invoice.status,
-    issue_date: invoice.issue_date,
-    due_date: invoice.due_date,
-    subtotal: Number(invoice.subtotal),
-    tax_rate: data.tax_rate,
-    tax_amount: invoice.tax_amount == null ? null : Number(invoice.tax_amount),
-    total_amount: invoice.total_amount == null ? null : Number(invoice.total_amount),
-    currency: "ILS",
-    customer: {
-      id: customer.id,
-      name: customer.name,
-      company: customer.company,
-      email: customer.email,
-    },
-    items: data.items,
-    notes: data.notes ?? null,
-  });
+  // Issue the document directly in Finbot. Failure never loses the invoice -
+  // it stays a draft and the UI offers a retry.
+  const finbot = await issueDocumentForInvoice(supabase, profile.tenant_id, invoice.id);
 
   revalidatePath("/invoices");
-  return { ok: true, id: invoice.id };
+  return {
+    ok: true,
+    id: invoice.id,
+    finbotError: finbot.ok ? undefined : finbot.error,
+    finbotUrl: finbot.ok ? finbot.url : null,
+  };
 }
 
 const UpdateInvoiceSchema = z.object({
@@ -263,30 +249,24 @@ export async function markInvoiceSent(id: string): Promise<InvoiceActionResult> 
 
   if (error) return { ok: false, error: error.message };
 
-  const { data: customer } = await supabase
-    .from("customers")
-    .select("id, name, company, email")
-    .eq("id", inv.customer_id)
-    .maybeSingle();
-
-  await fireMakeWebhook(profile.tenant_id, "invoice.sent", {
-    invoice_id: inv.id,
-    number: inv.number,
-    type: inv.type,
-    status: "sent",
-    issue_date: inv.issue_date,
-    due_date: inv.due_date,
-    subtotal: inv.subtotal == null ? null : Number(inv.subtotal),
-    tax_amount: inv.tax_amount == null ? null : Number(inv.tax_amount),
-    total_amount: inv.total_amount == null ? null : Number(inv.total_amount),
-    currency: inv.currency,
-    finbot_url: inv.finbot_url,
-    customer,
-  });
-
   revalidatePath("/invoices");
   revalidatePath(`/invoices/${id}`);
   return { ok: true, id };
+}
+
+/**
+ * Retry issuing the Finbot document for an invoice whose original attempt failed.
+ */
+export async function retryFinbotDocument(id: string): Promise<InvoiceActionResult> {
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { ok: false, error: "לא מחובר" };
+
+  const result = await issueDocumentForInvoice(supabase, profile.tenant_id, id);
+  if (!result.ok) return { ok: false, error: result.error };
+
+  revalidatePath("/invoices");
+  revalidatePath(`/invoices/${id}`);
+  return { ok: true, id, finbotUrl: result.url };
 }
 
 export async function cancelInvoice(id: string): Promise<InvoiceActionResult> {
@@ -438,72 +418,30 @@ export async function recordPayment(
 
   if (error || !payment) return { ok: false, error: error?.message ?? "שגיאה ברישום תשלום" };
 
-  const [{ data: customer }, { data: items }] = await Promise.all([
-    inv.customer_id
-      ? supabase
-          .from("customers")
-          .select("name, email, phone, company, address, company_registration_number")
-          .eq("id", inv.customer_id)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-    supabase
-      .from("invoice_items")
-      .select("description, quantity, unit_price, order_index")
-      .eq("invoice_id", inv.id)
-      .order("order_index", { ascending: true }),
-  ]);
-
   const issueDocument: PostPaymentDocument = data.issue_document ?? "none";
 
-  await fireMakeWebhook(profile.tenant_id, "invoice.payment_recorded", {
-    invoice_id: inv.id,
-    invoice_number: inv.number,
-    customer_id: inv.customer_id,
-    customer: customer
-      ? {
-          name: customer.name,
-          email: customer.email,
-          phone: customer.phone,
-          company: customer.company,
-          address: customer.address,
-          tax_id: customer.company_registration_number,
-        }
-      : null,
-    source_document: {
-      id: inv.finbot_invoice_id,
-      type: inv.document_type,
-    },
-    issue_document: issueDocument,
-    payment_id: payment.id,
-    amount: Number(payment.amount),
-    method: payment.method,
-    reference: payment.reference,
-    card_last_4: payment.card_last_4,
-    paid_at: payment.paid_at,
-    invoice: {
-      number: inv.number,
-      issue_date: inv.issue_date,
-      due_date: inv.due_date,
-      subtotal: inv.subtotal == null ? null : Number(inv.subtotal),
-      tax_rate: inv.tax_rate == null ? null : Number(inv.tax_rate),
-      tax_amount: inv.tax_amount == null ? null : Number(inv.tax_amount),
-      total: inv.total_amount == null ? null : Number(inv.total_amount),
-      currency: inv.currency,
-      notes: inv.notes,
-      items: (items ?? []).map((it) => ({
-        description: it.description,
-        quantity: Number(it.quantity),
-        unit_price: Number(it.unit_price),
-        line_total: Math.round(Number(it.quantity) * Number(it.unit_price) * 100) / 100,
-      })),
-    },
-    invoice_total: inv.total_amount == null ? null : Number(inv.total_amount),
-    currency: inv.currency,
-  });
+  // Issue the receipt / tax-invoice-receipt directly in Finbot.
+  let finbotError: string | undefined;
+  if (issueDocument !== "none") {
+    const finbot = await issueReceiptForPayment(
+      supabase,
+      profile.tenant_id,
+      inv.id,
+      {
+        amount: Number(payment.amount),
+        method: payment.method,
+        paid_at: payment.paid_at,
+        reference: payment.reference,
+        card_last_4: payment.card_last_4,
+      },
+      issueDocument,
+    );
+    if (!finbot.ok) finbotError = finbot.error;
+  }
 
   revalidatePath("/invoices");
   revalidatePath(`/invoices/${data.invoice_id}`);
-  return { ok: true, id: payment.id };
+  return { ok: true, id: payment.id, finbotError };
 }
 
 export async function deletePayment(paymentId: string): Promise<InvoiceActionResult> {

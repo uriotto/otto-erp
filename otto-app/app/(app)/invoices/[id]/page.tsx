@@ -76,6 +76,13 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
     })),
   );
 
+  // The invoice items are a frozen snapshot; the linked entries are live and may
+  // have been edited since. Surface a drift warning instead of silently disagreeing.
+  const invoicedHours =
+    invoice.type === "monthly_hours" || invoice.type === "overage"
+      ? Math.round((items ?? []).reduce((s, it) => s + Number(it.quantity ?? 0), 0) * 100) / 100
+      : null;
+
   const status = invoice.status as InvoiceStatusUI;
   const type = invoice.type as InvoiceTypeUI;
   const subtotal = Number(invoice.subtotal ?? 0);
@@ -183,6 +190,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             notes: invoice.notes,
             finbot_url: invoice.finbot_url,
             finbot_invoice_id: invoice.finbot_invoice_id,
+            document_type: invoice.document_type,
             balance,
             total,
           }}
@@ -263,6 +271,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         lines={hoursDetail.lines}
         totalHours={hoursDetail.totalHours}
         invoiceNumber={invoice.number}
+        invoicedHours={invoicedHours}
       />
 
       {/* Payments */}

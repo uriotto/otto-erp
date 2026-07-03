@@ -2,10 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Send, Pencil, Wallet, Ban, Trash2 } from "lucide-react";
+import { Send, Pencil, Wallet, Ban, Trash2, FileOutput } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
-import { cancelInvoice, deleteInvoice, markInvoiceSent } from "../actions";
+import { cancelInvoice, deleteInvoice, markInvoiceSent, retryFinbotDocument } from "../actions";
 import { EditInvoiceDialog } from "./edit-invoice-dialog";
 import { PaymentDialog } from "./payment-dialog";
 import type { InvoiceStatusUI } from "../invoices-list";
@@ -19,6 +19,7 @@ export type EditableInvoice = {
   notes: string | null;
   finbot_url: string | null;
   finbot_invoice_id: string | null;
+  document_type: string | null;
   balance: number;
   total: number;
 };
@@ -36,6 +37,25 @@ export function InvoiceActionsBar({ invoice }: { invoice: EditableInvoice }) {
   const canEdit = invoice.status !== "paid";
   const canRecordPayment = invoice.status !== "cancelled" && invoice.balance > 0;
   const canDelete = invoice.status === "draft" || invoice.status === "cancelled";
+  // Retry Finbot issuance when the original attempt failed (receipt flavours are
+  // produced on payment recording, not here).
+  const canIssueFinbot =
+    !invoice.finbot_url &&
+    invoice.status !== "cancelled" &&
+    (invoice.document_type === "payment_request" || invoice.document_type === "tax_invoice");
+
+  function handleIssueFinbot() {
+    if (!confirm("להפיק את המסמך בפינבוט? אם ללקוח יש מייל, המסמך יישלח אליו.")) return;
+    startTransition(async () => {
+      const result = await retryFinbotDocument(invoice.id);
+      if (!result.ok) {
+        toast.error(result.error);
+      } else {
+        toast.success("המסמך הופק בפינבוט");
+        router.refresh();
+      }
+    });
+  }
 
   function handleSend() {
     if (!confirm("לסמן את החשבונית כנשלחה?")) return;
@@ -92,6 +112,17 @@ export function InvoiceActionsBar({ invoice }: { invoice: EditableInvoice }) {
           >
             <Wallet size={14} />
             רישום תשלום
+          </button>
+        )}
+        {canIssueFinbot && (
+          <button
+            type="button"
+            onClick={handleIssueFinbot}
+            disabled={pending}
+            className="border-ink-line text-navy hover:border-navy flex items-center gap-1.5 rounded-lg border bg-white px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+          >
+            {pending ? <Spinner size={12} /> : <FileOutput size={14} />}
+            הפק בפינבוט
           </button>
         )}
         {canSend && (

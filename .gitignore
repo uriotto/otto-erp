@@ -53,3 +53,6 @@ vault/
 
 # Obsidian leftovers (Untitled.md / Untitled.canvas already tracked - removal needs Uri's approval)
 Untitled*
+
+# internal - local only
+PROJECT-IDENTITY.md

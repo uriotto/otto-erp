@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createTimeEntryFromTimerForUser, type TimerCreateInput } from "@/lib/time-entries";
-import { fireMakeWebhook } from "@/lib/make-webhook";
+import { issueDocumentForInvoice } from "@/lib/finbot";
 import { buildHoursDetail } from "@/lib/hours-detail";
+import { todayIL, ilDayKey } from "@/lib/dates";
 
 type InvoiceDocumentType = "payment_request" | "tax_invoice" | "tax_invoice_receipt";
 
@@ -30,6 +31,7 @@ const TimeEntrySchema = z
 
 export type TimeEntryFormState = {
   error?: string;
+  warning?: string;
   fieldErrors?: Record<string, string[]>;
   success?: boolean;
   entryId?: string;
@@ -118,10 +120,38 @@ export async function updateTimeEntry(
   // Capture previous bank/overage state to recalc after the change
   const { data: prevEntry } = await supabase
     .from("time_entries")
-    .select("consumed_from_bank_id, billing_status, is_overage, customer_id")
+    .select("consumed_from_bank_id, billing_status, is_overage, customer_id, invoice_id")
     .eq("id", data.id)
     .eq("tenant_id", profile.tenant_id)
     .maybeSingle();
+
+  // Invoiced entries: the fields may change, but the billing linkage stays frozen.
+  // The invoice keeps its original snapshot (items + notes) - no re-allocation.
+  if (prevEntry?.billing_status === "invoiced") {
+    const { error: invoicedErr } = await supabase
+      .from("time_entries")
+      .update({
+        customer_id: data.customer_id || null,
+        project_id: data.project_id || null,
+        task_id: data.task_id || null,
+        start_time: startISO,
+        end_time: endISO,
+        duration_minutes: diffMinutes(startISO, endISO),
+        notes: data.notes || null,
+        billable: data.billable,
+      })
+      .eq("id", data.id)
+      .eq("tenant_id", profile.tenant_id);
+
+    if (invoicedErr) return { error: invoicedErr.message };
+
+    revalidatePath("/time");
+    return {
+      success: true,
+      entryId: data.id,
+      warning: "הרשומה כבר על חשבונית - החשבונית לא השתנתה",
+    };
+  }
 
   // Reset bank linkage so the new state will be recomputed
   // billing_status=pending forces the allocation function to redo the math
@@ -312,13 +342,19 @@ export async function resetEntryToPending(entryId: string): Promise<{ error?: st
 
 export async function createHourlyInvoice(
   customerId: string,
-  opts?: { documentType?: InvoiceDocumentType; attachHoursDetail?: boolean },
+  opts?: {
+    documentType?: InvoiceDocumentType;
+    attachHoursDetail?: boolean;
+    /** ISO timestamp - bill only entries that started before this instant (billing-run month cutoff). */
+    until?: string;
+  },
 ): Promise<{
   error?: string;
   hours?: number;
   amount?: number;
   count?: number;
   invoiceId?: string;
+  finbotError?: string;
 }> {
   const documentType = opts?.documentType ?? "payment_request";
   const attachDetail = opts?.attachHoursDetail ?? true;
@@ -340,18 +376,26 @@ export async function createHourlyInvoice(
   const { data: settings } = await supabase
     .from("tenant_settings")
     .select("default_hourly_rate")
+    .eq("tenant_id", profile.tenant_id)
     .maybeSingle();
 
+  // Rate precedence: rate frozen on the entry -> customer override -> tenant default.
   const fallbackRate =
     Number(customer.hourly_rate_override) || Number(settings?.default_hourly_rate) || 0;
+  if (fallbackRate <= 0) {
+    return { error: "ללקוח אין תעריף מוגדר ואין תעריף ברירת מחדל - הגדר תעריף לפני הפקת חשבונית" };
+  }
 
-  const { data: entries, error: fetchError } = await supabase
+  let entriesQuery = supabase
     .from("time_entries")
-    .select("id, start_time, duration_minutes, notes, task_id, hourly_rate_at_entry")
+    .select("id, start_time, duration_minutes, notes, task_id, hourly_rate_at_entry, is_overage")
     .eq("customer_id", customerId)
     .eq("tenant_id", profile.tenant_id)
     .eq("billable", true)
     .in("billing_status", ["pending", "overage"]);
+  if (opts?.until) entriesQuery = entriesQuery.lt("start_time", opts.until);
+
+  const { data: entries, error: fetchError } = await entriesQuery;
 
   if (fetchError) return { error: fetchError.message };
   if (!entries || entries.length === 0) return { error: "אין שעות ממתינות לחיוב" };
@@ -366,20 +410,25 @@ export async function createHourlyInvoice(
     for (const t of tasks ?? []) taskTitle.set(t.id, t.title);
   }
 
-  // Group hours by their effective rate so each rate becomes one invoice line.
-  const byRate = new Map<number, number>();
+  // Group hours by rate + overage flag so regular and overage hours get separate,
+  // clearly-labelled invoice lines.
+  const byGroup = new Map<string, { rate: number; overage: boolean; hours: number }>();
   for (const e of entries) {
     const rate = Number(e.hourly_rate_at_entry) || fallbackRate;
+    const overage = e.is_overage === true;
     const minutes = Number(e.duration_minutes) || 0;
-    byRate.set(rate, (byRate.get(rate) ?? 0) + minutes / 60);
+    const key = `${overage ? "o" : "r"}:${rate}`;
+    const g = byGroup.get(key) ?? { rate, overage, hours: 0 };
+    g.hours += minutes / 60;
+    byGroup.set(key, g);
   }
 
-  const items = Array.from(byRate.entries())
-    .sort((a, b) => a[0] - b[0])
-    .map(([rate, hrs], idx) => ({
-      description: `שעות עבודה — ${Math.round(hrs * 100) / 100} שעות`,
-      quantity: Math.round(hrs * 100) / 100,
-      unit_price: rate,
+  const items = Array.from(byGroup.values())
+    .sort((a, b) => Number(a.overage) - Number(b.overage) || a.rate - b.rate)
+    .map((g, idx) => ({
+      description: `${g.overage ? "שעות חריגה" : "שעות עבודה"} — ${Math.round(g.hours * 100) / 100} שעות`,
+      quantity: Math.round(g.hours * 100) / 100,
+      unit_price: g.rate,
       order_index: idx,
     }));
 
@@ -394,8 +443,8 @@ export async function createHourlyInvoice(
     })),
   );
 
-  const today = new Date();
-  const due = new Date(today);
+  const issueDate = todayIL();
+  const due = new Date();
   due.setDate(due.getDate() + 14);
 
   const { data: invoice, error: invErr } = await supabase
@@ -407,8 +456,8 @@ export async function createHourlyInvoice(
       type: "monthly_hours",
       document_type: documentType,
       status: "draft",
-      issue_date: today.toISOString().slice(0, 10),
-      due_date: due.toISOString().slice(0, 10),
+      issue_date: issueDate,
+      due_date: ilDayKey(due),
       subtotal,
       tax_rate: 18,
       currency: "ILS",
@@ -437,31 +486,8 @@ export async function createHourlyInvoice(
 
   if (linkErr) return { error: linkErr.message };
 
-  await fireMakeWebhook(profile.tenant_id, "invoice.created", {
-    invoice_id: invoice.id,
-    type: "monthly_hours",
-    document_type: documentType,
-    status: "draft",
-    issue_date: today.toISOString().slice(0, 10),
-    due_date: due.toISOString().slice(0, 10),
-    subtotal,
-    tax_rate: 18,
-    tax_amount: invoice.tax_amount == null ? null : Number(invoice.tax_amount),
-    total_amount: invoice.total_amount == null ? null : Number(invoice.total_amount),
-    currency: "ILS",
-    customer: {
-      id: customerId,
-      name: customer.name,
-      email: customer.email,
-      phone: customer.phone,
-      company: customer.company,
-      address: customer.address,
-      tax_id: customer.company_registration_number,
-    },
-    items,
-    hours_detail: attachDetail ? detail.lines : null,
-    time_entry_ids: ids,
-  });
+  // Issue the document directly in Finbot (failure keeps the draft; UI offers retry).
+  const finbot = await issueDocumentForInvoice(supabase, profile.tenant_id, invoice.id);
 
   revalidatePath("/time");
   revalidatePath("/invoices");
@@ -469,24 +495,71 @@ export async function createHourlyInvoice(
 
   const hours = detail.totalHours;
   const amount = Math.round(subtotal);
-  return { hours, amount, count: entries.length, invoiceId: invoice.id };
+  return {
+    hours,
+    amount,
+    count: entries.length,
+    invoiceId: invoice.id,
+    finbotError: finbot.ok ? undefined : finbot.error,
+  };
 }
 
 export async function bulkToggleBillable(
   ids: string[],
   billable: boolean,
-): Promise<{ updated: number; error?: string }> {
+): Promise<{ updated: number; error?: string; skipped?: number }> {
   if (ids.length === 0) return { updated: 0 };
   const { supabase, profile } = await getTenant();
   if (!profile) return { updated: 0, error: "לא מחובר" };
 
-  const { error, count } = await supabase
+  // Invoiced entries keep their billing provenance - skip them.
+  const { data: rows, error: fetchErr } = await supabase
     .from("time_entries")
-    .update({ billable })
+    .select("id, customer_id, consumed_from_bank_id, billing_status")
     .in("id", ids)
     .eq("tenant_id", profile.tenant_id);
 
+  if (fetchErr) return { updated: 0, error: fetchErr.message };
+
+  const editable = (rows ?? []).filter((r) => r.billing_status !== "invoiced");
+  if (editable.length === 0) {
+    return { updated: 0, skipped: ids.length, error: "כל הרשומות שנבחרו כבר על חשבונית" };
+  }
+
+  const editableIds = editable.map((r) => r.id);
+  const affectedBanks = new Set(
+    editable.map((r) => r.consumed_from_bank_id).filter((id): id is string => !!id),
+  );
+
+  // Reset billing linkage so allocation math is redone from a clean state.
+  const { error, count } = await supabase
+    .from("time_entries")
+    .update({
+      billable,
+      billing_status: "pending",
+      consumed_from_bank_id: null,
+      is_overage: false,
+    })
+    .in("id", editableIds)
+    .eq("tenant_id", profile.tenant_id);
+
   if (error) return { updated: 0, error: error.message };
+
+  // Free the released bank capacity (may flip depleted -> active).
+  for (const bankId of affectedBanks) {
+    await supabase.rpc("recalculate_bank", { p_bank_id: bankId });
+  }
+
+  // Entries turned billable get re-allocated to the customer's active bank.
+  if (billable) {
+    for (const r of editable) {
+      if (r.customer_id) {
+        await supabase.rpc("allocate_time_entry_to_bank", { p_entry_id: r.id });
+      }
+    }
+  }
+
   revalidatePath("/time");
-  return { updated: count ?? ids.length };
+  revalidatePath("/hour-banks");
+  return { updated: count ?? editableIds.length, skipped: ids.length - editableIds.length };
 }

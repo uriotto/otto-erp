@@ -15,10 +15,10 @@ import { useToast } from "@/components/ui/toast";
 
 type Choice = "absorb" | "invoice" | "cancel";
 
+// Receipt-flavoured documents require a payment, so they're not offered at creation.
 const DOCUMENT_TYPE_OPTIONS: { value: InvoiceDocumentType; label: string }[] = [
   { value: "payment_request", label: "דרישת תשלום" },
   { value: "tax_invoice", label: "חשבונית מס" },
-  { value: "tax_invoice_receipt", label: "חשבונית מס קבלה" },
 ];
 
 export function OverageDialog({

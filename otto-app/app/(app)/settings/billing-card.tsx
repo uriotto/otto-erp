@@ -15,7 +15,6 @@ export function BillingCard({ initial }: Props) {
   const [pending, startTransition] = useTransition();
 
   const [hourlyRate, setHourlyRate] = useState(String(initial.default_hourly_rate));
-  const [bankRate, setBankRate] = useState(String(initial.default_hour_bank_rate));
   const [alertPct, setAlertPct] = useState(String(initial.default_alert_threshold_pct));
   const [alertHours, setAlertHours] = useState(String(initial.default_alert_threshold_hours));
   const [expiryMonths, setExpiryMonths] = useState(String(initial.default_hour_bank_expiry_months));
@@ -25,7 +24,6 @@ export function BillingCard({ initial }: Props) {
     startTransition(async () => {
       const res = await updateBillingSettings({
         default_hourly_rate: hourlyRate,
-        default_hour_bank_rate: bankRate,
         default_alert_threshold_pct: alertPct,
         default_alert_threshold_hours: alertHours,
         default_hour_bank_expiry_months: expiryMonths,
@@ -38,7 +36,6 @@ export function BillingCard({ initial }: Props) {
       toast.success("הגדרות החיוב נשמרו");
       const d = res.data;
       setHourlyRate(String(d.default_hourly_rate));
-      setBankRate(String(d.default_hour_bank_rate));
       setAlertPct(String(d.default_alert_threshold_pct));
       setAlertHours(String(d.default_alert_threshold_hours));
       setExpiryMonths(String(d.default_hour_bank_expiry_months));
@@ -55,19 +52,11 @@ export function BillingCard({ initial }: Props) {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field
-          label="תעריף שעתי רגיל (לא בבנק שעות)"
-          hint="ברירת מחדל ללקוחות בחיוב שעתי"
+          label="תעריף שעתי ברירת מחדל"
+          hint="חל כשאין ללקוח תעריף משלו (שעתי ובנקי שעות)"
           suffix="₪/שעה"
           value={hourlyRate}
           onChange={setHourlyRate}
-          inputMode="decimal"
-        />
-        <Field
-          label="תעריף שעתי לבנק שעות"
-          hint="המחיר ליצירת בנק חדש"
-          suffix="₪/שעה"
-          value={bankRate}
-          onChange={setBankRate}
           inputMode="decimal"
         />
         <Field

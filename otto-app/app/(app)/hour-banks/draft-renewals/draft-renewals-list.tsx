@@ -10,7 +10,6 @@ import { approveRenewalDraft, discardRenewalDraft, type InvoiceDocumentType } fr
 const DOCUMENT_TYPE_OPTIONS: { value: InvoiceDocumentType; label: string }[] = [
   { value: "payment_request", label: "דרישת תשלום" },
   { value: "tax_invoice", label: "חשבונית מס" },
-  { value: "tax_invoice_receipt", label: "חשבונית מס קבלה" },
 ];
 import { EditHourBankDialog } from "../[id]/edit-hour-bank-dialog";
 import { Spinner } from "@/components/ui/spinner";

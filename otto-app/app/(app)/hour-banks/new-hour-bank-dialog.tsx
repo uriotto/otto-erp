@@ -228,10 +228,9 @@ export function NewHourBankDialog({
             >
               <option value="payment_request">דרישת תשלום</option>
               <option value="tax_invoice">חשבונית מס</option>
-              <option value="tax_invoice_receipt">חשבונית מס קבלה</option>
             </select>
             <p className="text-ink-faded mt-1 text-xs">
-              המסמך שייווצר בפינבוט באמצעות Make כשהבנק יאושר
+              המסמך שייווצר בפינבוט כשהבנק יאושר. קבלה תופק בעת רישום התשלום.
             </p>
           </div>
 

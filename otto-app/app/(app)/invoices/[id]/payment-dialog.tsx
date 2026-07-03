@@ -76,7 +76,13 @@ export function PaymentDialog({
         toast.error(result.error);
         return;
       }
-      toast.success("התשלום נרשם");
+      if (result.finbotError) {
+        toast.error(`התשלום נרשם אך הפקת הקבלה בפינבוט נכשלה: ${result.finbotError}`);
+      } else if (issueDocument !== "none") {
+        toast.success("התשלום נרשם והקבלה הופקה בפינבוט");
+      } else {
+        toast.success("התשלום נרשם");
+      }
       onClose();
       router.refresh();
     });
