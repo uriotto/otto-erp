@@ -2601,7 +2601,8 @@ export type Database = {
         | "allocated_to_bank"
         | "overage"
         | "invoiced"
-        | "cancelled";
+        | "cancelled"
+        | "settled_externally";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -2766,6 +2767,7 @@ export const Constants = {
         "overage",
         "invoiced",
         "cancelled",
+        "settled_externally",
       ],
     },
   },

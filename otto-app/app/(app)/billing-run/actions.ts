@@ -5,6 +5,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { issueDocumentForInvoice } from "@/lib/finbot";
 import { todayIL } from "@/lib/dates";
+import { VAT_RATE, type InvoiceDraftPreview } from "@/lib/hourly-invoice-draft";
 
 const RetainerSchema = z.object({
   customer_id: z.string().uuid(),
@@ -24,6 +25,79 @@ async function getTenant() {
     .eq("id", user.id)
     .single();
   return { supabase, profile };
+}
+
+type TenantClient = Awaited<ReturnType<typeof getTenant>>["supabase"];
+
+/** One retainer invoice per customer per month label - guards against double billing. */
+async function findExistingRetainer(
+  supabase: TenantClient,
+  tenantId: string,
+  customerId: string,
+  monthLabel: string,
+): Promise<boolean> {
+  const { data } = await supabase
+    .from("invoices")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("customer_id", customerId)
+    .eq("type", "monthly_hours")
+    .ilike("notes", `%ריטיינר חודשי — ${monthLabel}%`)
+    .neq("status", "cancelled")
+    .limit(1);
+
+  return Boolean(data && data.length > 0);
+}
+
+/** Read-only draft of the fixed monthly retainer invoice. */
+export async function previewRetainerInvoice(input: {
+  customer_id: string;
+  month_label: string;
+}): Promise<{ error?: string; preview?: InvoiceDraftPreview }> {
+  const parsed = RetainerSchema.omit({ document_type: true }).safeParse(input);
+  if (!parsed.success) return { error: "קלט לא תקין" };
+
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { error: "לא מחובר" };
+
+  const { data: customer } = await supabase
+    .from("customers")
+    .select("name, email, retainer_monthly_amount")
+    .eq("id", parsed.data.customer_id)
+    .eq("tenant_id", profile.tenant_id)
+    .maybeSingle();
+
+  if (!customer) return { error: "לקוח לא נמצא" };
+  const amount = Number(customer.retainer_monthly_amount);
+  if (!(amount > 0)) return { error: "ללקוח אין סכום ריטיינר מוגדר" };
+
+  const duplicate = await findExistingRetainer(
+    supabase,
+    profile.tenant_id,
+    parsed.data.customer_id,
+    parsed.data.month_label,
+  );
+
+  const description = `ריטיינר חודשי — ${parsed.data.month_label}`;
+  const taxAmount = Math.round(((amount * VAT_RATE) / 100) * 100) / 100;
+
+  return {
+    preview: {
+      customerName: customer.name,
+      customerEmail: customer.email,
+      items: [{ description, quantity: 1, unit_price: amount, order_index: 0 }],
+      hoursLines: [],
+      totalHours: 0,
+      entryCount: 0,
+      subtotal: amount,
+      taxRate: VAT_RATE,
+      taxAmount,
+      total: Math.round((amount + taxAmount) * 100) / 100,
+      warning: duplicate
+        ? `כבר קיימת חשבונית ריטיינר ל${parsed.data.month_label} ללקוח זה`
+        : undefined,
+    },
+  };
 }
 
 /**
@@ -52,18 +126,13 @@ export async function issueRetainerInvoice(input: {
   const amount = Number(customer.retainer_monthly_amount);
   if (!(amount > 0)) return { error: "ללקוח אין סכום ריטיינר מוגדר" };
 
-  // Avoid double billing: one retainer invoice per customer per month label.
-  const { data: existing } = await supabase
-    .from("invoices")
-    .select("id")
-    .eq("tenant_id", profile.tenant_id)
-    .eq("customer_id", customer.id)
-    .eq("type", "monthly_hours")
-    .ilike("notes", `%ריטיינר חודשי — ${parsed.data.month_label}%`)
-    .neq("status", "cancelled")
-    .limit(1);
-
-  if (existing && existing.length > 0) {
+  const duplicate = await findExistingRetainer(
+    supabase,
+    profile.tenant_id,
+    customer.id,
+    parsed.data.month_label,
+  );
+  if (duplicate) {
     return { error: `כבר קיימת חשבונית ריטיינר ל${parsed.data.month_label} ללקוח זה` };
   }
 

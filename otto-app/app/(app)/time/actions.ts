@@ -5,7 +5,11 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createTimeEntryFromTimerForUser, type TimerCreateInput } from "@/lib/time-entries";
 import { issueDocumentForInvoice } from "@/lib/finbot";
-import { buildHoursDetail } from "@/lib/hours-detail";
+import {
+  buildHourlyInvoiceDraft,
+  draftToPreview,
+  type InvoiceDraftPreview,
+} from "@/lib/hourly-invoice-draft";
 import { todayIL, ilDayKey } from "@/lib/dates";
 
 type InvoiceDocumentType = "payment_request" | "tax_invoice" | "tax_invoice_receipt";
@@ -340,6 +344,78 @@ export async function resetEntryToPending(entryId: string): Promise<{ error?: st
   return {};
 }
 
+/**
+ * Read-only draft of the hours invoice for a customer - exactly what
+ * createHourlyInvoice would produce. Nothing is written, nothing is sent.
+ */
+export async function previewHourlyInvoice(
+  customerId: string,
+  until?: string,
+): Promise<{ error?: string; preview?: InvoiceDraftPreview }> {
+  if (!z.string().uuid().safeParse(customerId).success) return { error: "קלט לא תקין" };
+
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { error: "לא מחובר" };
+
+  const built = await buildHourlyInvoiceDraft(supabase, profile.tenant_id, customerId, { until });
+  if (!built.draft) return { error: built.error ?? "שגיאה בהכנת הטיוטה" };
+
+  return { preview: draftToPreview(built.draft) };
+}
+
+const SettleSchema = z.object({
+  customer_id: z.string().uuid(),
+  until: z.string().datetime().optional(),
+});
+
+/**
+ * Closes a customer's pending hours as "paid outside OTTO" - no invoice, no
+ * Finbot document. The hours leave the billing queue but stay in the ledger with
+ * a distinct status so the move is visible and reversible from /time.
+ */
+export async function settleHoursExternally(input: {
+  customer_id: string;
+  until?: string;
+}): Promise<{ error?: string; count?: number; hours?: number }> {
+  const parsed = SettleSchema.safeParse(input);
+  if (!parsed.success) return { error: "קלט לא תקין" };
+
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { error: "לא מחובר" };
+
+  let query = supabase
+    .from("time_entries")
+    .select("id, duration_minutes")
+    .eq("customer_id", parsed.data.customer_id)
+    .eq("tenant_id", profile.tenant_id)
+    .eq("billable", true)
+    .in("billing_status", ["pending", "overage"]);
+  if (parsed.data.until) query = query.lt("start_time", parsed.data.until);
+
+  const { data: entries, error: fetchErr } = await query;
+  if (fetchErr) return { error: fetchErr.message };
+  if (!entries || entries.length === 0) return { error: "אין שעות ממתינות לחיוב" };
+
+  const minutes = entries.reduce((sum, e) => sum + (Number(e.duration_minutes) || 0), 0);
+
+  const { error: updateErr } = await supabase
+    .from("time_entries")
+    .update({ billing_status: "settled_externally" })
+    .in(
+      "id",
+      entries.map((e) => e.id),
+    )
+    .eq("tenant_id", profile.tenant_id);
+
+  if (updateErr) return { error: updateErr.message };
+
+  revalidatePath("/billing-run");
+  revalidatePath("/time");
+  revalidatePath(`/customers/${parsed.data.customer_id}`);
+
+  return { count: entries.length, hours: Math.round((minutes / 60) * 100) / 100 };
+}
+
 export async function createHourlyInvoice(
   customerId: string,
   opts?: {
@@ -362,86 +438,12 @@ export async function createHourlyInvoice(
   const { supabase, profile } = await getTenant();
   if (!profile) return { error: "לא מחובר" };
 
-  const { data: customer } = await supabase
-    .from("customers")
-    .select(
-      "name, email, phone, company, address, company_registration_number, hourly_rate_override",
-    )
-    .eq("id", customerId)
-    .eq("tenant_id", profile.tenant_id)
-    .maybeSingle();
-
-  if (!customer) return { error: "לקוח לא נמצא" };
-
-  const { data: settings } = await supabase
-    .from("tenant_settings")
-    .select("default_hourly_rate")
-    .eq("tenant_id", profile.tenant_id)
-    .maybeSingle();
-
-  // Rate precedence: rate frozen on the entry -> customer override -> tenant default.
-  const fallbackRate =
-    Number(customer.hourly_rate_override) || Number(settings?.default_hourly_rate) || 0;
-  if (fallbackRate <= 0) {
-    return { error: "ללקוח אין תעריף מוגדר ואין תעריף ברירת מחדל - הגדר תעריף לפני הפקת חשבונית" };
-  }
-
-  let entriesQuery = supabase
-    .from("time_entries")
-    .select("id, start_time, duration_minutes, notes, task_id, hourly_rate_at_entry, is_overage")
-    .eq("customer_id", customerId)
-    .eq("tenant_id", profile.tenant_id)
-    .eq("billable", true)
-    .in("billing_status", ["pending", "overage"]);
-  if (opts?.until) entriesQuery = entriesQuery.lt("start_time", opts.until);
-
-  const { data: entries, error: fetchError } = await entriesQuery;
-
-  if (fetchError) return { error: fetchError.message };
-  if (!entries || entries.length === 0) return { error: "אין שעות ממתינות לחיוב" };
-
-  // Resolve task titles to enrich descriptions where the entry has no notes.
-  const taskIds = Array.from(
-    new Set(entries.map((e) => e.task_id).filter((id): id is string => !!id)),
-  );
-  const taskTitle = new Map<string, string>();
-  if (taskIds.length > 0) {
-    const { data: tasks } = await supabase.from("tasks").select("id, title").in("id", taskIds);
-    for (const t of tasks ?? []) taskTitle.set(t.id, t.title);
-  }
-
-  // Group hours by rate + overage flag so regular and overage hours get separate,
-  // clearly-labelled invoice lines.
-  const byGroup = new Map<string, { rate: number; overage: boolean; hours: number }>();
-  for (const e of entries) {
-    const rate = Number(e.hourly_rate_at_entry) || fallbackRate;
-    const overage = e.is_overage === true;
-    const minutes = Number(e.duration_minutes) || 0;
-    const key = `${overage ? "o" : "r"}:${rate}`;
-    const g = byGroup.get(key) ?? { rate, overage, hours: 0 };
-    g.hours += minutes / 60;
-    byGroup.set(key, g);
-  }
-
-  const items = Array.from(byGroup.values())
-    .sort((a, b) => Number(a.overage) - Number(b.overage) || a.rate - b.rate)
-    .map((g, idx) => ({
-      description: `${g.overage ? "שעות חריגה" : "שעות עבודה"} — ${Math.round(g.hours * 100) / 100} שעות`,
-      quantity: Math.round(g.hours * 100) / 100,
-      unit_price: g.rate,
-      order_index: idx,
-    }));
-
-  const subtotal =
-    Math.round(items.reduce((sum, it) => sum + it.quantity * it.unit_price, 0) * 100) / 100;
-
-  const detail = buildHoursDetail(
-    entries.map((e) => ({
-      start_time: e.start_time,
-      duration_minutes: e.duration_minutes,
-      description: (e.notes ?? "").trim() || (e.task_id ? (taskTitle.get(e.task_id) ?? "") : ""),
-    })),
-  );
+  // Same builder the /billing-run preview dialog uses - what Uri approved is what gets issued.
+  const built = await buildHourlyInvoiceDraft(supabase, profile.tenant_id, customerId, {
+    until: opts?.until,
+  });
+  if (!built.draft) return { error: built.error ?? "שגיאה בהכנת החשבונית" };
+  const { items, subtotal, detail, entryIds } = built.draft;
 
   const issueDate = todayIL();
   const due = new Date();
@@ -477,11 +479,10 @@ export async function createHourlyInvoice(
     return { error: itemsErr.message };
   }
 
-  const ids = entries.map((e) => e.id);
   const { error: linkErr } = await supabase
     .from("time_entries")
     .update({ billing_status: "invoiced", invoice_id: invoice.id })
-    .in("id", ids)
+    .in("id", entryIds)
     .eq("tenant_id", profile.tenant_id);
 
   if (linkErr) return { error: linkErr.message };
@@ -498,7 +499,7 @@ export async function createHourlyInvoice(
   return {
     hours,
     amount,
-    count: entries.length,
+    count: entryIds.length,
     invoiceId: invoice.id,
     finbotError: finbot.ok ? undefined : finbot.error,
   };

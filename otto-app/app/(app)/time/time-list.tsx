@@ -33,8 +33,12 @@ import {
   markEntryAsInvoiced,
   resetEntryToPending,
   createHourlyInvoice,
+  previewHourlyInvoice,
+  settleHoursExternally,
 } from "./actions";
 import { NewTimeEntryDialog } from "./new-time-entry-dialog";
+import { InvoiceDraftDialog } from "@/components/domain/invoice-draft-dialog";
+import type { InvoiceDraftPreview } from "@/lib/hourly-invoice-draft";
 import { BulkActionBar } from "@/components/ui/bulk-action-bar";
 import { saveFilters, loadFilters } from "@/lib/persist-filters";
 
@@ -108,6 +112,7 @@ const BILLING_STATUS_EXPORT_LABELS: Record<string, string> = {
   overage: "חריגה",
   invoiced: "חויב",
   allocated_to_bank: "שויך לבנק",
+  settled_externally: "שולם מחוץ למערכת",
 };
 
 export function TimeList({
@@ -1244,6 +1249,9 @@ function HourlyInvoiceBar({
   const [modalCustomer, setModalCustomer] = useState<{ id: string; name: string } | null>(null);
   const [docType, setDocType] = useState<HourlyInvoiceDocType>("payment_request");
   const [attachDetail, setAttachDetail] = useState(true);
+  const [preview, setPreview] = useState<InvoiceDraftPreview | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const hourlyCustomersWithPending = useMemo(() => {
     const map = new Map<string, { name: string; minutes: number; rate: number }>();
@@ -1272,6 +1280,49 @@ function HourlyInvoiceBar({
 
   if (hourlyCustomersWithPending.length === 0) return null;
 
+  function openDraft(customerId: string, name: string) {
+    setModalCustomer({ id: customerId, name });
+    setPreview(null);
+    setPreviewError(null);
+    setPreviewLoading(true);
+    startTransition(async () => {
+      const res = await previewHourlyInvoice(customerId);
+      setPreviewLoading(false);
+      if (res.error || !res.preview) {
+        setPreviewError(res.error ?? "שגיאה בהכנת הטיוטה");
+        return;
+      }
+      setPreview(res.preview);
+    });
+  }
+
+  function closeDraft() {
+    setModalCustomer(null);
+    setPreview(null);
+    setPreviewError(null);
+    setPreviewLoading(false);
+  }
+
+  function markSettled(customerId: string, name: string, hours: number) {
+    const ok = confirm(
+      `לסמן ${hours} שעות של ${name} כשולמו מחוץ למערכת?\n` +
+        `לא תופק חשבונית ולא יישלח כלום ללקוח - השעות רק יוצאות מרשימת החיוב.\n` +
+        `אפשר לבטל אחר כך מהרשומה עצמה ("אפס לממתין").`,
+    );
+    if (!ok) return;
+    setLoadingId(customerId);
+    startTransition(async () => {
+      const res = await settleHoursExternally({ customer_id: customerId });
+      setLoadingId(null);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(`${res.hours} שעות של ${name} סומנו כשולמו מחוץ למערכת`);
+      router.refresh();
+    });
+  }
+
   function runInvoice() {
     if (!modalCustomer) return;
     const customerId = modalCustomer.id;
@@ -1283,6 +1334,7 @@ function HourlyInvoiceBar({
       });
       setLoadingId(null);
       if (res.error) {
+        setPreviewError(res.error);
         toast.error(res.error);
         return;
       }
@@ -1295,7 +1347,7 @@ function HourlyInvoiceBar({
           `נוצרה חשבונית · ${hours.toFixed(1)} שעות${amount > 0 ? ` = ₪${amount.toLocaleString("he-IL")}` : ""}`,
         );
       }
-      setModalCustomer(null);
+      closeDraft();
       if (res.invoiceId) {
         router.push(`/invoices/${res.invoiceId}`);
       } else {
@@ -1322,11 +1374,20 @@ function HourlyInvoiceBar({
               </span>
               <button
                 type="button"
-                onClick={() => setModalCustomer({ id: customerId, name })}
+                onClick={() => markSettled(customerId, name, hours)}
+                disabled={pending}
+                title="סגירת השעות בלי חשבונית - שולם מחוץ למערכת"
+                className="rounded-md border border-amber-300 px-2 py-1 text-xs font-medium text-amber-800 hover:border-amber-600 disabled:opacity-50"
+              >
+                שולם מחוץ למערכת
+              </button>
+              <button
+                type="button"
+                onClick={() => openDraft(customerId, name)}
                 disabled={pending}
                 className="rounded-md bg-amber-600 px-2 py-1 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
               >
-                {loadingId === customerId ? <Spinner size={12} /> : "הפק חשבונית"}
+                {loadingId === customerId ? <Spinner size={12} /> : "טיוטה והפקה"}
               </button>
             </div>
           );
@@ -1334,57 +1395,45 @@ function HourlyInvoiceBar({
       </div>
 
       {modalCustomer && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4">
-          <div className="bg-cream w-full max-w-md rounded-2xl p-6 shadow-xl">
-            <h2 className="text-display-sm text-navy mb-1">הפקת חשבונית</h2>
-            <p className="text-ink-soft mb-4 text-sm">
-              חשבונית טיוטה עבור <strong className="text-navy">{modalCustomer.name}</strong> מכל
-              השעות הממתינות לחיוב.
-            </p>
-
-            <label className="text-ink-soft mb-1.5 block text-xs font-semibold">סוג מסמך</label>
-            <select
-              value={docType}
-              onChange={(e) => setDocType(e.target.value as HourlyInvoiceDocType)}
-              className="border-ink-line bg-cream-paper text-navy focus:border-navy mb-3 w-full rounded-lg border px-3 py-2 text-sm outline-none"
-            >
-              {HOURLY_INVOICE_DOC_TYPES.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-
-            <label className="text-ink-soft flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={attachDetail}
-                onChange={(e) => setAttachDetail(e.target.checked)}
-                className="accent-navy h-4 w-4 rounded"
-              />
-              צרף פירוט שעות להערות החשבונית
-            </label>
-
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setModalCustomer(null)}
-                disabled={pending}
-                className="border-ink-line text-navy hover:border-navy rounded-lg border px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50"
-              >
-                ביטול
-              </button>
-              <button
-                type="button"
-                onClick={runInvoice}
-                disabled={pending}
-                className="bg-navy text-cream-paper hover:bg-navy-deep rounded-lg px-5 py-2 text-sm font-semibold transition-colors disabled:opacity-50"
-              >
-                {pending ? <Spinner size={14} /> : "הפק חשבונית"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <InvoiceDraftDialog
+          preview={preview}
+          docTypeLabel={
+            HOURLY_INVOICE_DOC_TYPES.find((o) => o.value === docType)?.label ?? "חשבונית"
+          }
+          loading={previewLoading}
+          issuing={pending && loadingId === modalCustomer.id}
+          error={previewError}
+          showHoursDetail={attachDetail}
+          options={
+            <>
+              <div>
+                <label className="text-ink-soft mb-1.5 block text-xs font-semibold">סוג מסמך</label>
+                <select
+                  value={docType}
+                  onChange={(e) => setDocType(e.target.value as HourlyInvoiceDocType)}
+                  className="border-ink-line bg-cream-paper text-navy focus:border-navy w-full rounded-lg border px-3 py-2 text-sm outline-none"
+                >
+                  {HOURLY_INVOICE_DOC_TYPES.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <label className="text-ink-soft flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={attachDetail}
+                  onChange={(e) => setAttachDetail(e.target.checked)}
+                  className="accent-navy h-4 w-4 rounded"
+                />
+                צרף פירוט שעות להערות החשבונית
+              </label>
+            </>
+          }
+          onClose={closeDraft}
+          onConfirm={runInvoice}
+        />
       )}
     </div>
   );
@@ -1453,6 +1502,22 @@ function BillingStatusActions({
 
   if (status === "allocated_to_bank") {
     return <div className="text-ink-faded text-xs">שויך לבנק שעות — לשינוי, ערוך את הרשומה</div>;
+  }
+
+  if (status === "settled_externally") {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="text-ink-soft text-xs">סטטוס: שולם מחוץ למערכת</span>
+        <button
+          type="button"
+          onClick={handleReset}
+          disabled={pending}
+          className="text-ink-faded hover:text-navy text-xs underline disabled:opacity-50"
+        >
+          אפס לממתין
+        </button>
+      </div>
+    );
   }
 
   if (status === "invoiced") {
@@ -1526,6 +1591,13 @@ function BillingStatusBadge({
     return (
       <span className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-xs font-medium text-blue-700">
         חויב
+      </span>
+    );
+  }
+  if (status === "settled_externally") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md border border-teal-200 bg-teal-50 px-1.5 py-0.5 text-xs font-medium text-teal-700">
+        שולם חיצונית
       </span>
     );
   }

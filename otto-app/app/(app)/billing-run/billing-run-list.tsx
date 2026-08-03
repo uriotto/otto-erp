@@ -5,16 +5,20 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   CalendarClock,
+  Check,
   ChevronRight,
   ChevronLeft,
   ExternalLink,
   Mail,
   Receipt,
+  Wallet,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
-import { createHourlyInvoice } from "../time/actions";
-import { issueRetainerInvoice } from "./actions";
+import { createHourlyInvoice, previewHourlyInvoice, settleHoursExternally } from "../time/actions";
+import { issueRetainerInvoice, previewRetainerInvoice } from "./actions";
+import { InvoiceDraftDialog } from "@/components/domain/invoice-draft-dialog";
+import type { InvoiceDraftPreview } from "@/lib/hourly-invoice-draft";
 
 export type BillingRunRow = {
   customerId: string;
@@ -72,63 +76,123 @@ export function BillingRunList({
   const [docType, setDocType] = useState<DocType>("payment_request");
   const [isPending, startTransition] = useTransition();
   const [done, setDone] = useState<Map<string, string>>(new Map());
+  const [settled, setSettled] = useState<Set<string>>(new Set());
+
+  // The draft dialog: opened per customer, holds the read-only preview until approved.
+  const [draftTarget, setDraftTarget] = useState<{
+    kind: "hourly" | "retainer";
+    customerId: string;
+    customerName: string;
+  } | null>(null);
+  const [preview, setPreview] = useState<InvoiceDraftPreview | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [issuing, setIssuing] = useState(false);
 
   const totalAmount = rows.reduce((s, r) => s + r.estimatedAmount, 0);
+  const docTypeLabel = DOC_OPTIONS.find((d) => d.value === docType)?.label ?? "";
 
-  function issueHourly(row: BillingRunRow) {
-    const ok = confirm(
-      `להפיק ${DOC_OPTIONS.find((d) => d.value === docType)?.label} על ${row.hours} שעות (${formatILS(row.estimatedAmount)} לפני מע"מ) ל${row.customerName}?` +
-        (row.hasEmail
-          ? "\nהמסמך יישלח ללקוח במייל דרך פינבוט."
-          : "\nללקוח אין מייל - המסמך לא יישלח אוטומטית."),
-    );
-    if (!ok) return;
-    setPendingId(row.customerId);
+  function closeDraft() {
+    setDraftTarget(null);
+    setPreview(null);
+    setPreviewError(null);
+    setPreviewLoading(false);
+  }
+
+  function openHourlyDraft(row: BillingRunRow) {
+    setDraftTarget({ kind: "hourly", customerId: row.customerId, customerName: row.customerName });
+    setPreview(null);
+    setPreviewError(null);
+    setPreviewLoading(true);
     startTransition(async () => {
-      const res = await createHourlyInvoice(row.customerId, {
-        documentType: docType,
-        attachHoursDetail: true,
-        until: untilISO,
+      const res = await previewHourlyInvoice(row.customerId, untilISO);
+      setPreviewLoading(false);
+      if (res.error || !res.preview) {
+        setPreviewError(res.error ?? "שגיאה בהכנת הטיוטה");
+        return;
+      }
+      setPreview(res.preview);
+    });
+  }
+
+  function openRetainerDraft(row: RetainerRow) {
+    setDraftTarget({
+      kind: "retainer",
+      customerId: row.customerId,
+      customerName: row.customerName,
+    });
+    setPreview(null);
+    setPreviewError(null);
+    setPreviewLoading(true);
+    startTransition(async () => {
+      const res = await previewRetainerInvoice({
+        customer_id: row.customerId,
+        month_label: monthLabel,
       });
+      setPreviewLoading(false);
+      if (res.error || !res.preview) {
+        setPreviewError(res.error ?? "שגיאה בהכנת הטיוטה");
+        return;
+      }
+      setPreview(res.preview);
+    });
+  }
+
+  function confirmDraft() {
+    const target = draftTarget;
+    if (!target) return;
+    setIssuing(true);
+    setPendingId(target.customerId);
+    startTransition(async () => {
+      const res =
+        target.kind === "hourly"
+          ? await createHourlyInvoice(target.customerId, {
+              documentType: docType,
+              attachHoursDetail: true,
+              until: untilISO,
+            })
+          : await issueRetainerInvoice({
+              customer_id: target.customerId,
+              month_label: monthLabel,
+              document_type: docType,
+            });
+
+      setIssuing(false);
       setPendingId(null);
+
       if (res.error) {
+        setPreviewError(res.error);
         toast.error(res.error);
         return;
       }
       if (res.finbotError) {
         toast.error(`החשבונית נשמרה אך ההפקה בפינבוט נכשלה: ${res.finbotError}`);
       } else {
-        toast.success(`הופקה חשבונית על ${res.hours} שעות ל${row.customerName}`);
+        toast.success(`הופקה חשבונית ל${target.customerName}`);
       }
-      if (res.invoiceId) setDone((prev) => new Map(prev).set(row.customerId, res.invoiceId!));
+      if (res.invoiceId) setDone((prev) => new Map(prev).set(target.customerId, res.invoiceId!));
+      closeDraft();
       router.refresh();
     });
   }
 
-  function issueRetainer(row: RetainerRow) {
+  function markSettled(row: BillingRunRow) {
     const ok = confirm(
-      `להפיק חשבונית ריטיינר של ${formatILS(row.amount)} (לפני מע"מ) ל${row.customerName} עבור ${monthLabel}?` +
-        (row.hasEmail ? "\nהמסמך יישלח ללקוח במייל דרך פינבוט." : ""),
+      `לסמן ${row.hours} שעות של ${row.customerName} כשולמו מחוץ למערכת?\n` +
+        `לא תופק חשבונית ולא יישלח כלום ללקוח - השעות רק יוצאות מרשימת החיוב.\n` +
+        `ניתן לבטל מאוחר יותר במסך השעות (אפס לממתין).`,
     );
     if (!ok) return;
     setPendingId(row.customerId);
     startTransition(async () => {
-      const res = await issueRetainerInvoice({
-        customer_id: row.customerId,
-        month_label: monthLabel,
-        document_type: docType,
-      });
+      const res = await settleHoursExternally({ customer_id: row.customerId, until: untilISO });
       setPendingId(null);
       if (res.error) {
         toast.error(res.error);
         return;
       }
-      if (res.finbotError) {
-        toast.error(`החשבונית נשמרה אך ההפקה בפינבוט נכשלה: ${res.finbotError}`);
-      } else {
-        toast.success(`הופקה חשבונית ריטיינר ל${row.customerName}`);
-      }
-      if (res.invoiceId) setDone((prev) => new Map(prev).set(row.customerId, res.invoiceId!));
+      toast.success(`${res.hours} שעות של ${row.customerName} סומנו כשולמו מחוץ למערכת`);
+      setSettled((prev) => new Set(prev).add(row.customerId));
       router.refresh();
     });
   }
@@ -143,8 +207,8 @@ export function BillingRunList({
             {monthLabel}
           </h1>
           <p className="text-ink-soft mt-1 text-sm">
-            כל השעות שטרם חויבו עד סוף {monthLabel}. הפקה שולחת מסמך אמיתי בפינבוט - כלום לא יוצא
-            בלי לחיצה שלך.
+            כל השעות שטרם חויבו עד סוף {monthLabel}. כל הפקה מציגה קודם טיוטה לאישור - כלום לא יוצא
+            לפינבוט בלי הלחיצה שלך.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -263,20 +327,37 @@ export function BillingRunList({
                               <ExternalLink size={12} />
                               הופק
                             </Link>
+                          ) : settled.has(row.customerId) ? (
+                            <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+                              <Check size={12} />
+                              שולם מחוץ למערכת
+                            </span>
                           ) : (
-                            <button
-                              type="button"
-                              disabled={isPending}
-                              onClick={() => issueHourly(row)}
-                              className="bg-navy text-cream hover:bg-navy/90 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              {pendingId === row.customerId ? (
-                                <Spinner size={12} />
-                              ) : (
-                                <Receipt size={12} />
-                              )}
-                              הפק ושלח בפינבוט
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                disabled={isPending}
+                                onClick={() => markSettled(row)}
+                                title="סגירת השעות בלי חשבונית - שולם מחוץ למערכת"
+                                className="border-ink-line text-ink-soft hover:border-navy hover:text-navy inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <Wallet size={12} />
+                                שולם מחוץ למערכת
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isPending}
+                                onClick={() => openHourlyDraft(row)}
+                                className="bg-navy text-cream hover:bg-navy/90 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {pendingId === row.customerId ? (
+                                  <Spinner size={12} />
+                                ) : (
+                                  <Receipt size={12} />
+                                )}
+                                טיוטה והפקה
+                              </button>
+                            </>
                           )}
                         </div>
                       </td>
@@ -327,7 +408,7 @@ export function BillingRunList({
                       <button
                         type="button"
                         disabled={isPending}
-                        onClick={() => issueRetainer(row)}
+                        onClick={() => openRetainerDraft(row)}
                         className="bg-navy text-cream hover:bg-navy/90 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {pendingId === row.customerId ? (
@@ -335,7 +416,7 @@ export function BillingRunList({
                         ) : (
                           <Receipt size={12} />
                         )}
-                        הפק ושלח בפינבוט
+                        טיוטה והפקה
                       </button>
                     )}
                   </div>
@@ -344,6 +425,18 @@ export function BillingRunList({
             })}
           </ul>
         </div>
+      )}
+
+      {draftTarget && (
+        <InvoiceDraftDialog
+          preview={preview}
+          docTypeLabel={docTypeLabel}
+          loading={previewLoading}
+          issuing={issuing}
+          error={previewError}
+          onClose={closeDraft}
+          onConfirm={confirmDraft}
+        />
       )}
     </div>
   );
