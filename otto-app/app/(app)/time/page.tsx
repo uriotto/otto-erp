@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { ilDayEnd, ilDayStart, ilDayKey, ilMonthRange } from "@/lib/dates";
-import { TimeList, type TimeEntryItem } from "./time-list";
+import { TimeList, type TimeEntryItem, type PendingTotal } from "./time-list";
 
 export const metadata = { title: "שעות — OTTO" };
 
@@ -27,6 +27,7 @@ export default async function TimePage({
     { data: tasks },
     { data: activeBanks },
     { data: tenantSettings },
+    { data: pendingEntries },
   ] = await Promise.all([
     supabase
       .from("time_entries")
@@ -44,6 +45,13 @@ export default async function TimePage({
     supabase.from("tasks").select("id, title, project_id").order("title"),
     supabase.from("hour_banks").select("customer_id").eq("status", "active"),
     supabase.from("tenant_settings").select("default_hourly_rate").maybeSingle(),
+    // The "pending billing" bar must reflect everything that would actually be
+    // invoiced - the invoice actions ignore the date filter, so this query does too.
+    supabase
+      .from("time_entries")
+      .select("customer_id, duration_minutes, start_time")
+      .eq("billable", true)
+      .in("billing_status", ["pending", "overage"]),
   ]);
 
   const customerMap = new Map((customers ?? []).map((c) => [c.id, c.name]));
@@ -52,6 +60,19 @@ export default async function TimePage({
   const customersWithActiveBank = new Set(
     (activeBanks ?? []).map((b) => b.customer_id).filter(Boolean) as string[],
   );
+
+  const pendingMap = new Map<string, { minutes: number; oldest: string }>();
+  for (const e of pendingEntries ?? []) {
+    if (!e.customer_id) continue;
+    const prev = pendingMap.get(e.customer_id);
+    pendingMap.set(e.customer_id, {
+      minutes: (prev?.minutes ?? 0) + (e.duration_minutes ?? 0),
+      oldest: prev && prev.oldest <= e.start_time ? prev.oldest : e.start_time,
+    });
+  }
+  const pendingTotals: PendingTotal[] = Array.from(pendingMap.entries())
+    .filter(([customerId]) => customerMap.has(customerId))
+    .map(([customerId, v]) => ({ customerId, minutes: v.minutes, oldest: v.oldest }));
 
   const items: TimeEntryItem[] = (entries ?? []).map((e) => ({
     ...e,
@@ -71,6 +92,7 @@ export default async function TimePage({
       tasks={tasks ?? []}
       customersWithActiveBank={customersWithActiveBank}
       defaultHourlyRate={tenantSettings?.default_hourly_rate ?? 0}
+      pendingTotals={pendingTotals}
       rangeFrom={rangeFrom}
       rangeTo={rangeTo}
     />

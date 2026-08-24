@@ -60,6 +60,13 @@ export type TimeEntryItem = Pick<
   task_name: string | null;
 };
 
+/** All-time unbilled hours per customer - independent of the screen's date filter. */
+export type PendingTotal = {
+  customerId: string;
+  minutes: number;
+  oldest: string;
+};
+
 export type CustomerOpt = Pick<
   Tables<"customers">,
   "id" | "name" | "billing_model_default" | "hourly_rate_override"
@@ -122,6 +129,7 @@ export function TimeList({
   tasks,
   customersWithActiveBank,
   defaultHourlyRate,
+  pendingTotals,
   rangeFrom,
   rangeTo,
 }: {
@@ -131,6 +139,7 @@ export function TimeList({
   tasks: TaskOpt[];
   customersWithActiveBank: Set<string>;
   defaultHourlyRate: number;
+  pendingTotals: PendingTotal[];
   rangeFrom: string;
   rangeTo: string;
 }) {
@@ -526,7 +535,7 @@ export function TimeList({
       </div>
 
       <HourlyInvoiceBar
-        entries={filtered}
+        pendingTotals={pendingTotals}
         customerBillingModel={customerBillingModel}
         customerHourlyRate={customerHourlyRate}
         customers={customers}
@@ -1232,12 +1241,12 @@ function EditEntryRow({
 }
 
 function HourlyInvoiceBar({
-  entries,
+  pendingTotals,
   customerBillingModel,
   customerHourlyRate,
   customers,
 }: {
-  entries: TimeEntryItem[];
+  pendingTotals: PendingTotal[];
   customerBillingModel: Map<string, string | null | undefined>;
   customerHourlyRate: Map<string, number>;
   customers: CustomerOpt[];
@@ -1253,30 +1262,20 @@ function HourlyInvoiceBar({
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
 
+  // Deliberately NOT derived from the filtered entries on screen: issuing an
+  // invoice bills every pending hour, so the bar must show every pending hour.
   const hourlyCustomersWithPending = useMemo(() => {
-    const map = new Map<string, { name: string; minutes: number; rate: number }>();
-    for (const e of entries) {
-      if (!e.customer_id) continue;
-      if (!e.billable) continue;
-      if (
-        e.billing_status !== "pending" &&
-        e.billing_status !== "overage" &&
-        e.billing_status !== null
-      )
-        continue;
-      const model = customerBillingModel.get(e.customer_id);
-      if (model !== "hourly") continue;
-      const existing = map.get(e.customer_id);
-      const name = customers.find((c) => c.id === e.customer_id)?.name ?? "לקוח";
-      const rate = customerHourlyRate.get(e.customer_id) ?? 0;
-      map.set(e.customer_id, {
-        name,
-        minutes: (existing?.minutes ?? 0) + (e.duration_minutes ?? 0),
-        rate,
-      });
-    }
-    return Array.from(map.entries());
-  }, [entries, customerBillingModel, customerHourlyRate, customers]);
+    return pendingTotals
+      .filter((p) => customerBillingModel.get(p.customerId) === "hourly")
+      .map((p) => ({
+        customerId: p.customerId,
+        name: customers.find((c) => c.id === p.customerId)?.name ?? "לקוח",
+        minutes: p.minutes,
+        rate: customerHourlyRate.get(p.customerId) ?? 0,
+        oldest: p.oldest,
+      }))
+      .sort((a, b) => b.minutes - a.minutes);
+  }, [pendingTotals, customerBillingModel, customerHourlyRate, customers]);
 
   if (hourlyCustomersWithPending.length === 0) return null;
 
@@ -1358,9 +1357,12 @@ function HourlyInvoiceBar({
 
   return (
     <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
-      <div className="mb-2 text-xs font-semibold text-amber-800">לקוחות עם שעות ממתינות לחיוב</div>
+      <div className="mb-2 text-xs font-semibold text-amber-800">
+        לקוחות עם שעות ממתינות לחיוב{" "}
+        <span className="font-normal text-amber-700">(כל השעות, ללא תלות בטווח התאריכים)</span>
+      </div>
       <div className="flex flex-wrap gap-2">
-        {hourlyCustomersWithPending.map(([customerId, { name, minutes, rate }]) => {
+        {hourlyCustomersWithPending.map(({ customerId, name, minutes, rate, oldest }) => {
           const hours = Math.round((minutes / 60) * 10) / 10;
           const amount = Math.round((minutes / 60) * rate);
           return (
@@ -1371,6 +1373,9 @@ function HourlyInvoiceBar({
               <span className="text-sm font-medium text-amber-900">{name}</span>
               <span className="text-xs text-amber-700" dir="ltr">
                 {hours}h {rate > 0 ? `= ₪${amount.toLocaleString("he-IL")}` : ""}
+              </span>
+              <span className="text-[11px] text-amber-600">
+                מ-{new Date(oldest).toLocaleDateString("he-IL")}
               </span>
               <button
                 type="button"
