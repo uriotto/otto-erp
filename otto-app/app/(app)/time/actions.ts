@@ -353,6 +353,7 @@ export async function previewHourlyInvoice(
   until?: string,
 ): Promise<{ error?: string; preview?: InvoiceDraftPreview }> {
   if (!z.string().uuid().safeParse(customerId).success) return { error: "קלט לא תקין" };
+  if (until && !z.string().datetime().safeParse(until).success) return { error: "תאריך לא תקין" };
 
   const { supabase, profile } = await getTenant();
   if (!profile) return { error: "לא מחובר" };
@@ -434,6 +435,9 @@ export async function createHourlyInvoice(
 }> {
   const documentType = opts?.documentType ?? "payment_request";
   const attachDetail = opts?.attachHoursDetail ?? true;
+  if (opts?.until && !z.string().datetime().safeParse(opts.until).success) {
+    return { error: "תאריך לא תקין" };
+  }
 
   const { supabase, profile } = await getTenant();
   if (!profile) return { error: "לא מחובר" };

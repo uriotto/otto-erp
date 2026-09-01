@@ -41,6 +41,7 @@ import { InvoiceDraftDialog } from "@/components/domain/invoice-draft-dialog";
 import type { InvoiceDraftPreview } from "@/lib/hourly-invoice-draft";
 import { BulkActionBar } from "@/components/ui/bulk-action-bar";
 import { saveFilters, loadFilters } from "@/lib/persist-filters";
+import { formatDateIL, ilDayEnd, ilDayKey, ilDayStart, ilMonthRange, todayIL } from "@/lib/dates";
 
 export type TimeEntryItem = Pick<
   Tables<"time_entries">,
@@ -1261,6 +1262,9 @@ function HourlyInvoiceBar({
   const [preview, setPreview] = useState<InvoiceDraftPreview | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  // Billing cutoff: "" = every pending hour. Otherwise "yyyy-mm-dd" (Israel day),
+  // inclusive - only hours worked on or before that day are billed.
+  const [cutoff, setCutoff] = useState("");
 
   // Deliberately NOT derived from the filtered entries on screen: issuing an
   // invoice bills every pending hour, so the bar must show every pending hour.
@@ -1279,13 +1283,15 @@ function HourlyInvoiceBar({
 
   if (hourlyCustomersWithPending.length === 0) return null;
 
-  function openDraft(customerId: string, name: string) {
-    setModalCustomer({ id: customerId, name });
+  function loadPreview(customerId: string, day: string) {
     setPreview(null);
     setPreviewError(null);
     setPreviewLoading(true);
     startTransition(async () => {
-      const res = await previewHourlyInvoice(customerId);
+      const res = await previewHourlyInvoice(
+        customerId,
+        day ? ilDayEnd(day).toISOString() : undefined,
+      );
       setPreviewLoading(false);
       if (res.error || !res.preview) {
         setPreviewError(res.error ?? "שגיאה בהכנת הטיוטה");
@@ -1295,11 +1301,23 @@ function HourlyInvoiceBar({
     });
   }
 
+  function openDraft(customerId: string, name: string) {
+    setModalCustomer({ id: customerId, name });
+    setCutoff("");
+    loadPreview(customerId, "");
+  }
+
+  function changeCutoff(day: string) {
+    setCutoff(day);
+    if (modalCustomer) loadPreview(modalCustomer.id, day);
+  }
+
   function closeDraft() {
     setModalCustomer(null);
     setPreview(null);
     setPreviewError(null);
     setPreviewLoading(false);
+    setCutoff("");
   }
 
   function markSettled(customerId: string, name: string, hours: number) {
@@ -1330,6 +1348,7 @@ function HourlyInvoiceBar({
       const res = await createHourlyInvoice(customerId, {
         documentType: docType,
         attachHoursDetail: attachDetail,
+        until: cutoff ? ilDayEnd(cutoff).toISOString() : undefined,
       });
       setLoadingId(null);
       if (res.error) {
@@ -1412,6 +1431,43 @@ function HourlyInvoiceBar({
           options={
             <>
               <div>
+                <label className="text-ink-soft mb-1.5 block text-xs font-semibold">
+                  חייב שעות עד תאריך
+                </label>
+                <div className="mb-2 flex flex-wrap gap-1.5">
+                  {CUTOFF_PRESETS.map((opt) => {
+                    const value = opt.day();
+                    const active = cutoff === value;
+                    return (
+                      <button
+                        key={opt.label}
+                        type="button"
+                        onClick={() => changeCutoff(value)}
+                        className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${
+                          active
+                            ? "border-navy bg-navy text-cream-paper"
+                            : "border-ink-line text-ink-soft hover:border-navy"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <input
+                  type="date"
+                  value={cutoff}
+                  max={todayIL()}
+                  onChange={(e) => changeCutoff(e.target.value)}
+                  className="border-ink-line bg-cream-paper text-navy focus:border-navy w-full rounded-lg border px-3 py-2 text-sm outline-none"
+                />
+                <p className="text-ink-faded mt-1 text-xs">
+                  {cutoff
+                    ? `רק שעות שבוצעו עד ${formatDateIL(ilDayStart(cutoff).toISOString())} (כולל). שעות מאוחרות יותר יישארו ממתינות לחיוב.`
+                    : "כל השעות הממתינות לחיוב, ללא הגבלת תאריך."}
+                </p>
+              </div>
+              <div>
                 <label className="text-ink-soft mb-1.5 block text-xs font-semibold">סוג מסמך</label>
                 <select
                   value={docType}
@@ -1443,6 +1499,16 @@ function HourlyInvoiceBar({
     </div>
   );
 }
+
+/** Quick cutoff choices. Each returns an Israel day key ("" = no cutoff / all hours). */
+const CUTOFF_PRESETS: { label: string; day: () => string }[] = [
+  { label: "כל השעות", day: () => "" },
+  {
+    label: "עד סוף החודש שעבר",
+    day: () => ilDayKey(new Date(ilMonthRange(new Date()).start.getTime() - 1)),
+  },
+  { label: "עד אתמול", day: () => ilDayKey(new Date(ilDayStart(todayIL()).getTime() - 1)) },
+];
 
 type HourlyInvoiceDocType = "payment_request" | "tax_invoice" | "tax_invoice_receipt";
 
