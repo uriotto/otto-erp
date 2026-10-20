@@ -6,17 +6,13 @@ import { useTimerStore } from "@/lib/stores/timer";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
 import { createClient } from "@/lib/supabase/client";
-import { createTimeEntryFromTimer } from "@/app/(app)/time/actions";
-
-type ActiveTimerRow = {
-  user_id: string;
-  tenant_id: string;
-  customer_id: string | null;
-  project_id: string | null;
-  task_id: string | null;
-  notes: string | null;
-  started_at: string;
-};
+import {
+  startDesktopTimer,
+  updateDesktopTimer,
+  stopDesktopTimer,
+  cancelDesktopTimer,
+} from "@/app/desktop-timer/actions";
+import type { TimerResult } from "@/lib/desktop-timer";
 
 interface CustomerOpt {
   id: string;
@@ -50,9 +46,8 @@ export function Timer() {
   const projectId = useTimerStore((s) => s.projectId);
   const taskId = useTimerStore((s) => s.taskId);
   const notes = useTimerStore((s) => s.notes);
-  const start = useTimerStore((s) => s.start);
-  const stop = useTimerStore((s) => s.stop);
-  const updateContext = useTimerStore((s) => s.updateContext);
+  const sessionId = useTimerStore((s) => s.sessionId);
+  const revision = useTimerStore((s) => s.revision);
   const reset = useTimerStore((s) => s.reset);
   const hydrateFromDB = useTimerStore((s) => s.hydrateFromDB);
   const saveRecentRun = useTimerStore((s) => s.saveRecentRun);
@@ -70,6 +65,8 @@ export function Timer() {
   const recentRef = useRef<HTMLDivElement>(null);
 
   const toast = useToast();
+  const syncGeneration = useRef(0);
+  const mutationBusy = useRef(false);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -107,15 +104,35 @@ export function Timer() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [showRecent]);
 
-  // Hydrate active timer from DB + subscribe to changes.
-  const userIdRef = useRef<string | null>(null);
-  const tenantIdRef = useRef<string | null>(null);
-  const channelRef = useRef<ReturnType<ReturnType<typeof createClient>["channel"]> | null>(null);
-
+  // Re-read authoritative state on reconnect/focus; never clear on a failed read.
   useEffect(() => {
     let cancelled = false;
     const supabase = createClient();
-
+    let userId: string | null = null;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    const sync = async () => {
+      if (!userId || mutationBusy.current) return;
+      const request = ++syncGeneration.current;
+      const { data: row, error } = await supabase
+        .from("active_timers")
+        .select("session_id, revision, customer_id, project_id, task_id, notes, started_at")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (cancelled || error || request !== syncGeneration.current || mutationBusy.current) return;
+      if (row)
+        hydrateFromDB({
+          ctx: {
+            customerId: row.customer_id,
+            projectId: row.project_id,
+            taskId: row.task_id,
+            notes: row.notes ?? "",
+          },
+          startTime: row.started_at,
+          sessionId: row.session_id,
+          revision: row.revision,
+        });
+      else reset();
+    };
     void (async () => {
       const [c, p, t, userResult] = await Promise.all([
         supabase.from("customers").select("id, name").order("name"),
@@ -131,84 +148,34 @@ export function Timer() {
       setCustomers(c.data ?? []);
       setProjects(p.data ?? []);
       setTasks(t.data ?? []);
-
-      const user = userResult.data.user;
-      if (!user) return;
-      userIdRef.current = user.id;
-
-      const { data: profile } = await supabase
-        .from("users")
-        .select("tenant_id")
-        .eq("id", user.id)
-        .maybeSingle();
-      if (cancelled) return;
-      if (profile?.tenant_id) tenantIdRef.current = profile.tenant_id;
-
-      const { data: row } = await supabase
-        .from("active_timers")
-        .select("customer_id, project_id, task_id, notes, started_at")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (cancelled) return;
-
-      if (row) {
-        hydrateFromDB({
-          ctx: {
-            customerId: row.customer_id,
-            projectId: row.project_id,
-            taskId: row.task_id,
-            notes: row.notes ?? "",
-          },
-          startTime: row.started_at,
-        });
-      } else if (useTimerStore.getState().isRunning) {
-        // localStorage thinks a timer is running but the DB disagrees - resync.
-        reset();
-      }
-
-      // Ensure no stale channel with this name exists before subscribing
-      const channelName = `active_timer:${user.id}`;
-      const stale = supabase.getChannels().find((ch) => ch.topic === `realtime:${channelName}`);
-      if (stale) await supabase.removeChannel(stale);
-      if (cancelled) return;
-
-      const channel = supabase
-        .channel(channelName)
+      userId = userResult.data.user?.id ?? null;
+      if (!userId) return;
+      channel = supabase
+        .channel(`active_timer:${userId}`)
         .on(
           "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "active_timers",
-            filter: `user_id=eq.${user.id}`,
-          },
-          (payload) => {
-            if (payload.eventType === "DELETE") {
-              if (useTimerStore.getState().isRunning) reset();
-              return;
-            }
-            const next = payload.new as ActiveTimerRow;
-            hydrateFromDB({
-              ctx: {
-                customerId: next.customer_id,
-                projectId: next.project_id,
-                taskId: next.task_id,
-                notes: next.notes ?? "",
-              },
-              startTime: next.started_at,
-            });
+          { event: "*", schema: "public", table: "active_timers", filter: `user_id=eq.${userId}` },
+          () => {
+            void sync();
           },
         )
-        .subscribe();
-      channelRef.current = channel;
+        .subscribe(() => {
+          void sync();
+        });
+      await sync();
     })();
-
+    const focus = () => {
+      void sync();
+    };
+    const interval = setInterval(focus, 30000);
+    window.addEventListener("focus", focus);
+    window.addEventListener("online", focus);
     return () => {
       cancelled = true;
-      if (channelRef.current) {
-        void supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
+      clearInterval(interval);
+      window.removeEventListener("focus", focus);
+      window.removeEventListener("online", focus);
+      if (channel) void supabase.removeChannel(channel);
     };
   }, [hydrateFromDB, reset]);
 
@@ -220,103 +187,83 @@ export function Timer() {
   const overWarning = isRunning && elapsed > FOUR_HOURS_MS;
   const customerName = customerId ? customers.find((c) => c.id === customerId)?.name : null;
 
-  const upsertActiveTimer = async (
-    ctx: {
-      customerId: string | null;
-      projectId: string | null;
-      taskId: string | null;
-      notes: string;
-    },
-    startedAt: string,
-  ) => {
-    const userId = userIdRef.current;
-    const tenantId = tenantIdRef.current;
-    if (!userId || !tenantId) return;
-    const supabase = createClient();
-    await supabase.from("active_timers").upsert(
-      {
-        user_id: userId,
-        tenant_id: tenantId,
-        customer_id: ctx.customerId,
-        project_id: ctx.projectId,
-        task_id: ctx.taskId,
-        notes: ctx.notes || null,
-        started_at: startedAt,
-        source: "web",
-      },
-      { onConflict: "user_id" },
-    );
+  const applyResult = (result: TimerResult) => {
+    if (result.error) {
+      toast.error(result.error);
+      return false;
+    }
+    if (!result.snapshot) return false;
+    const active = result.snapshot.active;
+    if (active)
+      hydrateFromDB({
+        ctx: {
+          customerId: active.customer_id,
+          projectId: active.project_id,
+          taskId: active.task_id,
+          notes: active.notes ?? "",
+        },
+        startTime: active.started_at,
+        sessionId: active.session_id,
+        revision: active.revision,
+      });
+    else reset();
+    return true;
   };
 
-  const deleteActiveTimer = async () => {
-    const userId = userIdRef.current;
-    if (!userId) return;
-    const supabase = createClient();
-    await supabase.from("active_timers").delete().eq("user_id", userId);
+  const mutate = async (action: () => Promise<TimerResult>) => {
+    if (mutationBusy.current) return false;
+    mutationBusy.current = true;
+    syncGeneration.current += 1;
+    setStopping(true);
+    try {
+      return applyResult(await action());
+    } catch {
+      toast.error("החיבור נותק. רענן את המצב לפני ניסיון נוסף.");
+      return false;
+    } finally {
+      mutationBusy.current = false;
+      setStopping(false);
+    }
   };
 
-  const handleStartNow = () => {
-    const startedAt = new Date().toISOString();
-    const ctx = { customerId: null, projectId: null, taskId: null, notes: "" };
-    start(ctx);
-    void upsertActiveTimer(ctx, startedAt);
-    setShowAssign(true);
-    setShowRecent(false);
+  const handleStartNow = async () => {
+    if (await mutate(() => startDesktopTimer({ customer_id: null, notes: "" }))) {
+      setShowAssign(true);
+      setShowRecent(false);
+    }
   };
 
-  const handleLoadRecent = (run: (typeof recentRuns)[0]) => {
-    const startedAt = new Date().toISOString();
-    const ctx = {
-      customerId: run.customerId,
-      projectId: run.projectId,
-      taskId: run.taskId,
-      notes: run.notes ?? "",
-    };
-    start(ctx);
-    void upsertActiveTimer(ctx, startedAt);
-    setShowRecent(false);
+  const handleLoadRecent = async (run: (typeof recentRuns)[0]) => {
+    if (
+      await mutate(() =>
+        startDesktopTimer({
+          customer_id: run.customerId,
+          project_id: run.projectId,
+          task_id: run.taskId,
+          notes: run.notes ?? "",
+        }),
+      )
+    )
+      setShowRecent(false);
   };
 
   const handleStop = async () => {
-    setShowAssign(false);
-    setStopping(true);
-    const snapshot = stop();
-    void deleteActiveTimer();
-    if (!snapshot) {
-      setStopping(false);
+    if (!sessionId || !revision) {
+      toast.error("יש לרענן את הטיימר לפני עצירה");
       return;
     }
-    const res = await createTimeEntryFromTimer({
-      customer_id: snapshot.ctx.customerId,
-      project_id: snapshot.ctx.projectId,
-      task_id: snapshot.ctx.taskId,
-      start_time: snapshot.startTime,
-      end_time: snapshot.endTime,
-      notes: snapshot.ctx.notes || null,
-      billable: true,
-    });
-    setStopping(false);
-    if (res.error) {
-      toast.error(res.error);
-      return;
-    }
-    saveRecentRun({
-      customerId: snapshot.ctx.customerId,
-      projectId: snapshot.ctx.projectId,
-      taskId: snapshot.ctx.taskId,
-      notes: snapshot.ctx.notes,
-      customerName: customers.find((c) => c.id === snapshot.ctx.customerId)?.name ?? null,
-      projectName: projects.find((p) => p.id === snapshot.ctx.projectId)?.name ?? null,
-      taskName: tasks.find((t) => t.id === snapshot.ctx.taskId)?.title ?? null,
-    });
-
-    if (!snapshot.ctx.customerId) {
-      toast.show(
-        `נשמרו ${res.durationMinutes ?? 0} דקות ללא שיוך ללקוח. שייך מתוך מסך השעות.`,
-        "info",
-      );
-    } else {
-      toast.success(`נשמרו ${res.durationMinutes ?? 0} דקות`);
+    if (await mutate(() => stopDesktopTimer({ session_id: sessionId, revision }))) {
+      setShowAssign(false);
+      saveRecentRun({
+        customerId,
+        projectId,
+        taskId,
+        notes,
+        customerName: customers.find((c) => c.id === customerId)?.name ?? null,
+        projectName: projects.find((p) => p.id === projectId)?.name ?? null,
+        taskName: tasks.find((t) => t.id === taskId)?.title ?? null,
+      });
+      toast.success("הדיווח נשמר");
     }
   };
 
@@ -373,8 +320,8 @@ export function Timer() {
           type="button"
           onClick={() => {
             if (confirm("לבטל את הטיימר ללא שמירה?")) {
-              reset();
-              void deleteActiveTimer();
+              if (sessionId && revision)
+                void mutate(() => cancelDesktopTimer({ session_id: sessionId, revision }));
             }
           }}
           disabled={stopping}
@@ -394,10 +341,22 @@ export function Timer() {
             currentProjectId={projectId}
             currentTaskId={taskId}
             currentNotes={notes}
-            onAssign={(ctx) => {
-              updateContext(ctx);
-              if (startTime) void upsertActiveTimer(ctx, startTime);
-              setShowAssign(false);
+            onAssign={async (ctx) => {
+              if (!sessionId || !revision || !startTime) return;
+              if (
+                await mutate(() =>
+                  updateDesktopTimer({
+                    session_id: sessionId,
+                    revision,
+                    customer_id: ctx.customerId,
+                    project_id: ctx.projectId,
+                    task_id: ctx.taskId,
+                    notes: ctx.notes,
+                    started_at: startTime,
+                  }),
+                )
+              )
+                setShowAssign(false);
             }}
             onClose={() => setShowAssign(false)}
           />
@@ -411,6 +370,7 @@ export function Timer() {
       <button
         type="button"
         onClick={handleStartNow}
+        disabled={stopping}
         className="bg-cream-paper border-ink-line text-ink-soft hover:border-navy hover:text-navy flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium transition-colors"
         aria-label="התחל טיימר"
       >
@@ -448,6 +408,7 @@ export function Timer() {
                     key={run.id}
                     type="button"
                     onClick={() => handleLoadRecent(run)}
+                    disabled={stopping}
                     className="hover:bg-cream-deep flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-start text-sm transition-colors"
                   >
                     <RotateCcw size={12} className="text-ink-faded shrink-0" />
@@ -542,7 +503,7 @@ function TimerAssignPopup({
           className={selectCls}
           autoFocus
         >
-          <option value="">לקוח —</option>
+          <option value="">לקוח -</option>
           {customers.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
@@ -559,7 +520,7 @@ function TimerAssignPopup({
           className={selectCls}
           disabled={!customerId || filteredProjects.length === 0}
         >
-          <option value="">פרויקט —</option>
+          <option value="">פרויקט -</option>
           {filteredProjects.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
@@ -573,7 +534,7 @@ function TimerAssignPopup({
           className={selectCls}
           disabled={!projectId || filteredTasks.length === 0}
         >
-          <option value="">משימה —</option>
+          <option value="">משימה -</option>
           {filteredTasks.map((t) => (
             <option key={t.id} value={t.id}>
               {t.title}

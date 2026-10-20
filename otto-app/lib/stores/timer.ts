@@ -23,6 +23,8 @@ export interface RecentRun {
 }
 
 export interface TimerState extends TimerContext {
+  sessionId: string | null;
+  revision: number | null;
   isRunning: boolean;
   startTime: string | null; // ISO
   recentRuns: RecentRun[];
@@ -32,7 +34,12 @@ export interface TimerState extends TimerContext {
   saveRecentRun: (run: Omit<RecentRun, "id" | "stoppedAt">) => void;
   loadRecentRun: (run: RecentRun) => void;
   reset: () => void;
-  hydrateFromDB: (input: { ctx: TimerContext; startTime: string }) => void;
+  hydrateFromDB: (input: {
+    ctx: TimerContext;
+    startTime: string;
+    sessionId: string;
+    revision: number;
+  }) => void;
 }
 
 const initialCtx: TimerContext = {
@@ -46,6 +53,8 @@ export const useTimerStore = create<TimerState>()(
   persist(
     (set, get) => ({
       ...initialCtx,
+      sessionId: null,
+      revision: null,
       isRunning: false,
       startTime: null,
       recentRuns: [],
@@ -93,10 +102,13 @@ export const useTimerStore = create<TimerState>()(
           taskId: run.taskId,
           notes: run.notes,
         }),
-      reset: () => set({ isRunning: false, startTime: null, ...initialCtx }),
-      hydrateFromDB: ({ ctx, startTime }) =>
+      reset: () =>
+        set({ sessionId: null, revision: null, isRunning: false, startTime: null, ...initialCtx }),
+      hydrateFromDB: ({ ctx, startTime, sessionId, revision }) =>
         set({
           ...ctx,
+          sessionId,
+          revision,
           isRunning: true,
           startTime,
         }),

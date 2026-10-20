@@ -10,6 +10,8 @@ export type Database = {
     Tables: {
       active_timers: {
         Row: {
+          session_id: string;
+          revision: number;
           created_at: string;
           customer_id: string | null;
           notes: string | null;
@@ -21,6 +23,8 @@ export type Database = {
           user_id: string;
         };
         Insert: {
+          session_id?: string;
+          revision?: number;
           created_at?: string;
           customer_id?: string | null;
           notes?: string | null;
@@ -32,6 +36,8 @@ export type Database = {
           user_id: string;
         };
         Update: {
+          session_id?: string;
+          revision?: number;
           created_at?: string;
           customer_id?: string | null;
           notes?: string | null;
@@ -2535,6 +2541,12 @@ export type Database = {
       };
     };
     Functions: {
+      bot_timer: {
+        Args: { p_user: string; p_tenant: string; p_operation: string; p_input?: Json };
+        Returns: Json;
+      };
+      desktop_timer_history: { Args: { p_cursor?: Json }; Returns: Json };
+      desktop_timer: { Args: { p_operation: string; p_input?: Json }; Returns: Json };
       allocate_time_entry_to_bank: {
         Args: { p_entry_id: string };
         Returns: {
