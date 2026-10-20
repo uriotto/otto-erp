@@ -1,52 +1,46 @@
+import { z } from "zod";
 import { guardBotRequest } from "@/lib/bot-auth";
 import { createServiceClient } from "@/lib/supabase/service";
-import { createTimeEntryFromTimerForUser } from "@/lib/time-entries";
 
 export async function POST(request: Request) {
   const guard = await guardBotRequest(request);
   if (!guard.ok) return guard.response;
-  const auth = guard.auth;
-
   const supabase = createServiceClient();
-
-  const { data: timer, error: readError } = await supabase
-    .from("active_timers")
-    .select("customer_id, project_id, task_id, notes, started_at")
-    .eq("user_id", auth.userId)
-    .eq("tenant_id", auth.tenantId)
-    .maybeSingle();
-
-  if (readError) {
-    return Response.json({ error: "internal error" }, { status: 500 });
+  const body = await request.text();
+  let input: { session_id: string; revision: number };
+  if (body.trim()) {
+    let parsed;
+    try {
+      parsed = z
+        .object({ session_id: z.string().uuid(), revision: z.number().int().positive() })
+        .safeParse(JSON.parse(body));
+    } catch {
+      return Response.json({ error: "invalid body" }, { status: 400 });
+    }
+    if (!parsed.success) return Response.json({ error: "invalid body" }, { status: 400 });
+    input = parsed.data;
+  } else {
+    const { data: timer, error } = await supabase
+      .from("active_timers")
+      .select("session_id, revision")
+      .eq("user_id", guard.auth.userId)
+      .eq("tenant_id", guard.auth.tenantId)
+      .maybeSingle();
+    if (error) return Response.json({ error: "internal error" }, { status: 500 });
+    if (!timer) return Response.json({ error: "no active timer" }, { status: 404 });
+    input = timer;
   }
-  if (!timer) {
-    return Response.json({ error: "no active timer" }, { status: 404 });
-  }
-
-  const endTime = new Date().toISOString();
-  const result = await createTimeEntryFromTimerForUser(supabase, auth.userId, auth.tenantId, {
-    customer_id: timer.customer_id,
-    project_id: timer.project_id,
-    task_id: timer.task_id,
-    notes: timer.notes,
-    start_time: timer.started_at,
-    end_time: endTime,
-    billable: true,
+  const { data, error } = await supabase.rpc("bot_timer", {
+    p_user: guard.auth.userId,
+    p_tenant: guard.auth.tenantId,
+    p_operation: "stop",
+    p_input: input,
   });
-
-  if (result.error) {
-    return Response.json({ error: result.error }, { status: 500 });
-  }
-
-  await supabase
-    .from("active_timers")
-    .delete()
-    .eq("user_id", auth.userId)
-    .eq("tenant_id", auth.tenantId);
-
-  return Response.json({
-    stopped: true,
-    entry_id: result.entryId,
-    duration_minutes: result.durationMinutes,
-  });
+  if (error)
+    return Response.json(
+      { error: "timer changed or stop failed; refresh before retrying" },
+      { status: 409 },
+    );
+  const result = data as { operation_result: { entry_id: string; duration_minutes: number } };
+  return Response.json({ stopped: true, ...result.operation_result });
 }

@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("active_timers")
-    .select("customer_id, started_at, notes")
+    .select("session_id, revision, customer_id, started_at, notes")
     .eq("user_id", auth.userId)
     .eq("tenant_id", auth.tenantId)
     .maybeSingle();
@@ -46,6 +46,8 @@ export async function GET(request: Request) {
 
   return Response.json({
     active: true,
+    session_id: data.session_id,
+    revision: data.revision,
     customer_id: data.customer_id,
     customer_name,
     started_at: data.started_at,
@@ -55,7 +57,7 @@ export async function GET(request: Request) {
 }
 
 const PatchSchema = z.object({
-  notes: z.string().min(1),
+  notes: z.string().min(1).max(4000),
   append_mode: z.boolean().optional(),
 });
 
@@ -79,7 +81,7 @@ export async function PATCH(request: Request) {
   const supabase = createServiceClient();
   const { data: existing, error: readError } = await supabase
     .from("active_timers")
-    .select("notes")
+    .select("session_id, revision, notes")
     .eq("user_id", auth.userId)
     .eq("tenant_id", auth.tenantId)
     .maybeSingle();
@@ -94,11 +96,12 @@ export async function PATCH(request: Request) {
   const nextNotes =
     appendMode && existing.notes ? `${existing.notes}\n${parsed.data.notes}` : parsed.data.notes;
 
-  const { error: updateError } = await supabase
-    .from("active_timers")
-    .update({ notes: nextNotes })
-    .eq("user_id", auth.userId)
-    .eq("tenant_id", auth.tenantId);
+  const { error: updateError } = await supabase.rpc("bot_timer", {
+    p_user: auth.userId,
+    p_tenant: auth.tenantId,
+    p_operation: "update",
+    p_input: { session_id: existing.session_id, revision: existing.revision, notes: nextNotes },
+  });
 
   if (updateError) {
     return Response.json({ error: "internal error" }, { status: 500 });

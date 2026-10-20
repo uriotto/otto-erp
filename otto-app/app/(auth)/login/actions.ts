@@ -31,7 +31,7 @@ export async function signInWithEmail(
   const { error } = await supabase.auth.signInWithOtp({
     email: parsed.data.email,
     options: {
-      emailRedirectTo: `${origin}/auth/callback?next=/dashboard`,
+      emailRedirectTo: `${origin}/auth/callback?next=${formData.get("next") === "/desktop-timer" ? "/desktop-timer" : "/dashboard"}`,
     },
   });
 

@@ -1,89 +1,58 @@
 import { z } from "zod";
-
 import { guardBotRequest } from "@/lib/bot-auth";
 import { createServiceClient } from "@/lib/supabase/service";
-import { createTimeEntryFromTimerForUser } from "@/lib/time-entries";
+import type { TimerSnapshot } from "@/lib/desktop-timer";
 
 const StartSchema = z.object({
+  request_id: z.string().uuid().optional(),
   customer_id: z.string().uuid().nullish(),
   project_id: z.string().uuid().nullish(),
   task_id: z.string().uuid().nullish(),
-  notes: z.string().nullish(),
+  notes: z.string().max(4000).nullish(),
   source: z.enum(["telegram", "api"]).optional(),
 });
 
 export async function POST(request: Request) {
   const guard = await guardBotRequest(request);
   if (!guard.ok) return guard.response;
-  const auth = guard.auth;
-
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    body = {};
-  }
-  const parsed = StartSchema.safeParse(body);
-  if (!parsed.success) {
     return Response.json({ error: "invalid body" }, { status: 400 });
   }
-
-  const supabase = createServiceClient();
-
-  // Stop any existing timer first so we never silently overwrite a running session.
-  const { data: existing, error: readError } = await supabase
-    .from("active_timers")
-    .select("customer_id, project_id, task_id, notes, started_at")
-    .eq("user_id", auth.userId)
-    .eq("tenant_id", auth.tenantId)
-    .maybeSingle();
-
-  if (readError) {
-    return Response.json({ error: "internal error" }, { status: 500 });
-  }
-
-  let stoppedPrevious: { entry_id: string; duration_minutes: number } | undefined;
-  if (existing) {
-    const stopResult = await createTimeEntryFromTimerForUser(supabase, auth.userId, auth.tenantId, {
-      customer_id: existing.customer_id,
-      project_id: existing.project_id,
-      task_id: existing.task_id,
-      notes: existing.notes,
-      start_time: existing.started_at,
-      end_time: new Date().toISOString(),
-      billable: true,
-    });
-    if (stopResult.error) {
-      return Response.json({ error: stopResult.error }, { status: 500 });
-    }
-    stoppedPrevious = {
-      entry_id: stopResult.entryId!,
-      duration_minutes: stopResult.durationMinutes!,
-    };
-  }
-
-  const startedAt = new Date().toISOString();
-  const { error } = await supabase.from("active_timers").upsert(
-    {
-      user_id: auth.userId,
-      tenant_id: auth.tenantId,
-      customer_id: parsed.data.customer_id ?? null,
-      project_id: parsed.data.project_id ?? null,
-      task_id: parsed.data.task_id ?? null,
-      notes: parsed.data.notes ?? null,
-      started_at: startedAt,
-      source: parsed.data.source ?? "telegram",
-    },
-    { onConflict: "user_id" },
-  );
-
-  if (error) {
-    return Response.json({ error: "internal error" }, { status: 500 });
-  }
-
+  const parsed = StartSchema.safeParse(body);
+  if (!parsed.success) return Response.json({ error: "invalid body" }, { status: 400 });
+  const { data, error } = await createServiceClient().rpc("bot_timer", {
+    p_user: guard.auth.userId,
+    p_tenant: guard.auth.tenantId,
+    // Legacy callers cannot safely auto-stop after an uncertain response.
+    p_operation: parsed.data.request_id ? "restart" : "start",
+    p_input: { ...parsed.data, source: parsed.data.source ?? "telegram" },
+  });
+  if (error)
+    return Response.json(
+      {
+        error:
+          error.message === "REQUEST_CONFLICT"
+            ? "This request_id was already used with different timer details."
+            : error.message === "TIMER_ACTIVE"
+              ? "A timer is already active. Stop it before starting another."
+              : "timer operation failed",
+      },
+      { status: ["TIMER_ACTIVE", "REQUEST_CONFLICT"].includes(error.message) ? 409 : 400 },
+    );
+  const snapshot = data as unknown as TimerSnapshot & {
+    started_result: { session_id: string; revision: number; started_at: string };
+    replayed?: boolean;
+    stopped_previous?: { entry_id: string; duration_minutes: number } | null;
+  };
   return Response.json({
     started: true,
-    started_at: startedAt,
-    ...(stoppedPrevious ? { stopped_previous: stoppedPrevious } : {}),
+    replayed: snapshot.replayed ?? false,
+    ...(snapshot.stopped_previous ? { stopped_previous: snapshot.stopped_previous } : {}),
+    started_at: snapshot.started_result.started_at,
+    session_id: snapshot.started_result.session_id,
+    revision: snapshot.started_result.revision,
   });
 }
