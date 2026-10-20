@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/server";
 import { BreadcrumbLabel } from "@/components/layout/breadcrumb-label";
 import { HourBankProgress } from "@/components/domain/hour-bank-progress";
 import { HourBankActionsBar } from "./hour-bank-actions-bar";
+import { BankHoursPanel, type BankHourEntry } from "./bank-hours-panel";
 
 export const metadata = { title: "בנק שעות — OTTO" };
 
@@ -79,6 +80,36 @@ export default async function HourBankPage({ params }: { params: Promise<{ id: s
     .select("id, number, status, type, issue_date, total_amount, finbot_url")
     .eq("hour_bank_id", id)
     .order("issue_date", { ascending: false });
+
+  const bankEntries: BankHourEntry[] = [];
+  let hoursLoadFailed = false;
+  // Fetch every linked entry, including work transferred from an earlier period.
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase
+      .from("time_entries")
+      .select("id, start_time, duration_minutes, notes, projects(name), tasks(title)")
+      .eq("consumed_from_bank_id", id)
+      .eq("billing_status", "allocated_to_bank")
+      .order("start_time", { ascending: true })
+      .order("id", { ascending: true })
+      .range(offset, offset + pageSize - 1);
+    if (error) {
+      hoursLoadFailed = true;
+      break;
+    }
+    bankEntries.push(
+      ...(data ?? []).map((entry) => ({
+        id: entry.id,
+        startTime: entry.start_time,
+        minutes: entry.duration_minutes ?? 0,
+        description: entry.notes ?? "",
+        project: entry.projects?.name ?? "",
+        task: entry.tasks?.title ?? "",
+      })),
+    );
+    if (!data || data.length < pageSize) break;
+  }
 
   const purchased = bank.purchased_hours == null ? 0 : Number(bank.purchased_hours);
   const consumed = bank.consumed_hours == null ? 0 : Number(bank.consumed_hours);
@@ -195,6 +226,14 @@ export default async function HourBankPage({ params }: { params: Promise<{ id: s
           }}
         />
       </div>
+
+      <BankHoursPanel
+        entries={hoursLoadFailed ? [] : bankEntries}
+        loadFailed={hoursLoadFailed}
+        customerName={customer?.name ?? ""}
+        bankId={bank.id}
+        purchaseDate={bank.purchase_date}
+      />
 
       <div className="bg-cream-paper border-ink-line mt-4 rounded-2xl border p-6">
         <div className="mb-4 flex items-center justify-between">
