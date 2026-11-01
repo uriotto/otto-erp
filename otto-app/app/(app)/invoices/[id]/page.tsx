@@ -193,6 +193,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             document_type: invoice.document_type,
             balance,
             total,
+            customerPhone: customer?.phone ?? null,
           }}
         />
       </div>

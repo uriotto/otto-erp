@@ -2,7 +2,16 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Send, Pencil, Wallet, Ban, Trash2, FileOutput, RefreshCw } from "lucide-react";
+import {
+  Send,
+  Pencil,
+  Wallet,
+  Ban,
+  Trash2,
+  FileOutput,
+  RefreshCw,
+  MessageCircle,
+} from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { Spinner } from "@/components/ui/spinner";
 import {
@@ -11,6 +20,7 @@ import {
   markInvoiceSent,
   retryFinbotDocument,
   reissueFinbotDocument,
+  sendInvoiceViaWhatsApp,
 } from "../actions";
 import { EditInvoiceDialog } from "./edit-invoice-dialog";
 import { PaymentDialog } from "./payment-dialog";
@@ -28,6 +38,7 @@ export type EditableInvoice = {
   document_type: string | null;
   balance: number;
   total: number;
+  customerPhone: string | null;
 };
 
 export function InvoiceActionsBar({ invoice }: { invoice: EditableInvoice }) {
@@ -123,6 +134,20 @@ export function InvoiceActionsBar({ invoice }: { invoice: EditableInvoice }) {
     });
   }
 
+  const canWhatsApp = Boolean(invoice.finbot_url && invoice.customerPhone);
+
+  function handleWhatsApp() {
+    if (!confirm("לשלוח את קישור המסמך ללקוח בוואטסאפ?")) return;
+    startTransition(async () => {
+      const result = await sendInvoiceViaWhatsApp(invoice.id);
+      if (!result.ok) {
+        toast.error(result.error);
+      } else {
+        toast.success("קישור נשלח בוואטסאפ");
+      }
+    });
+  }
+
   if (isFinalized && !showEdit && !showPayment) {
     return null;
   }
@@ -150,6 +175,17 @@ export function InvoiceActionsBar({ invoice }: { invoice: EditableInvoice }) {
           >
             {pending ? <Spinner size={12} /> : <FileOutput size={14} />}
             הפק בפינבוט
+          </button>
+        )}
+        {canWhatsApp && (
+          <button
+            type="button"
+            onClick={handleWhatsApp}
+            disabled={pending}
+            className="flex items-center gap-1.5 rounded-lg border border-green-300 bg-green-50 px-3 py-2 text-sm font-medium text-green-800 transition-colors hover:bg-green-100 disabled:opacity-50"
+          >
+            {pending ? <Spinner size={12} /> : <MessageCircle size={14} />}
+            שלח בוואטסאפ
           </button>
         )}
         {canReissueFinbot && (

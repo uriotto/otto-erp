@@ -236,6 +236,7 @@ export async function issueDocumentForInvoice(
       200,
     ),
     ...(invoice.notes ? { remark: invoice.notes.slice(0, 1500) } : {}),
+    ...(customer.email ? { email: { to: customer.email } } : {}),
     customer: customerPayload(customer),
     items: items.map((it) => ({
       name: (it.description || "שירות").slice(0, 100),
@@ -308,6 +309,7 @@ export async function issueReceiptForPayment(
     vatType: true,
     rounding: false,
     description: label.slice(0, 200),
+    ...(customer.email ? { email: { to: customer.email } } : {}),
     customer: customerPayload(customer),
     items: [{ name: label.slice(0, 100), amount: 1, price: net }],
     payments: [
