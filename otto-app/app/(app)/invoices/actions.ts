@@ -575,3 +575,36 @@ export async function bulkUpdateInvoiceStatus(
   revalidatePath("/invoices");
   return { updated: count ?? ids.length };
 }
+
+export async function sendInvoiceViaWhatsApp(invoiceId: string): Promise<InvoiceActionResult> {
+  const { supabase, profile } = await getTenant();
+  if (!profile) return { ok: false, error: "לא מחובר" };
+
+  const { data: invoice } = await supabase
+    .from("invoices")
+    .select("id, number, finbot_url, customer_id")
+    .eq("id", invoiceId)
+    .eq("tenant_id", profile.tenant_id)
+    .maybeSingle();
+
+  if (!invoice) return { ok: false, error: "חשבונית לא נמצאה" };
+  if (!invoice.finbot_url) return { ok: false, error: "אין קישור מסמך לשלוח - הפק קודם בפינבוט" };
+
+  const { data: customer } = await supabase
+    .from("customers")
+    .select("name, phone")
+    .eq("id", invoice.customer_id as string)
+    .eq("tenant_id", profile.tenant_id)
+    .maybeSingle();
+
+  if (!customer?.phone) return { ok: false, error: "ללקוח אין מספר טלפון" };
+
+  const label = invoice.number ? `מסמך ${invoice.number}` : "מסמך";
+  const message = `שלום,\nמצ"ב ${label}:\n${invoice.finbot_url}`;
+
+  const { sendWhatsAppMessage } = await import("@/lib/green-api");
+  const result = await sendWhatsAppMessage(customer.phone, message);
+  if (!result.ok) return { ok: false, error: result.error ?? "שגיאה בשליחת WhatsApp" };
+
+  return { ok: true, id: invoiceId };
+}
