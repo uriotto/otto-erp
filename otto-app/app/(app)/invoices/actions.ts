@@ -582,7 +582,7 @@ export async function sendInvoiceViaWhatsApp(invoiceId: string): Promise<Invoice
 
   const { data: invoice } = await supabase
     .from("invoices")
-    .select("id, number, finbot_url, customer_id")
+    .select("id, number, finbot_url, customer_id, document_type")
     .eq("id", invoiceId)
     .eq("tenant_id", profile.tenant_id)
     .maybeSingle();
@@ -599,8 +599,17 @@ export async function sendInvoiceViaWhatsApp(invoiceId: string): Promise<Invoice
 
   if (!customer?.phone) return { ok: false, error: "ללקוח אין מספר טלפון" };
 
-  const label = invoice.number ? `מסמך ${invoice.number}` : "מסמך";
-  const message = `שלום,\nמצ"ב ${label}:\n${invoice.finbot_url}`;
+  const DOC_TYPE_LABELS: Record<string, string> = {
+    payment_request: "דרישת תשלום",
+    tax_invoice: "חשבונית מס",
+    tax_invoice_receipt: "חשבונית מס קבלה",
+    receipt: "קבלה",
+  };
+  const docLabel = invoice.document_type
+    ? (DOC_TYPE_LABELS[invoice.document_type] ?? "מסמך")
+    : "מסמך";
+  const numberLine = invoice.number ? `\n${docLabel} מספר ${invoice.number}` : "";
+  const message = `שלום ${customer.name} 👋\nקיבלת ${docLabel} מאת אורי פולק.${numberLine}\n\n*לצפייה ולהורדה:*\n${invoice.finbot_url}`;
 
   const { sendWhatsAppMessage } = await import("@/lib/green-api");
   const result = await sendWhatsAppMessage(customer.phone, message);
